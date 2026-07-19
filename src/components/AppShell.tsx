@@ -37,22 +37,30 @@ export const AppShell: React.FC<AppShellProps> = ({
   team,
   onLogout,
 }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Desktop state: visible by default (isSidebarCollapsed = false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Mobile state: hidden by default (isMobileOpen = false)
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const handleNavClick = (tab: string) => {
     setActiveTab(tab);
-    setIsSidebarOpen(false);
+    setIsMobileOpen(false);
+  };
+
+  const handleDrawerToggle = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+    setIsMobileOpen(!isMobileOpen);
   };
 
   return (
     <div className="app-layout">
-      {/* Sidebar Overlay Backdrop */}
-      {isSidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {isMobileOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsMobileOpen(false)} />
       )}
 
-      {/* Sidebar - Drawer Layout */}
-      <aside className={`app-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+      {/* Sidebar - Collapsible & Slide-over Drawer */}
+      <aside className={`app-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo-container">
             <div className="sidebar-logo">
@@ -64,13 +72,16 @@ export const AppShell: React.FC<AppShellProps> = ({
             </div>
           </div>
           
-          {/* Close Sidebar Drawer Button */}
+          {/* Close Sidebar Drawer Button (Toggles Collapse / Close) */}
           <button 
             type="button"
             className="btn btn-secondary btn-icon-only" 
-            onClick={() => setIsSidebarOpen(false)}
+            onClick={() => {
+              setIsSidebarCollapsed(true);
+              setIsMobileOpen(false);
+            }}
             style={{ border: 'none', padding: '6px' }}
-            title="Close Menu"
+            title="Collapse Menu"
           >
             <X size={16} />
           </button>
@@ -125,7 +136,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             className="nav-item"
             onClick={() => {
               onLogout();
-              setIsSidebarOpen(false);
+              setIsMobileOpen(false);
             }}
             style={{ 
               color: '#dc2626', 
@@ -162,13 +173,13 @@ export const AppShell: React.FC<AppShellProps> = ({
       <div className="app-main">
         <header className="app-header">
           <div className="header-title-section">
-            {/* Hamburger Burger Menu Button */}
+            {/* Hamburger Burger Menu Button - Toggles sidebar collapse */}
             <button 
               type="button"
               className="btn btn-secondary btn-icon-only" 
-              onClick={() => setIsSidebarOpen(true)}
+              onClick={handleDrawerToggle}
               style={{ border: 'none', padding: '8px', marginRight: '12px' }}
-              title="Open Menu"
+              title="Toggle Menu"
             >
               <Menu size={20} style={{ display: 'block' }} />
             </button>
@@ -176,6 +187,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             <h2 className="header-title">
               {activeTab === 'dashboard' && 'Dashboard Analytics'}
               {activeTab === 'board' && 'Content Kanban Board'}
+              {activeTab === 'calendar' && 'Content Calendar Planner'}
               {activeTab === 'list' && 'Content Schedule List'}
               {activeTab === 'settings' && 'Settings Center'}
             </h2>
