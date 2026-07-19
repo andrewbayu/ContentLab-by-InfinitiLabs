@@ -1,6 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { TeamMember } from '../services/sheets';
-import { LayoutDashboard, Kanban, ListTodo, Settings, Plus, Layers, User, LogOut } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Kanban, 
+  ListTodo, 
+  Settings, 
+  Plus, 
+  Layers, 
+  User, 
+  LogOut, 
+  Menu, 
+  X 
+} from 'lucide-react';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -25,24 +36,49 @@ export const AppShell: React.FC<AppShellProps> = ({
   team,
   onLogout,
 }) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleNavClick = (tab: string) => {
+    setActiveTab(tab);
+    setIsSidebarOpen(false);
+  };
+
   return (
     <div className="app-layout">
-      {/* Sidebar - Desktop Layout */}
-      <aside className="app-sidebar">
+      {/* Sidebar Overlay Backdrop */}
+      {isSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar - Drawer Layout */}
+      <aside className={`app-sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <Layers size={18} />
+          <div className="sidebar-logo-container">
+            <div className="sidebar-logo">
+              <Layers size={18} />
+            </div>
+            <div className="sidebar-brand">
+              <span className="brand-name">ContentLab</span>
+              <span className="brand-tag">Studio Planner</span>
+            </div>
           </div>
-          <div className="sidebar-brand">
-            <span className="brand-name">ContentLab</span>
-            <span className="brand-tag">Studio Planner</span>
-          </div>
+          
+          {/* Close Sidebar Drawer Button */}
+          <button 
+            type="button"
+            className="btn btn-secondary btn-icon-only" 
+            onClick={() => setIsSidebarOpen(false)}
+            style={{ border: 'none', padding: '6px' }}
+            title="Close Menu"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">
           <button
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => handleNavClick('dashboard')}
           >
             <LayoutDashboard className="nav-item-icon" />
             Dashboard
@@ -50,7 +86,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           
           <button
             className={`nav-item ${activeTab === 'board' ? 'active' : ''}`}
-            onClick={() => setActiveTab('board')}
+            onClick={() => handleNavClick('board')}
           >
             <Kanban className="nav-item-icon" />
             Kanban Board
@@ -58,7 +94,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           <button
             className={`nav-item ${activeTab === 'list' ? 'active' : ''}`}
-            onClick={() => setActiveTab('list')}
+            onClick={() => handleNavClick('list')}
           >
             <ListTodo className="nav-item-icon" />
             Content List
@@ -66,7 +102,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           <button
             className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleNavClick('settings')}
           >
             <Settings className="nav-item-icon" />
             Settings Manager
@@ -78,7 +114,10 @@ export const AppShell: React.FC<AppShellProps> = ({
           {/* Sign Out Button */}
           <button
             className="nav-item"
-            onClick={onLogout}
+            onClick={() => {
+              onLogout();
+              setIsSidebarOpen(false);
+            }}
             style={{ 
               color: '#dc2626', 
               borderTop: '1px solid var(--border-subtle)', 
@@ -114,6 +153,17 @@ export const AppShell: React.FC<AppShellProps> = ({
       <div className="app-main">
         <header className="app-header">
           <div className="header-title-section">
+            {/* Hamburger Burger Menu Button */}
+            <button 
+              type="button"
+              className="btn btn-secondary btn-icon-only" 
+              onClick={() => setIsSidebarOpen(true)}
+              style={{ border: 'none', padding: '8px', marginRight: '12px' }}
+              title="Open Menu"
+            >
+              <Menu size={20} style={{ display: 'block' }} />
+            </button>
+
             <h2 className="header-title">
               {activeTab === 'dashboard' && 'Dashboard Analytics'}
               {activeTab === 'board' && 'Content Kanban Board'}
