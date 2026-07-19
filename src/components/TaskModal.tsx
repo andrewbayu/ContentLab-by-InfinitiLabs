@@ -274,457 +274,452 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 150px)', overflowY: 'auto' }}>
-          <div className="modal-body" style={{ flexGrow: 0, overflowY: 'visible' }}>
-            {/* Multi-user creator track banner */}
-            {item && item.createdBy && (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--text-secondary)',
-                backgroundColor: 'var(--bg-app)',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-subtle)',
-                marginBottom: '4px'
-              }}>
-                Planned & Created by: <strong>{item.createdBy}</strong>
-              </div>
-            )}
+        <form onSubmit={handleSubmit} className="modal-form-wrapper">
+          <div className={`modal-columns-container ${!item ? 'single-column' : ''}`}>
+            
+            {/* LEFT COLUMN: Main Form Editor Fields */}
+            <div className="modal-column-left">
+              {/* Multi-user creator track banner */}
+              {item && item.createdBy && (
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  backgroundColor: 'var(--bg-app)',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-subtle)',
+                  marginBottom: '4px'
+                }}>
+                  Planned & Created by: <strong>{item.createdBy}</strong>
+                </div>
+              )}
 
-            {/* Title */}
-            <div className="form-group">
-              <label className="form-label">Content Title *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. 5 Tips for Video Recording"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-
-            {/* Brief / Copy (Togglable) */}
-            {variablesConfig.brief && (
+              {/* Title */}
               <div className="form-group">
-                <label className="form-label">Content Brief & Description</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="Write outline, ideas, or brief visual layouts..."
-                  value={brief}
-                  onChange={(e) => setBrief(e.target.value)}
+                <label className="form-label">Content Title *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 5 Tips for Video Recording"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  autoFocus
                 />
               </div>
-            )}
 
-            {/* Status and Format Row */}
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Production Status</label>
-                <select
-                  className="form-select"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as ContentItem['status'])}
-                >
-                  <option value="Idea">Idea</option>
-                  <option value="Scripting/Writing">Scripting/Writing</option>
-                  <option value="Production/Design">Production/Design</option>
-                  <option value="Review/Editing">Review/Editing</option>
-                  <option value="Scheduled">Scheduled</option>
-                  <option value="Published">Published</option>
-                </select>
+              {/* Brief / Copy (Togglable) */}
+              {variablesConfig.brief && (
+                <div className="form-group">
+                  <label className="form-label">Content Brief & Description</label>
+                  <textarea
+                    className="form-textarea"
+                    placeholder="Write outline, ideas, or brief visual layouts..."
+                    value={brief}
+                    onChange={(e) => setBrief(e.target.value)}
+                    style={{ minHeight: '120px' }}
+                  />
+                </div>
+              )}
+
+              {/* Status and Format Row */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Production Status</label>
+                  <select
+                    className="form-select"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as ContentItem['status'])}
+                  >
+                    <option value="Idea">Idea</option>
+                    <option value="Scripting/Writing">Scripting/Writing</option>
+                    <option value="Production/Design">Production/Design</option>
+                    <option value="Review/Editing">Review/Editing</option>
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="Published">Published</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Content Format</label>
+                  <select
+                    className="form-select"
+                    value={format}
+                    onChange={(e) => setFormat(e.target.value as ContentItem['format'])}
+                  >
+                    <option value="Video">Video (Landscape)</option>
+                    <option value="Short">Short / Reel / Vertical</option>
+                    <option value="Carousel">Carousel Slider</option>
+                    <option value="Graphic">Single Image/Infographic</option>
+                    <option value="Article">Blog Post / Article</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Content Format</label>
-                <select
-                  className="form-select"
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value as ContentItem['format'])}
-                >
-                  <option value="Video">Video (Landscape)</option>
-                  <option value="Short">Short / Reel / Vertical</option>
-                  <option value="Carousel">Carousel Slider</option>
-                  <option value="Graphic">Single Image/Infographic</option>
-                  <option value="Article">Blog Post / Article</option>
-                </select>
-              </div>
-            </div>
+              {/* Platform Channel Section with dynamic adding */}
+              <div className="form-group" style={{ position: 'relative' }}>
+                <label className="form-label">Publishing Channel</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    value={channel}
+                    onChange={handleChannelDropdownChange}
+                    style={{ flexGrow: 1 }}
+                  >
+                    <option value="">Select Channel</option>
+                    {channels.map((ch) => (
+                      <option key={ch.id} value={ch.name}>
+                        {ch.name}
+                      </option>
+                    ))}
+                    <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
+                      ➕ Add Custom Channel...
+                    </option>
+                  </select>
+                </div>
 
-            {/* Platform Channel Section with dynamic adding */}
-            <div className="form-group" style={{ position: 'relative' }}>
-              <label className="form-label">Publishing Channel</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+                {/* Inline Add Channel Form */}
+                {showAddChannelForm && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '12px',
+                    backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                    border: '1px dashed var(--primary)',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>Add New Platform Channel</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. Threads, X, Pinterest"
+                        value={newChannelName}
+                        onChange={(e) => setNewChannelName(e.target.value)}
+                        style={{ flexGrow: 1 }}
+                      />
+                      <input
+                        type="color"
+                        value={newChannelColor}
+                        onChange={(e) => setNewChannelColor(e.target.value)}
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          padding: 0,
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: 'transparent'
+                        }}
+                        title="Choose Label Color"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-icon-only"
+                        onClick={handleCreateChannelSubmit}
+                        disabled={isAddingChannel}
+                      >
+                        {isAddingChannel ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-icon-only"
+                        onClick={() => setShowAddChannelForm(false)}
+                        style={{ padding: '10px' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Creator / Assignee Section with dynamic adding */}
+              <div className="form-group">
+                <label className="form-label">Creator / Assignee</label>
                 <select
                   className="form-select"
-                  value={channel}
-                  onChange={handleChannelDropdownChange}
-                  style={{ flexGrow: 1 }}
+                  value={assignee}
+                  onChange={handleAssigneeDropdownChange}
                 >
-                  <option value="">Select Channel</option>
-                  {channels.map((ch) => (
-                    <option key={ch.id} value={ch.name}>
-                      {ch.name}
+                  <option value="">Unassigned</option>
+                  {team.map((member) => (
+                    <option key={member.id} value={member.name}>
+                      {member.name}
                     </option>
                   ))}
                   <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                    ➕ Add Custom Channel...
+                    ➕ Add New Creator...
                   </option>
                 </select>
+
+                {/* Inline Add Creator Form */}
+                {showAddCreatorForm && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '12px',
+                    backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                    border: '1px dashed var(--primary)',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>Add New Creator Crew</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Creator Name"
+                        value={newCreatorName}
+                        onChange={(e) => setNewCreatorName(e.target.value)}
+                      />
+                      <input
+                        type="email"
+                        className="form-input"
+                        placeholder="Email Address"
+                        value={newCreatorEmail}
+                        onChange={(e) => setNewCreatorEmail(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-icon-only"
+                        onClick={handleCreateCreatorSubmit}
+                        disabled={isAddingCreator}
+                      >
+                        {isAddingCreator ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-icon-only"
+                        onClick={() => setShowAddCreatorForm(false)}
+                        style={{ padding: '10px' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Inline Add Channel Form */}
-              {showAddChannelForm && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '12px',
-                  backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                  border: '1px dashed var(--primary)',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>Add New Platform Channel</span>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. Threads, X, Pinterest"
-                      value={newChannelName}
-                      onChange={(e) => setNewChannelName(e.target.value)}
-                      style={{ flexGrow: 1 }}
-                    />
-                    <input
-                      type="color"
-                      value={newChannelColor}
-                      onChange={(e) => setNewChannelColor(e.target.value)}
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        padding: 0,
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        backgroundColor: 'transparent'
-                      }}
-                      title="Choose Label Color"
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-icon-only"
-                      onClick={handleCreateChannelSubmit}
-                      disabled={isAddingChannel}
-                    >
-                      {isAddingChannel ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-icon-only"
-                      onClick={() => setShowAddChannelForm(false)}
-                      style={{ padding: '10px' }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Creator / Assignee Section with dynamic adding */}
-            <div className="form-group">
-              <label className="form-label">Creator / Assignee</label>
-              <select
-                className="form-select"
-                value={assignee}
-                onChange={handleAssigneeDropdownChange}
-              >
-                <option value="">Unassigned</option>
-                {team.map((member) => (
-                  <option key={member.id} value={member.name}>
-                    {member.name}
-                  </option>
-                ))}
-                <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                  ➕ Add New Creator...
-                </option>
-              </select>
-
-              {/* Inline Add Creator Form */}
-              {showAddCreatorForm && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '12px',
-                  backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                  border: '1px dashed var(--primary)',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>Add New Creator Crew</span>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="Creator Name"
-                      value={newCreatorName}
-                      onChange={(e) => setNewCreatorName(e.target.value)}
-                    />
-                    <input
-                      type="email"
-                      className="form-input"
-                      placeholder="Email Address"
-                      value={newCreatorEmail}
-                      onChange={(e) => setNewCreatorEmail(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-icon-only"
-                      onClick={handleCreateCreatorSubmit}
-                      disabled={isAddingCreator}
-                    >
-                      {isAddingCreator ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-icon-only"
-                      onClick={() => setShowAddCreatorForm(false)}
-                      style={{ padding: '10px' }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Target Publish Date (Togglable) & Priority Row */}
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Priority Level</label>
-                <select
-                  className="form-select"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as ContentItem['priority'])}
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
-              </div>
-
-              {variablesConfig.publishDate ? (
+              {/* Target Publish Date (Togglable) & Priority Row */}
+              <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Target Publish Date</label>
+                  <label className="form-label">Priority Level</label>
+                  <select
+                    className="form-select"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as ContentItem['priority'])}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+
+                {variablesConfig.publishDate ? (
+                  <div className="form-group">
+                    <label className="form-label">Target Publish Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={publishDate}
+                      onChange={(e) => setPublishDate(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="form-group" style={{ visibility: 'hidden' }} />
+                )}
+              </div>
+
+              {/* Custom Tags Section (Togglable) */}
+              {variablesConfig.tags && (
+                <div className="form-group">
+                  <label className="form-label">Campaign Tags (Select Multiple)</label>
+                  <div className="tags-select-container">
+                    {customTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <span
+                          key={tag}
+                          className={`tag-select-pill ${isSelected ? 'selected' : ''}`}
+                          onClick={() => handleTagClick(tag)}
+                        >
+                          {isSelected ? '✓ ' : '+ '}
+                          {tag}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Budget / Cost (Togglable) */}
+              {variablesConfig.budget && (
+                <div className="form-group">
+                  <label className="form-label">Production Budget (IDR / USD)</label>
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
-                    value={publishDate}
-                    onChange={(e) => setPublishDate(e.target.value)}
+                    placeholder="e.g. 500000 atau $50"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
                   />
                 </div>
-              ) : (
-                <div className="form-group" style={{ visibility: 'hidden' }} />
               )}
+
+              {/* Platform Notes / Caption Draft (Togglable) */}
+              {variablesConfig.platformNotes && (
+                <div className="form-group">
+                  <label className="form-label">Copywriting Caption & Hashtags</label>
+                  <textarea
+                    className="form-textarea"
+                    placeholder="Draft caption, tweet text, or posting hashtags..."
+                    value={platformNotes}
+                    onChange={(e) => setPlatformNotes(e.target.value)}
+                    style={{ minHeight: '80px' }}
+                  />
+                </div>
+              )}
+
+              {/* Target Audience Persona (Togglable) */}
+              {variablesConfig.targetAudience && (
+                <div className="form-group">
+                  <label className="form-label">Target Viewer Persona / Audience</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Pemula UX Design, Startup Founders"
+                    value={targetAudience}
+                    onChange={(e) => setTargetAudience(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Assets Link */}
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Link size={14} />
+                  Assets Link (Google Drive / Figma / Draft)
+                </label>
+                <input
+                  type="url"
+                  className="form-input"
+                  placeholder="https://drive.google.com/..."
+                  value={assetsLink}
+                  onChange={(e) => setAssetsLink(e.target.value)}
+                />
+              </div>
             </div>
 
-            {/* Custom Tags Section (Togglable) */}
-            {variablesConfig.tags && (
-              <div className="form-group">
-                <label className="form-label">Campaign Tags (Select Multiple)</label>
-                <div className="tags-select-container">
-                  {customTags.map((tag) => {
-                    const isSelected = selectedTags.includes(tag);
-                    return (
-                      <span
-                        key={tag}
-                        className={`tag-select-pill ${isSelected ? 'selected' : ''}`}
-                        onClick={() => handleTagClick(tag)}
+            {/* RIGHT COLUMN: Revision & Discussion Thread */}
+            {item && (
+              <div className="modal-column-right">
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+                  <MessageSquare size={16} className="text-secondary" />
+                  <span>Discussion & Revisions ({itemComments.length})</span>
+                </h4>
+
+                {/* Comments Feed List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto', paddingRight: '4px', minHeight: '150px' }}>
+                  {itemComments.length > 0 ? (
+                    itemComments.map((comm) => (
+                      <div 
+                        key={comm.id} 
+                        style={{ 
+                          display: 'flex', 
+                          gap: '10px', 
+                          backgroundColor: '#f8fafc', 
+                          padding: '12px', 
+                          borderRadius: '8px', 
+                          border: '1px solid var(--border-subtle)'
+                        }}
                       >
-                        {isSelected ? '✓ ' : '+ '}
-                        {tag}
+                        <div className="avatar-ring" style={{ width: '26px', height: '26px', fontSize: '11px', flexShrink: 0 }}>
+                          {comm.author.charAt(0)}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 650, color: 'var(--text-primary)' }}>{comm.author}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              {new Date(comm.createdAt).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+                            </span>
+                          </div>
+                          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                            {renderCommentText(comm.text)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)', fontSize: '12px', border: '1px dashed var(--border-subtle)', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+                      Belum ada diskusi revisi. Mulai diskusi di bawah dengan me-mention crew!
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Comment Input Form Box */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                  <textarea
+                    className="form-textarea"
+                    placeholder={activeUser ? "Ketik komentar diskusi atau catatan revisi..." : "Pilih profil Anda di kanan atas dahulu untuk berdiskusi"}
+                    value={commentText}
+                    onChange={(e) => {
+                      setCommentText(e.target.value);
+                      if (e.target.value.endsWith('@')) {
+                        setShowMentionSuggestions(true);
+                      } else if (!e.target.value.includes('@') || e.target.value.endsWith(' ')) {
+                        setShowMentionSuggestions(false);
+                      }
+                    }}
+                    disabled={!activeUser}
+                    style={{ minHeight: '54px', padding: '8px', fontSize: '12px', resize: 'none' }}
+                  />
+
+                  {/* Mention Suggestor Toolbar Panel */}
+                  {(showMentionSuggestions || commentText.includes('@')) && team.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <AtSign size={10} /> Mention:
                       </span>
-                    );
-                  })}
+                      {team.map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          className="tag-select-pill"
+                          onClick={() => handleInsertMention(member.name)}
+                          style={{ padding: '1px 6px', fontSize: '10px', borderStyle: 'dashed' }}
+                        >
+                          {member.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Tip: Ketik @ atau klik nama di atas untuk mention
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSendComment}
+                      disabled={!activeUser || !commentText.trim()}
+                      className="btn btn-primary"
+                      style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                    >
+                      <Send size={10} />
+                      <span>Send</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
-
-            {/* Budget / Cost (Togglable) */}
-            {variablesConfig.budget && (
-              <div className="form-group">
-                <label className="form-label">Production Budget (IDR / USD)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g. 500000 atau $50"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                />
-              </div>
-            )}
-
-            {/* Platform Notes / Caption Draft (Togglable) */}
-            {variablesConfig.platformNotes && (
-              <div className="form-group">
-                <label className="form-label">Copywriting Caption & Hashtags</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="Draft caption, tweet text, or posting hashtags..."
-                  value={platformNotes}
-                  onChange={(e) => setPlatformNotes(e.target.value)}
-                  style={{ minHeight: '80px' }}
-                />
-              </div>
-            )}
-
-            {/* Target Audience Persona (Togglable) */}
-            {variablesConfig.targetAudience && (
-              <div className="form-group">
-                <label className="form-label">Target Viewer Persona / Audience</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g. Pemula UX Design, Startup Founders"
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                />
-              </div>
-            )}
-
-            {/* Assets Link */}
-            <div className="form-group">
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Link size={14} />
-                Assets Link (Google Drive / Figma / Draft)
-              </label>
-              <input
-                type="url"
-                className="form-input"
-                placeholder="https://drive.google.com/..."
-                value={assetsLink}
-                onChange={(e) => setAssetsLink(e.target.value)}
-              />
-            </div>
           </div>
 
-          {/* DISKUSI & REVISI COLLABORATIVE COMMENTS SECTION */}
-          {item && (
-            <div 
-              className="modal-body" 
-              style={{ 
-                borderTop: '1px solid var(--border-subtle)', 
-                backgroundColor: 'var(--bg-app)', 
-                padding: '24px 32px',
-                flexGrow: 1,
-                overflowY: 'visible'
-              }}
-            >
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', color: 'var(--text-primary)', marginBottom: '16px' }}>
-                <MessageSquare size={16} className="text-secondary" />
-                <span>Diskusi & Revisi ({itemComments.length})</span>
-              </h4>
-
-              {/* Comments Feed List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
-                {itemComments.length > 0 ? (
-                  itemComments.map((comm) => (
-                    <div 
-                      key={comm.id} 
-                      style={{ 
-                        display: 'flex', 
-                        gap: '10px', 
-                        backgroundColor: 'white', 
-                        padding: '12px 14px', 
-                        borderRadius: '8px', 
-                        border: '1px solid var(--border-subtle)',
-                        boxShadow: 'var(--shadow-sm)'
-                      }}
-                    >
-                      <div className="avatar-ring" style={{ width: '28px', height: '28px', fontSize: '12px', flexShrink: 0 }}>
-                        {comm.author.charAt(0)}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', width: '100%' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 650, color: 'var(--text-primary)' }}>{comm.author}</span>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                            {new Date(comm.createdAt).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
-                          </span>
-                        </div>
-                        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                          {renderCommentText(comm.text)}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '12px', border: '1px dashed var(--border-subtle)', borderRadius: '8px', backgroundColor: 'white' }}>
-                    Belum ada diskusi revisi. Mulai diskusi di bawah dengan menyebut crew menggunakan @nama!
-                  </div>
-                )}
-              </div>
-
-              {/* Add Comment Input Form */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'white', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <textarea
-                  className="form-textarea"
-                  placeholder={activeUser ? "Ketik catatan revisi atau komentar diskusi..." : "Pilih profil Anda di kanan atas dahulu untuk berdiskusi"}
-                  value={commentText}
-                  onChange={(e) => {
-                    setCommentText(e.target.value);
-                    if (e.target.value.endsWith('@')) {
-                      setShowMentionSuggestions(true);
-                    } else if (!e.target.value.includes('@') || e.target.value.endsWith(' ')) {
-                      setShowMentionSuggestions(false);
-                    }
-                  }}
-                  disabled={!activeUser}
-                  style={{ minHeight: '60px', padding: '8px', fontSize: '13px' }}
-                />
-
-                {/* Mention Suggestor Toolbar Panel */}
-                {(showMentionSuggestions || commentText.includes('@')) && team.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <AtSign size={10} /> Mention:
-                    </span>
-                    {team.map((member) => (
-                      <button
-                        key={member.id}
-                        type="button"
-                        className="tag-select-pill"
-                        onClick={() => handleInsertMention(member.name)}
-                        style={{ padding: '2px 8px', fontSize: '11px', borderStyle: 'dashed' }}
-                      >
-                        {member.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Tip: Klik tombol tag di atas untuk me-mention crew
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleSendComment}
-                    disabled={!activeUser || !commentText.trim()}
-                    className="btn btn-primary"
-                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    <Send size={12} />
-                    <span>Send</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="modal-footer" style={{ flexShrink: 0 }}>
+          <div className="modal-footer">
             {item && onDelete && (
               <button
                 type="button"

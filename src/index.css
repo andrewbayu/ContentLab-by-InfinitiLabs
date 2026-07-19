@@ -1089,7 +1089,7 @@ input:disabled + .switch-slider {
 
 .modal-sheet {
   width: 100%;
-  max-width: 520px;
+  max-width: 960px;
   height: 100%;
   background-color: white;
   border-left: 1px solid var(--border-subtle);
@@ -1098,6 +1098,47 @@ input:disabled + .switch-slider {
   box-shadow: -5px 0 25px rgba(15, 23, 42, 0.08);
   animation: slideIn var(--transition-normal);
 }
+
+.modal-form-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 72px);
+  overflow: hidden;
+}
+
+.modal-columns-container {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 32px;
+  padding: 32px;
+  flex-grow: 1;
+  overflow: hidden;
+  background-color: white;
+}
+
+.modal-columns-container.single-column {
+  grid-template-columns: 1fr;
+}
+
+.modal-column-left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  padding-right: 16px;
+  height: 100%;
+}
+
+.modal-column-right {
+  border-left: 1px solid var(--border-subtle);
+  padding-left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow: hidden;
+}
+
 
 .modal-header {
   padding: 24px 32px;
@@ -1368,6 +1409,29 @@ input:disabled + .switch-slider {
   
   .modal-sheet {
     max-width: 100%;
+  }
+  
+  .modal-columns-container {
+    grid-template-columns: 1fr !important;
+    overflow-y: auto;
+    gap: 24px;
+    padding: 20px;
+    height: auto;
+  }
+  
+  .modal-column-left {
+    overflow-y: visible;
+    padding-right: 0;
+    height: auto;
+  }
+  
+  .modal-column-right {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    padding-left: 0;
+    padding-top: 24px;
+    height: auto;
+    overflow: visible;
   }
 }
 
