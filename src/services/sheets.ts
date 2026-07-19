@@ -15,6 +15,11 @@ export interface ContentItem {
   platformNotes?: string;
   targetAudience?: string;
   createdBy?: string;
+  // New upgraded features variables
+  checklist?: string;     // JSON string representing subtask assets
+  views?: string;         // performance view counts
+  likes?: string;         // performance likes
+  engagement?: string;    // performance engagement (comments/shares)
   createdAt: string;
   updatedAt: string;
 }
@@ -101,6 +106,11 @@ const INITIAL_MOCK_CONTENT: ContentItem[] = [
     assetsLink: 'https://docs.google.com/document/d/example1',
     tags: 'Educational,Branding',
     createdBy: 'Andi Pratama',
+    checklist: JSON.stringify([
+      { id: 'sub1', label: 'Outline Script', done: true, link: 'https://docs.google.com/document/d/outline1' },
+      { id: 'sub2', label: 'Review Keyword SEO', done: false, link: '' },
+      { id: 'sub3', label: 'Featured Image Graphics', done: false, link: '' }
+    ]),
     createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
@@ -116,9 +126,32 @@ const INITIAL_MOCK_CONTENT: ContentItem[] = [
     publishDate: '2026-07-25',
     assetsLink: 'https://drive.google.com/drive/example2',
     tags: 'Trending,Promo',
-    createdBy: 'Siti Rahma',
+    checklist: JSON.stringify([
+      { id: 'sub4', label: 'Draft Video CapCut', done: true, link: 'https://drive.google.com/drive/draft1' },
+      { id: 'sub5', label: 'Teks Caption', done: true, link: '' },
+      { id: 'sub6', label: 'Publish Render Final', done: false, link: '' }
+    ]),
     createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: 'c5',
+    title: 'Kenapa Spreadsheet adalah Database Favorit Startup?',
+    brief: 'Post LinkedIn tentang kepraktisan Google Sheets untuk workflow dashboard internal.',
+    status: 'Published',
+    channel: 'LinkedIn',
+    format: 'Article',
+    priority: 'Medium',
+    assignee: 'Andi Pratama',
+    publishDate: '2026-07-18',
+    assetsLink: 'https://linkedin.com/post/example5',
+    tags: 'Branding,Sponsor',
+    createdBy: 'Siti Rahma',
+    views: '8500',
+    likes: '620',
+    engagement: '142',
+    createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
   }
 ];
 
@@ -268,6 +301,10 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       platformNotes: item.platformNotes ? String(item.platformNotes) : '',
       targetAudience: item.targetAudience ? String(item.targetAudience) : '',
       createdBy: item.createdBy ? String(item.createdBy) : '',
+      checklist: item.checklist ? String(item.checklist) : '',
+      views: item.views ? String(item.views) : '',
+      likes: item.likes ? String(item.likes) : '',
+      engagement: item.engagement ? String(item.engagement) : '',
       createdAt: String(item.createdAt || new Date().toISOString()),
       updatedAt: String(item.updatedAt || new Date().toISOString()),
     }));

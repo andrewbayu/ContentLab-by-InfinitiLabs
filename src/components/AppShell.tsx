@@ -10,7 +10,8 @@ import {
   User, 
   LogOut, 
   Menu, 
-  X 
+  X,
+  Calendar
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -90,6 +91,14 @@ export const AppShell: React.FC<AppShellProps> = ({
           >
             <Kanban className="nav-item-icon" />
             Kanban Board
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
+            onClick={() => handleNavClick('calendar')}
+          >
+            <Calendar className="nav-item-icon" />
+            Content Calendar
           </button>
 
           <button

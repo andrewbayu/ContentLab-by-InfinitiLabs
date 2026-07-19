@@ -6,6 +6,7 @@ import { ListView } from './components/ListView';
 import { SettingsView } from './components/SettingsView';
 import { TaskModal } from './components/TaskModal';
 import { LoginPage } from './components/LoginPage';
+import { CalendarView } from './components/CalendarView';
 import {
   fetchData,
   createContent,
@@ -170,6 +171,30 @@ function App() {
     } catch (e) {
       console.error(e);
       addToast('Sync failed. Reverting status...', 'error');
+      setItems(originalItems);
+    }
+  };
+
+  // Move content publish date (drag and drop in calendar)
+  const handleMoveDate = async (id: string, newDate: string) => {
+    const originalItems = [...items];
+    const targetItem = items.find((item) => item.id === id);
+    if (!targetItem || targetItem.publishDate === newDate) return;
+
+    const updatedItem: ContentItem = {
+      ...targetItem,
+      publishDate: newDate,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setItems((prev) => prev.map((item) => (item.id === id ? updatedItem : item)));
+
+    try {
+      await updateContent(updatedItem);
+      addToast(`Publish date rescheduled to ${newDate}`, 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Sync failed. Reverting date...', 'error');
       setItems(originalItems);
     }
   };
@@ -407,6 +432,15 @@ function App() {
             channels={channels}
             variablesConfig={variablesConfig}
             activeUser={activeUser}
+          />
+        )}
+
+        {activeTab === 'calendar' && (
+          <CalendarView
+            items={items}
+            channels={channels}
+            onEditItem={handleOpenEditModal}
+            onMoveDate={handleMoveDate}
           />
         )}
 

@@ -193,7 +193,9 @@ function doPost(e) {
         item.id, item.title, item.brief, item.status, 
         item.channel, item.format, item.priority, item.assignee, item.publishDate,
         item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
-        item.targetAudience || "", item.createdAt, item.updatedAt
+        item.targetAudience || "", item.createdBy || "", item.checklist || "",
+        item.views || "", item.likes || "", item.engagement || "",
+        item.createdAt, item.updatedAt
       ]);
       result = { success: true, item: item };
     } 
@@ -211,11 +213,13 @@ function doPost(e) {
       }
       
       if (rowIndex !== -1) {
-        contentSheet.getRange(rowIndex, 1, 1, 16).setValues([[
+        contentSheet.getRange(rowIndex, 1, 1, 21).setValues([[
           item.id, item.title, item.brief, item.status, 
           item.channel, item.format, item.priority, item.assignee, item.publishDate,
           item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
-          item.targetAudience || "", item.createdAt, item.updatedAt
+          item.targetAudience || "", item.createdBy || "", item.checklist || "",
+          item.views || "", item.likes || "", item.engagement || "",
+          item.createdAt, item.updatedAt
         ]]);
         result = { success: true, item: item };
       } else {
@@ -714,15 +718,15 @@ function getSheetData(sheet) {
                   <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
                     <strong>1. Configure Google Sheets Tabs:</strong>
                     <p className="text-secondary" style={{ fontSize: '13px', marginTop: '4px' }}>
-                      Buka spreadsheet Anda dan buat 3 tab dengan judul persis berikut:
+                      Buka spreadsheet Anda dan buat 4 tab dengan judul persis berikut:
                     </p>
                     <ul style={{ listStyleType: 'disc', paddingLeft: '24px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
                       <li>
                         Nama tab: <strong style={{ color: 'var(--text-primary)' }}>Content</strong>
                         <br />
-                        Tulis header berikut di baris pertama (kolom A-P):
+                        Tulis header berikut di baris pertama (kolom A-U):
                         <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)', fontSize: '11px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                          id | title | brief | status | channel | format | priority | assignee | publishDate | assetsLink | tags | budget | platformNotes | targetAudience | createdAt | updatedAt
+                          id | title | brief | status | channel | format | priority | assignee | publishDate | assetsLink | tags | budget | platformNotes | targetAudience | createdBy | checklist | views | likes | engagement | createdAt | updatedAt
                         </div>
                       </li>
                       <li style={{ marginTop: '10px' }}>
@@ -739,6 +743,14 @@ function getSheetData(sheet) {
                         Tulis header berikut di baris pertama (kolom A-C):
                         <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)' }}>
                           id | name | color
+                        </div>
+                      </li>
+                      <li style={{ marginTop: '10px' }}>
+                        Nama tab: <strong style={{ color: 'var(--text-primary)' }}>Comments</strong>
+                        <br />
+                        Tulis header berikut di baris pertama (kolom A-E):
+                        <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)' }}>
+                          id | contentId | author | text | createdAt
                         </div>
                       </li>
                     </ul>
