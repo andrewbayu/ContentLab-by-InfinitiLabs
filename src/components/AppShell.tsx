@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TeamMember } from '../services/sheets';
-import { LayoutDashboard, Kanban, ListTodo, Settings, Plus, Layers, User } from 'lucide-react';
+import { LayoutDashboard, Kanban, ListTodo, Settings, Plus, Layers, User, LogOut } from 'lucide-react';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -11,6 +11,7 @@ interface AppShellProps {
   activeUser: string;
   setActiveUser: (user: string) => void;
   team: TeamMember[];
+  onLogout: () => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -22,6 +23,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   activeUser,
   setActiveUser,
   team,
+  onLogout,
 }) => {
   return (
     <div className="app-layout">
@@ -68,6 +70,25 @@ export const AppShell: React.FC<AppShellProps> = ({
           >
             <Settings className="nav-item-icon" />
             Settings Manager
+          </button>
+
+          {/* Spacer to push logout to bottom */}
+          <div style={{ flexGrow: 1 }} />
+
+          {/* Sign Out Button */}
+          <button
+            className="nav-item"
+            onClick={onLogout}
+            style={{ 
+              color: '#dc2626', 
+              borderTop: '1px solid var(--border-subtle)', 
+              borderRadius: '0', 
+              paddingTop: '16px', 
+              marginTop: '16px' 
+            }}
+          >
+            <LogOut className="nav-item-icon" />
+            Sign Out
           </button>
         </nav>
 

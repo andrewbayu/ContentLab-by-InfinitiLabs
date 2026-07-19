@@ -5,6 +5,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { ListView } from './components/ListView';
 import { SettingsView } from './components/SettingsView';
 import { TaskModal } from './components/TaskModal';
+import { LoginPage } from './components/LoginPage';
 import {
   fetchData,
   createContent,
@@ -33,6 +34,10 @@ interface Toast {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    localStorage.getItem('contentlab_is_authenticated') === 'true'
+  );
+
   const [items, setItems] = useState<ContentItem[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -53,6 +58,7 @@ function App() {
 
   // Load spreadsheet data
   const loadData = async (showLoading = true) => {
+    if (!isAuthenticated) return;
     if (showLoading) setIsLoading(true);
     try {
       const data = await fetchData();
@@ -69,8 +75,10 @@ function App() {
   };
 
   useEffect(() => {
-    loadData();
-  }, [isMock]);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isMock, isAuthenticated]);
 
   // Handle connection script changes
   const handleConnectionChange = () => {
@@ -88,6 +96,13 @@ function App() {
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Logout Handler
+  const handleLogout = () => {
+    localStorage.removeItem('contentlab_is_authenticated');
+    setIsAuthenticated(false);
+    addToast('Signed out of ContentLab.', 'info');
   };
 
   // Create or Update content planner
@@ -303,6 +318,28 @@ function App() {
     setIsModalOpen(true);
   };
 
+  // Render Login view if user is not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />
+        {/* Toast Alert System overlay for login failure notifications */}
+        <div className="toast-container">
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast toast-${toast.type}`}>
+              {toast.type === 'success' && <CheckCircle2 size={16} style={{ color: '#16a34a' }} />}
+              {toast.type === 'error' && <AlertCircle size={16} style={{ color: '#dc2626' }} />}
+              <span className="toast-text">{toast.message}</span>
+              <button className="toast-close" onClick={() => removeToast(toast.id)}>
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
   return (
     <AppShell
       activeTab={activeTab}
@@ -312,6 +349,7 @@ function App() {
       activeUser={activeUser}
       setActiveUser={handleActiveUserChange}
       team={team}
+      onLogout={handleLogout}
     >
       {/* Loading Overlay */}
       {isLoading && (
