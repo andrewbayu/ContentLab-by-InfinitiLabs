@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import type { ContentItem, Channel, VariablesConfig } from '../services/sheets';
+import { isUserInvolved } from '../services/sheets';
+import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
 import { Calendar, Link, Plus, FileText, Video, RefreshCw, UserCheck } from 'lucide-react';
 
 interface KanbanBoardProps {
@@ -9,7 +10,7 @@ interface KanbanBoardProps {
   onMoveItem: (id: string, newStatus: ContentItem['status']) => void;
   onEditItem: (item: ContentItem) => void;
   onOpenCreateModalWithStatus: (status: ContentItem['status']) => void;
-  activeUser: string;
+  currentUser: TeamMember;
 }
 
 const COLUMNS: { label: string; status: ContentItem['status'] }[] = [
@@ -31,7 +32,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onMoveItem,
   onEditItem,
   onOpenCreateModalWithStatus,
-  activeUser,
+  currentUser,
 }) => {
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
@@ -62,8 +63,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   // Filter items assigned to the active user if toggled
   const displayedItems = items.filter((item) => {
-    if (onlyMyTasks && activeUser) {
-      return item.assignee.toLowerCase() === activeUser.toLowerCase();
+    if (onlyMyTasks) {
+      return isUserInvolved(item, currentUser);
     }
     return true;
   });
@@ -110,7 +111,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <button
           type="button"
           onClick={() => setOnlyMyTasks(!onlyMyTasks)}
-          disabled={!activeUser}
           className="btn"
           style={{
             borderColor: onlyMyTasks ? 'var(--primary)' : 'var(--border-strong)',
@@ -118,10 +118,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             color: onlyMyTasks ? 'var(--primary)' : 'var(--text-secondary)',
             fontSize: '13px',
             padding: '6px 12px',
-            opacity: activeUser ? 1 : 0.6,
-            cursor: activeUser ? 'pointer' : 'not-allowed'
+            opacity: 1,
+            cursor: 'pointer'
           }}
-          title={!activeUser ? "Pilih profil Anda di kanan atas dulu" : "Saring tugas saya"}
+          title="Tampilkan task saat saya menjadi PIC, collaborator, atau reviewer"
         >
           <UserCheck size={14} style={{ marginRight: '6px', display: 'inline', verticalAlign: 'middle' }} />
           <span>{onlyMyTasks ? 'Showing Only My Tasks' : 'Filter by My Tasks'}</span>
@@ -228,7 +228,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               }}
                             />
                             {item.assignee && (
-                              <div className="avatar-ring" style={{ width: '22px', height: '22px', fontSize: '10px' }} title={`Creator: ${item.assignee}`}>
+                              <div className="avatar-ring" style={{ width: '22px', height: '22px', fontSize: '10px' }} title={`PIC: ${item.assignee}`}>
                                 {item.assignee.charAt(0)}
                               </div>
                             )}

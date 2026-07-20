@@ -7,6 +7,7 @@ function doGet(e) {
   const clients = getSheetData(sheet.getSheetByName("Clients"));
   const kpiDefinitions = getSheetData(sheet.getSheetByName("KPI Definitions"));
   const kpiUpdates = getSheetData(sheet.getSheetByName("KPI Updates"));
+  const taskMembers = getSheetData(sheet.getSheetByName("Task Members"));
   const publicTeam = team.map(function(member) {
     return {
       id: member.id,
@@ -24,7 +25,8 @@ function doGet(e) {
     comments: comments,
     clients: clients,
     kpiDefinitions: kpiDefinitions,
-    kpiUpdates: kpiUpdates
+    kpiUpdates: kpiUpdates,
+    taskMembers: taskMembers
   };
   
   return ContentService.createTextOutput(JSON.stringify(payload))
@@ -55,6 +57,7 @@ function doPost(e) {
         item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
         item.dueDate || "", item.client || "", item.brand || ""
       ]);
+      syncTaskMembers(sheet, item, true);
       result = { success: true, item: item };
     } 
     else if (action === "updateContent") {
@@ -71,6 +74,8 @@ function doPost(e) {
       }
       
       if (rowIndex !== -1) {
+        item.createdBy = data[rowIndex - 1][14] || item.createdBy || "";
+        item.createdAt = data[rowIndex - 1][19] || item.createdAt;
         contentSheet.getRange(rowIndex, 1, 1, 26).setValues([[
           item.id, item.title, item.brief, item.status, 
           item.channel, item.format, item.priority, item.assignee, item.publishDate,
@@ -80,6 +85,7 @@ function doPost(e) {
           item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
           item.dueDate || "", item.client || "", item.brand || ""
         ]]);
+        syncTaskMembers(sheet, item, false);
         result = { success: true, item: item };
       } else {
         result = { success: false, error: "Content item not found" };
@@ -98,6 +104,7 @@ function doPost(e) {
       }
       if (rowIndex !== -1) {
         contentSheet.deleteRow(rowIndex);
+        deleteTaskMembers(sheet, itemId);
         result = { success: true };
       } else {
         result = { success: false, error: "Content item not found" };
@@ -259,4 +266,57 @@ function getSheetData(sheet) {
     data.push(row);
   }
   return data;
+}
+
+function syncTaskMembers(spreadsheet, item, isCreate) {
+  const memberSheet = spreadsheet.getSheetByName("Task Members");
+  if (!memberSheet) return;
+
+  const values = memberSheet.getDataRange().getValues();
+  let hasCreator = false;
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][1]) !== String(item.id)) continue;
+    if (!isCreate && String(values[i][3]) === "creator") {
+      hasCreator = true;
+      continue;
+    }
+    memberSheet.deleteRow(i + 1);
+  }
+
+  const actorId = item.actorId || item.creatorId || "";
+  const now = new Date().toISOString();
+  if ((!hasCreator || isCreate) && item.creatorId) {
+    appendTaskMember(memberSheet, item.id, item.creatorId, "creator", now, actorId);
+  }
+  if (item.ownerId) {
+    appendTaskMember(memberSheet, item.id, item.ownerId, "owner", now, actorId);
+  }
+
+  const collaborators = Array.isArray(item.collaboratorIds) ? item.collaboratorIds : [];
+  const seen = {};
+  for (let i = 0; i < collaborators.length; i++) {
+    const userId = String(collaborators[i] || "");
+    if (!userId || userId === String(item.ownerId || "") || userId === String(item.reviewerId || "") || seen[userId]) continue;
+    seen[userId] = true;
+    appendTaskMember(memberSheet, item.id, userId, "collaborator", now, actorId);
+  }
+
+  if (item.reviewerId && String(item.reviewerId) !== String(item.ownerId || "")) {
+    appendTaskMember(memberSheet, item.id, item.reviewerId, "reviewer", now, actorId);
+  }
+}
+
+function appendTaskMember(memberSheet, taskId, userId, role, addedAt, addedBy) {
+  memberSheet.appendRow([
+    Utilities.getUUID(), taskId, userId, role, addedAt, addedBy || ""
+  ]);
+}
+
+function deleteTaskMembers(spreadsheet, taskId) {
+  const memberSheet = spreadsheet.getSheetByName("Task Members");
+  if (!memberSheet) return;
+  const values = memberSheet.getDataRange().getValues();
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][1]) === String(taskId)) memberSheet.deleteRow(i + 1);
+  }
 }

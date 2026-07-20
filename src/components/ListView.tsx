@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import type { ContentItem, Channel, VariablesConfig } from '../services/sheets';
+import { isUserInvolved } from '../services/sheets';
+import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
 import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck } from 'lucide-react';
 
 interface ListViewProps {
@@ -7,7 +8,7 @@ interface ListViewProps {
   channels: Channel[];
   variablesConfig: VariablesConfig;
   onEditItem: (item: ContentItem) => void;
-  activeUser: string;
+  currentUser: TeamMember;
 }
 
 type SortField = 'title' | 'client' | 'taskType' | 'status' | 'priority' | 'publishDate';
@@ -18,7 +19,7 @@ export const ListView: React.FC<ListViewProps> = ({
   channels,
   variablesConfig,
   onEditItem,
-  activeUser,
+  currentUser,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -67,8 +68,10 @@ export const ListView: React.FC<ListViewProps> = ({
         return matchesSearch && matchesStatus && matchesChannel && matchesAssignee;
       })
       .sort((a, b) => {
-        let valA: string | number = a[sortField as keyof ContentItem] || '';
-        let valB: string | number = b[sortField as keyof ContentItem] || '';
+        const rawA = a[sortField as keyof ContentItem];
+        const rawB = b[sortField as keyof ContentItem];
+        let valA: string | number = typeof rawA === 'string' || typeof rawA === 'number' ? rawA : '';
+        let valB: string | number = typeof rawB === 'string' || typeof rawB === 'number' ? rawB : '';
 
         // Priority sorting comparison helper
         if (sortField === 'priority') {
@@ -94,12 +97,12 @@ export const ListView: React.FC<ListViewProps> = ({
   // Apply Active User Tasks Filter
   const displayedItems = useMemo(() => {
     return filteredAndSortedItems.filter((item) => {
-      if (onlyMyTasks && activeUser) {
-        return item.assignee.toLowerCase() === activeUser.toLowerCase();
+      if (onlyMyTasks) {
+        return isUserInvolved(item, currentUser);
       }
       return true;
     });
-  }, [filteredAndSortedItems, onlyMyTasks, activeUser]);
+  }, [filteredAndSortedItems, onlyMyTasks, currentUser]);
 
   // Dynamic style mapper helper
   const getChannelStyle = (channelName: string) => {
@@ -164,7 +167,6 @@ export const ListView: React.FC<ListViewProps> = ({
           <button
             type="button"
             onClick={() => setOnlyMyTasks(!onlyMyTasks)}
-            disabled={!activeUser}
             className="btn"
             style={{
               borderColor: onlyMyTasks ? 'var(--primary)' : 'var(--border-strong)',
@@ -172,11 +174,11 @@ export const ListView: React.FC<ListViewProps> = ({
               color: onlyMyTasks ? 'var(--primary)' : 'var(--text-secondary)',
               fontSize: '13px',
               padding: '6px 12px',
-              opacity: activeUser ? 1 : 0.6,
-              cursor: activeUser ? 'pointer' : 'not-allowed',
+              opacity: 1,
+              cursor: 'pointer',
               marginRight: '6px'
             }}
-            title={!activeUser ? "Pilih profil Anda di kanan atas dulu" : "Saring tugas saya"}
+            title="Tampilkan task saat saya menjadi PIC, collaborator, atau reviewer"
           >
             <UserCheck size={14} style={{ marginRight: '6px', display: 'inline', verticalAlign: 'middle' }} />
             <span>My Tasks</span>
@@ -345,7 +347,7 @@ export const ListView: React.FC<ListViewProps> = ({
                         />
 
                         {item.assignee && (
-                          <div className="avatar-ring" style={{ width: '22px', height: '22px', fontSize: '10px' }} title={`Creator: ${item.assignee}`}>
+                          <div className="avatar-ring" style={{ width: '22px', height: '22px', fontSize: '10px' }} title={`PIC: ${item.assignee}`}>
                             {item.assignee.charAt(0)}
                           </div>
                         )}

@@ -25,6 +25,7 @@ import {
   saveVariablesConfig,
   getCustomTags,
   saveCustomTags,
+  isUserInvolved,
   isMockMode
 } from './services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate } from './services/sheets';
@@ -172,6 +173,9 @@ function App() {
           ...itemPayload,
           id: itemPayload.id,
           createdAt: existing.createdAt,
+          creatorId: existing.creatorId,
+          createdBy: existing.createdBy,
+          actorId: currentUser?.id,
           updatedAt: new Date().toISOString(),
         };
 
@@ -182,7 +186,9 @@ function App() {
       } else {
         const createdPayload = {
           ...itemPayload,
-          createdBy: currentUser?.name || 'Anonymous'
+          createdBy: currentUser?.name || 'Anonymous',
+          creatorId: currentUser?.id || '',
+          actorId: currentUser?.id || '',
         };
         const created = await createContent(createdPayload);
         setItems((prev) => [created, ...prev]);
@@ -207,6 +213,7 @@ function App() {
     const updatedItem: ContentItem = {
       ...targetItem,
       ...(targetItem.taskType === 'General' ? { dueDate: newDate } : { publishDate: newDate }),
+      actorId: currentUser?.id,
       updatedAt: new Date().toISOString(),
     };
 
@@ -227,10 +234,17 @@ function App() {
     const originalItems = [...items];
     const targetItem = items.find((item) => item.id === id);
     if (!targetItem || targetItem.status === newStatus) return;
+    if (!['Idea', 'To Do'].includes(newStatus) && !targetItem.ownerId && !targetItem.assignee) {
+      setSelectedItem(targetItem);
+      setIsModalOpen(true);
+      addToast('Pilih satu PIC sebelum task masuk tahap aktif.', 'error');
+      return;
+    }
 
     const updatedItem: ContentItem = {
       ...targetItem,
       status: newStatus,
+      actorId: currentUser?.id,
       updatedAt: new Date().toISOString(),
     };
 
@@ -445,14 +459,14 @@ function App() {
   const filteredItems = useMemo(() => scopedItems.filter((item) => {
     if (taskView === 'content') return item.taskType === 'Content';
     if (taskView === 'general') return item.taskType === 'General';
-    if (taskView === 'mine') return item.assignee === currentUser?.name;
+    if (taskView === 'mine') return currentUser ? isUserInvolved(item, currentUser) : false;
     if (taskView === 'overdue') {
       const date = item.taskType === 'General' ? item.dueDate : item.publishDate;
       const done = item.status === 'Done' || item.status === 'Published';
       return !!date && date < new Date().toISOString().slice(0, 10) && !done;
     }
     return true;
-  }), [scopedItems, taskView, currentUser?.name]);
+  }), [scopedItems, taskView, currentUser]);
 
   const scopeLabel = selectedBrand
     ? `${selectedBrand.client} / ${selectedBrand.brand}`
@@ -570,7 +584,7 @@ function App() {
             onOpenCreateModalWithStatus={handleOpenCreateModalWithStatus}
             channels={channels}
             variablesConfig={variablesConfig}
-            activeUser={currentUser.name}
+            currentUser={currentUser}
           />
         )}
 
@@ -589,7 +603,7 @@ function App() {
             onEditItem={handleOpenEditModal}
             channels={channels}
             variablesConfig={variablesConfig}
-            activeUser={currentUser.name}
+            currentUser={currentUser}
           />
         )}
 
@@ -646,6 +660,7 @@ function App() {
         variablesConfig={variablesConfig}
         customTags={customTags}
         activeUser={currentUser.name}
+        activeUserId={currentUser.id}
         comments={comments}
         onAddComment={handleAddComment}
         onAddCreator={handleAddCreator}

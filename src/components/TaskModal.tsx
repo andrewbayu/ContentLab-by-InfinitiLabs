@@ -16,6 +16,7 @@ interface TaskModalProps {
   variablesConfig: VariablesConfig;
   customTags: string[];
   activeUser: string;
+  activeUserId: string;
   comments: CommentItem[];
   onAddComment: (contentId: string, text: string) => void;
   onAddCreator: (name: string, email: string) => Promise<TeamMember>;
@@ -45,6 +46,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   variablesConfig,
   customTags,
   activeUser,
+  activeUserId,
   comments,
   onAddComment,
   onAddCreator,
@@ -58,7 +60,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [channel, setChannel] = useState('');
   const [format, setFormat] = useState<ContentItem['format']>('Video');
   const [priority, setPriority] = useState<ContentItem['priority']>('Medium');
-  const [assignee, setAssignee] = useState('');
+  const [ownerId, setOwnerId] = useState('');
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>([]);
+  const [reviewerId, setReviewerId] = useState('');
+  const [assignmentError, setAssignmentError] = useState('');
   const [publishDate, setPublishDate] = useState('');
   const [assetsLink, setAssetsLink] = useState('');
   const [taskType, setTaskType] = useState<TaskType>('Content');
@@ -106,13 +111,16 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   // Update form fields when modal opens or item changes
   useEffect(() => {
     if (item) {
+      const legacyOwnerMatches = team.filter((member) => member.name.trim().toLowerCase() === item.assignee.trim().toLowerCase());
       setTitle(item.title);
       setBrief(item.brief);
       setStatus(item.status);
       setChannel(item.channel);
       setFormat(item.format);
       setPriority(item.priority || 'Medium');
-      setAssignee(item.assignee);
+      setOwnerId(item.ownerId || (legacyOwnerMatches.length === 1 ? legacyOwnerMatches[0].id : ''));
+      setCollaboratorIds(item.collaboratorIds || []);
+      setReviewerId(item.reviewerId || '');
       setPublishDate(item.publishDate || '');
       setAssetsLink(item.assetsLink || '');
       setTaskType(item.taskType || 'Content');
@@ -146,7 +154,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setChannel(channels.length > 0 ? channels[0].name : '');
       setFormat('Video');
       setPriority('Medium');
-      setAssignee(activeUser || (team.length > 0 ? team[0].name : ''));
+      setOwnerId(activeUserId || '');
+      setCollaboratorIds([]);
+      setReviewerId('');
       setPublishDate('');
       setAssetsLink('');
       const inferredType: TaskType = initialStatus && ['To Do', 'In Progress', 'Done'].includes(initialStatus) ? 'General' : 'Content';
@@ -176,13 +186,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setCommentText('');
     setShowMentionSuggestions(false);
     setNewChecklistItemText('');
-  }, [item, initialStatus, isOpen, team, channels, activeUser, defaultClientBrand]);
+    setAssignmentError('');
+  }, [item, initialStatus, isOpen, team, channels, activeUser, activeUserId, defaultClientBrand]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    const ownerRequired = !['Idea', 'To Do'].includes(status);
+    if (ownerRequired && !ownerId) {
+      setAssignmentError('Pilih satu PIC sebelum task masuk tahap aktif.');
+      return;
+    }
+    const owner = team.find((member) => member.id === ownerId);
 
     onSave({
       id: item?.id,
@@ -192,7 +209,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       channel: taskType === 'Content' ? channel : '',
       format: taskType === 'Content' ? format : 'Article',
       priority,
-      assignee,
+      assignee: owner?.name || '',
+      ownerId,
+      collaboratorIds: collaboratorIds.filter((id) => id !== ownerId && id !== reviewerId),
+      reviewerId: reviewerId === ownerId ? '' : reviewerId,
       publishDate: taskType === 'Content' && variablesConfig.publishDate ? publishDate : '',
       assetsLink,
       tags: variablesConfig.tags ? selectedTags.join(',') : '',
@@ -334,7 +354,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setIsAddingCreator(true);
     try {
       const created = await onAddCreator(newCreatorName.trim(), newCreatorEmail.trim());
-      setAssignee(created.name);
+      setOwnerId(created.id);
       setNewCreatorName('');
       setNewCreatorEmail('');
       setShowAddCreatorForm(false);
@@ -374,14 +394,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     }
   };
 
-  const handleAssigneeDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleOwnerDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     if (val === '__add_new__') {
       setShowAddCreatorForm(true);
     } else {
-      setAssignee(val);
+      setOwnerId(val);
+      setCollaboratorIds((previous) => previous.filter((id) => id !== val));
+      if (reviewerId === val) setReviewerId('');
+      setAssignmentError('');
       setShowAddCreatorForm(false);
     }
+  };
+
+  const toggleCollaborator = (userId: string) => {
+    setCollaboratorIds((previous) => previous.includes(userId)
+      ? previous.filter((id) => id !== userId)
+      : [...previous, userId]);
   };
 
   const handleTaskTypeChange = (nextType: TaskType) => {
@@ -436,8 +465,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             
             {/* LEFT COLUMN: Main Form Editor Fields */}
             <div className="modal-column-left">
-              {/* Multi-user creator track banner */}
-              {item && item.createdBy && (
+              {/* Immutable creator audit banner */}
+              {(item?.createdBy || activeUser) && (
                 <div style={{
                   fontSize: '12px',
                   color: 'var(--text-secondary)',
@@ -447,7 +476,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   border: '1px solid var(--border-subtle)',
                   marginBottom: '4px'
                 }}>
-                  Planned & Created by: <strong>{item.createdBy}</strong>
+                  Creator: <strong>{item?.createdBy || activeUser}</strong>
+                  <span style={{ marginLeft: '6px', color: 'var(--text-muted)' }}>· otomatis, tidak dapat diubah</span>
                 </div>
               )}
 
@@ -645,26 +675,29 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               </div>
               )}
 
-              {/* Creator / Assignee Section with dynamic adding */}
+              {/* Ownership and participation */}
+              <div className="assignment-panel">
               <div className="form-group">
-                <label className="form-label">Creator / Assignee</label>
+                <label className="form-label">PIC / Owner</label>
+                <span className="form-help">Satu orang yang bertanggung jawab menyelesaikan task.</span>
                 <select
                   className="form-select"
-                  value={assignee}
-                  onChange={handleAssigneeDropdownChange}
+                  value={ownerId}
+                  onChange={handleOwnerDropdownChange}
                 >
                   <option value="">Unassigned</option>
                   {team.map((member) => (
-                    <option key={member.id} value={member.name}>
-                      {member.name}
+                    <option key={member.id} value={member.id}>
+                      {member.name}{member.email ? ` — ${member.email}` : ''}
                     </option>
                   ))}
                   {canManageRegistries && (
                     <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                      ➕ Add New Creator...
+                      ➕ Add Team Member...
                     </option>
                   )}
                 </select>
+                {assignmentError && <span className="form-error">{assignmentError}</span>}
 
                 {/* Inline Add Creator Form */}
                 {canManageRegistries && showAddCreatorForm && (
@@ -678,12 +711,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     flexDirection: 'column',
                     gap: '8px'
                   }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>Add New Creator Crew</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>Add New Team Member</span>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="Creator Name"
+                        placeholder="Team member name"
                         value={newCreatorName}
                         onChange={(e) => setNewCreatorName(e.target.value)}
                       />
@@ -713,6 +746,51 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Collaborators</label>
+                <span className="form-help">Pilih semua anggota yang ikut mengerjakan. PIC tidak perlu dipilih lagi.</span>
+                <div className="member-choice-grid">
+                  {team.filter((member) => member.id !== ownerId && member.id !== reviewerId).map((member) => {
+                    const selected = collaboratorIds.includes(member.id);
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        className={`member-choice ${selected ? 'selected' : ''}`}
+                        onClick={() => toggleCollaborator(member.id)}
+                        title={member.email || member.name}
+                      >
+                        <span className="member-choice-avatar">{member.name.charAt(0)}</span>
+                        <span>{member.name}</span>
+                        <span className="member-choice-check">{selected ? '✓' : '+'}</span>
+                      </button>
+                    );
+                  })}
+                  {team.length === 0 && <span className="form-help">Belum ada anggota tim.</span>}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Reviewer / Approver</label>
+                <span className="form-help">Opsional; cocok untuk content atau task yang memerlukan approval.</span>
+                <select
+                  className="form-select"
+                  value={reviewerId}
+                  onChange={(e) => {
+                    setReviewerId(e.target.value);
+                    setCollaboratorIds((previous) => previous.filter((id) => id !== e.target.value));
+                  }}
+                >
+                  <option value="">No reviewer</option>
+                  {team.filter((member) => member.id !== ownerId).map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}{member.email ? ` — ${member.email}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
               </div>
 
               {/* Target Publish Date (Togglable) & Priority Row */}

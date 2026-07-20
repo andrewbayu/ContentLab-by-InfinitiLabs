@@ -2,6 +2,7 @@ export type TaskType = 'Content' | 'General';
 export type UserRole = 'super' | 'team';
 export type KpiDirection = 'increase' | 'decrease';
 export type KpiCadence = 'Weekly' | 'Monthly' | 'Quarterly';
+export type TaskMemberRole = 'creator' | 'owner' | 'collaborator' | 'reviewer';
 export type TaskStatus =
   | 'Idea'
   | 'Scripting/Writing'
@@ -22,6 +23,11 @@ export interface ContentItem {
   format: 'Video' | 'Carousel' | 'Graphic' | 'Article' | 'Short';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   assignee: string;
+  ownerId?: string;
+  creatorId?: string;
+  collaboratorIds?: string[];
+  reviewerId?: string;
+  actorId?: string;
   publishDate: string; // YYYY-MM-DD
   assetsLink: string;
   // Optional variables
@@ -59,6 +65,22 @@ export interface TeamMember {
   avatar: string;
   password?: string; // New field for multi-user authentication
   role: UserRole;
+}
+
+export interface TaskMember {
+  id: string;
+  taskId: string;
+  userId: string;
+  role: TaskMemberRole;
+  addedAt: string;
+  addedBy: string;
+}
+
+export function isUserInvolved(item: ContentItem, user: Pick<TeamMember, 'id' | 'name'>): boolean {
+  return item.ownerId === user.id ||
+    item.reviewerId === user.id ||
+    (item.collaboratorIds || []).includes(user.id) ||
+    (!item.ownerId && item.assignee.toLowerCase() === user.name.toLowerCase());
 }
 
 export interface Channel {
@@ -366,7 +388,41 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
     if (!response.ok) throw new Error('API fetch failed');
     const data = await response.json();
     
-    const content = (data.content || []).map((item: any) => ({
+    const team = (data.team || []).map((item: any) => ({
+      id: String(item.id || ''),
+      name: String(item.name || ''),
+      email: String(item.email || ''),
+      avatar: String(item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'),
+      password: item.password ? String(item.password) : '',
+      role: String(item.role || 'team').toLowerCase() === 'super' ? 'super' : 'team',
+    })) as TeamMember[];
+
+    const taskMembers = (data.taskMembers || []).map((item: any) => ({
+      id: String(item.id || ''),
+      taskId: String(item.taskId || ''),
+      userId: String(item.userId || ''),
+      role: String(item.role || '') as TaskMemberRole,
+      addedAt: String(item.addedAt || ''),
+      addedBy: String(item.addedBy || ''),
+    })) as TaskMember[];
+
+    const uniqueUserIdForName = (name: unknown) => {
+      const normalized = String(name || '').trim().toLowerCase();
+      if (!normalized) return '';
+      const matches = team.filter((member) => member.name.trim().toLowerCase() === normalized);
+      return matches.length === 1 ? matches[0].id : '';
+    };
+
+    const content = (data.content || []).map((item: any) => {
+      const memberships = taskMembers.filter((member) => member.taskId === String(item.id || ''));
+      const creatorId = memberships.find((member) => member.role === 'creator')?.userId || uniqueUserIdForName(item.createdBy);
+      const ownerId = memberships.find((member) => member.role === 'owner')?.userId || uniqueUserIdForName(item.assignee);
+      const reviewerId = memberships.find((member) => member.role === 'reviewer')?.userId || '';
+      const collaboratorIds = memberships.filter((member) => member.role === 'collaborator').map((member) => member.userId);
+      const creator = team.find((member) => member.id === creatorId);
+      const owner = team.find((member) => member.id === ownerId);
+
+      return {
       id: String(item.id || ''),
       title: String(item.title || ''),
       brief: String(item.brief || ''),
@@ -374,14 +430,18 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       channel: String(item.channel || 'YouTube') as ContentItem['channel'],
       format: String(item.format || 'Article') as ContentItem['format'],
       priority: String(item.priority || 'Medium') as ContentItem['priority'],
-      assignee: String(item.assignee || ''),
+      assignee: owner?.name || String(item.assignee || ''),
+      ownerId,
+      creatorId,
+      collaboratorIds,
+      reviewerId,
       publishDate: String(item.publishDate ? item.publishDate.split('T')[0] : ''),
       assetsLink: String(item.assetsLink || ''),
       tags: item.tags ? String(item.tags) : '',
       budget: item.budget ? String(item.budget) : '',
       platformNotes: item.platformNotes ? String(item.platformNotes) : '',
       targetAudience: item.targetAudience ? String(item.targetAudience) : '',
-      createdBy: item.createdBy ? String(item.createdBy) : '',
+      createdBy: creator?.name || (item.createdBy ? String(item.createdBy) : ''),
       checklist: item.checklist ? String(item.checklist) : '',
       views: item.views ? String(item.views) : '',
       likes: item.likes ? String(item.likes) : '',
@@ -393,16 +453,8 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       brand: item.brand ? String(item.brand) : '',
       createdAt: String(item.createdAt || new Date().toISOString()),
       updatedAt: String(item.updatedAt || new Date().toISOString()),
-    }));
-
-    const team = (data.team || []).map((item: any) => ({
-      id: String(item.id || ''),
-      name: String(item.name || ''),
-      email: String(item.email || ''),
-      avatar: String(item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'),
-      password: item.password ? String(item.password) : '',
-      role: String(item.role || 'team').toLowerCase() === 'super' ? 'super' : 'team',
-    }));
+      };
+    });
 
     const channels = (data.channels || []).map((item: any) => ({
       id: String(item.id || ''),

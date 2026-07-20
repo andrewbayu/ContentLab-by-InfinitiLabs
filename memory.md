@@ -14,7 +14,7 @@ Dokumen ini berfungsi sebagai acuan kelanjutan proyek (*continuity guide*) bagi 
 ---
 
 ## 🗂️ 2. Skema Struktur Database Google Sheets
-Database spreadsheet terdiri dari **7 tab** dengan kolom-kolom persis seperti berikut di baris pertama:
+Database spreadsheet terdiri dari **8 tab** dengan kolom-kolom persis seperti berikut di baris pertama:
 
 ### A. Tab `Content` (26 Kolom, A s/d Z)
 `id` | `title` | `brief` | `status` | `channel` | `format` | `priority` | `assignee` | `publishDate` | `assetsLink` | `tags` | `budget` | `platformNotes` | `targetAudience` | `createdBy` | `checklist` | `views` | `likes` | `engagement` | `createdAt` | `updatedAt` | `taskType` | `category` | `dueDate` | `client` | `brand`
@@ -43,6 +43,11 @@ Database spreadsheet terdiri dari **7 tab** dengan kolom-kolom persis seperti be
 ### G. Tab `KPI Updates` (8 Kolom, A s/d H)
 `id` | `kpiId` | `period` | `actual` | `notes` | `sourceLink` | `updatedBy` | `updatedAt`
 
+### H. Tab `Task Members` (6 Kolom, A s/d F)
+`id` | `taskId` | `userId` | `role` | `addedAt` | `addedBy`
+
+Role task member: `creator` (immutable), `owner` (satu PIC), `collaborator` (bisa banyak), dan `reviewer` (opsional).
+
 ---
 
 ## 🧭 3. Task Umum & Multi-Client
@@ -54,6 +59,9 @@ Database spreadsheet terdiri dari **7 tab** dengan kolom-kolom persis seperti be
 *   Data lama yang tidak memiliki `taskType` dibaca sebagai `Content` agar backward-compatible.
 *   Scope switcher mendukung level All Clients, satu client, atau satu brand dan berlaku konsisten pada Overview, Tasks, Calendar, serta Analytics.
 *   View task bawaan: All Work, Content, General, My Work, dan Overdue.
+*   Creator terisi otomatis dari user login dan tidak berubah saat PIC diganti.
+*   Satu task memiliki maksimal satu PIC, beberapa collaborator, dan satu reviewer opsional.
+*   My Work mencakup task ketika user menjadi PIC, collaborator, atau reviewer.
 
 ### Analytics & KPI
 

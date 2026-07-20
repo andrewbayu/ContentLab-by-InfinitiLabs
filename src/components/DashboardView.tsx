@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isUserInvolved } from '../services/sheets';
 import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
 import { 
   Layers, 
@@ -140,7 +141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
 
   // --- PERSONAL CALCULATIONS (WORKSPACE SAYA) ---
-  const myItems = items.filter((item) => item.assignee === currentUser.name);
+  const myItems = items.filter((item) => isUserInvolved(item, currentUser));
 
   // 1. Personal Active Tasks (Backlog)
   const myActiveTasks = myItems.filter(
@@ -613,7 +614,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '11px', color: 'var(--text-secondary)' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Eye size={10} /> <strong>{formatNumber(parseInt(item.views || '0', 10))}</strong> Views</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><ThumbsUp size={10} /> <strong>{formatNumber(parseInt(item.likes || '0', 10))}</strong> Likes</span>
-                          <span>Creator: {item.assignee || 'Unassigned'}</span>
+                          <span>PIC: {item.assignee || 'Unassigned'}</span>
                         </div>
                       </div>
                     </div>
@@ -700,7 +701,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span className={getStatusClass(item.status)} style={{ fontWeight: 500 }}>
                             {item.status}
                           </span>
-                          <span className="text-muted">| Creator: {item.assignee || 'Unassigned'}</span>
+                          <span className="text-muted">| PIC: {item.assignee || 'Unassigned'}</span>
                         </div>
                       </div>
                     </div>
