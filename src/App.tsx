@@ -7,6 +7,7 @@ import { SettingsView } from './components/SettingsView';
 import { TaskModal } from './components/TaskModal';
 import { LoginPage } from './components/LoginPage';
 import { CalendarView } from './components/CalendarView';
+import { AnalyticsView } from './components/AnalyticsView';
 import {
   fetchData,
   createContent,
@@ -18,13 +19,15 @@ import {
   createTeamMember,
   deleteTeamMember,
   createComment,
+  createKpiDefinition,
+  createKpiUpdate,
   getVariablesConfig,
   saveVariablesConfig,
   getCustomTags,
   saveCustomTags,
   isMockMode
 } from './services/sheets';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from './services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate } from './services/sheets';
 import { RefreshCw, CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -32,6 +35,8 @@ interface Toast {
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+type TaskView = 'all' | 'content' | 'general' | 'mine' | 'overdue';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
@@ -50,9 +55,10 @@ function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [clients, setClients] = useState<ClientBrand[]>([]);
-  const [taskTypeFilter, setTaskTypeFilter] = useState<'All' | TaskType>('All');
-  const [clientFilter, setClientFilter] = useState('');
-  const [brandFilter, setBrandFilter] = useState('');
+  const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>([]);
+  const [kpiUpdates, setKpiUpdates] = useState<KpiUpdate[]>([]);
+  const [scopeKey, setScopeKey] = useState(() => localStorage.getItem('contentlab_scope_key') || 'all');
+  const [taskView, setTaskView] = useState<TaskView>(() => (localStorage.getItem('contentlab_task_view') as TaskView) || 'all');
   
   // Custom configurations & tags registry
   const [variablesConfig, setVariablesConfig] = useState<VariablesConfig>(getVariablesConfig());
@@ -77,6 +83,8 @@ function App() {
       setChannels(data.channels);
       setComments(data.comments || []);
       setClients(data.clients || []);
+      setKpiDefinitions(data.kpiDefinitions || []);
+      setKpiUpdates(data.kpiUpdates || []);
 
       // Keep only sessions that still exist in the live Team registry.
       if (currentUser) {
@@ -110,6 +118,13 @@ function App() {
       setActiveTab('dashboard');
     }
   }, [activeTab, currentUser?.role]);
+
+  useEffect(() => {
+    if (scopeKey.startsWith('brand:') && clients.length > 0 && !clients.some((entry) => `brand:${entry.id}` === scopeKey)) {
+      setScopeKey('all');
+      localStorage.setItem('contentlab_scope_key', 'all');
+    }
+  }, [clients, scopeKey]);
 
   // Handle connection settings change
   const handleConnectionChange = () => {
@@ -349,6 +364,33 @@ function App() {
     }
   };
 
+  const handleCreateKpiDefinition = async (definition: Omit<KpiDefinition, 'id' | 'createdAt'>): Promise<KpiDefinition> => {
+    if (currentUser?.role !== 'super') throw new Error('Super access required');
+    try {
+      const created = await createKpiDefinition(definition);
+      setKpiDefinitions((previous) => [...previous, created]);
+      addToast(`KPI "${created.name}" created for ${created.brand}.`, 'success');
+      return created;
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to create KPI.', 'error');
+      throw error;
+    }
+  };
+
+  const handleCreateKpiUpdate = async (update: Omit<KpiUpdate, 'id' | 'updatedAt'>): Promise<KpiUpdate> => {
+    try {
+      const created = await createKpiUpdate(update);
+      setKpiUpdates((previous) => [...previous, created]);
+      addToast('KPI progress updated.', 'success');
+      return created;
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to update KPI progress.', 'error');
+      throw error;
+    }
+  };
+
   // Variable toggles
   const handleSaveVariablesConfig = (config: VariablesConfig) => {
     saveVariablesConfig(config);
@@ -387,22 +429,44 @@ function App() {
     setIsModalOpen(true);
   };
 
-  const filteredItems = useMemo(() => items.filter((item) => {
-    if (taskTypeFilter !== 'All' && item.taskType !== taskTypeFilter) return false;
-    if (clientFilter && item.client !== clientFilter) return false;
-    if (brandFilter && item.brand !== brandFilter) return false;
+  const selectedBrand = useMemo(
+    () => scopeKey.startsWith('brand:') ? clients.find((entry) => `brand:${entry.id}` === scopeKey) : undefined,
+    [clients, scopeKey]
+  );
+
+  const selectedClient = scopeKey.startsWith('client:') ? scopeKey.slice(7) : '';
+
+  const scopedItems = useMemo(() => items.filter((item) => {
+    if (selectedBrand) return item.client === selectedBrand.client && item.brand === selectedBrand.brand;
+    if (selectedClient) return item.client === selectedClient;
     return true;
-  }), [items, taskTypeFilter, clientFilter, brandFilter]);
+  }), [items, selectedBrand, selectedClient]);
 
-  const availableClients = useMemo(
-    () => Array.from(new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))),
-    [clients]
-  );
+  const filteredItems = useMemo(() => scopedItems.filter((item) => {
+    if (taskView === 'content') return item.taskType === 'Content';
+    if (taskView === 'general') return item.taskType === 'General';
+    if (taskView === 'mine') return item.assignee === currentUser?.name;
+    if (taskView === 'overdue') {
+      const date = item.taskType === 'General' ? item.dueDate : item.publishDate;
+      const done = item.status === 'Done' || item.status === 'Published';
+      return !!date && date < new Date().toISOString().slice(0, 10) && !done;
+    }
+    return true;
+  }), [scopedItems, taskView, currentUser?.name]);
 
-  const availableBrands = useMemo(
-    () => clients.filter((entry) => entry.active && (!clientFilter || entry.client === clientFilter)),
-    [clients, clientFilter]
-  );
+  const scopeLabel = selectedBrand
+    ? `${selectedBrand.client} / ${selectedBrand.brand}`
+    : selectedClient || 'InfinitiLabs / All Clients';
+
+  const handleScopeChange = (nextScope: string) => {
+    setScopeKey(nextScope);
+    localStorage.setItem('contentlab_scope_key', nextScope);
+  };
+
+  const handleTaskViewChange = (nextView: TaskView) => {
+    setTaskView(nextView);
+    localStorage.setItem('contentlab_task_view', nextView);
+  };
 
   // Render Login page if not authenticated
   if (!isAuthenticated || !currentUser) {
@@ -440,6 +504,9 @@ function App() {
       isMock={isMock}
       currentUser={currentUser}
       onLogout={handleLogout}
+      clients={clients}
+      scopeKey={scopeKey}
+      onScopeChange={handleScopeChange}
     >
       {/* Loading Overlay */}
       {isLoading && (
@@ -469,27 +536,25 @@ function App() {
 
       {/* Pages Container */}
       <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {activeTab !== 'settings' && (
-          <div className="workspace-filter-bar">
-            <select className="select-filter" value={taskTypeFilter} onChange={(e) => setTaskTypeFilter(e.target.value as 'All' | TaskType)}>
-              <option value="All">All Tasks</option>
-              <option value="Content">Content Tasks</option>
-              <option value="General">General Tasks</option>
-            </select>
-            <select className="select-filter" value={clientFilter} onChange={(e) => { setClientFilter(e.target.value); setBrandFilter(''); }}>
-              <option value="">All Clients</option>
-              {availableClients.map((client) => <option key={client} value={client}>{client}</option>)}
-            </select>
-            <select className="select-filter" value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}>
-              <option value="">All Brands</option>
-              {availableBrands.map((entry) => <option key={entry.id} value={entry.brand}>{entry.brand}</option>)}
-            </select>
-            <span className="workspace-filter-count">{filteredItems.length} of {items.length} tasks</span>
+        {['board', 'calendar', 'list'].includes(activeTab) && (
+          <div className="task-view-bar">
+            <div className="task-view-tabs">
+              {([
+                ['all', 'All Work'],
+                ['content', 'Content'],
+                ['general', 'General'],
+                ['mine', 'My Work'],
+                ['overdue', 'Overdue'],
+              ] as [TaskView, string][]).map(([value, label]) => (
+                <button key={value} className={`task-view-tab ${taskView === value ? 'active' : ''}`} onClick={() => handleTaskViewChange(value)}>{label}</button>
+              ))}
+            </div>
+            <div className="task-view-context"><strong>{scopeLabel}</strong><span>{filteredItems.length} of {scopedItems.length} tasks</span></div>
           </div>
         )}
         {activeTab === 'dashboard' && (
           <DashboardView
-            items={filteredItems}
+            items={scopedItems}
             onEditItem={handleOpenEditModal}
             channels={channels}
             variablesConfig={variablesConfig}
@@ -528,6 +593,20 @@ function App() {
           />
         )}
 
+        {activeTab === 'analytics' && (
+          <AnalyticsView
+            items={scopedItems}
+            clients={clients}
+            definitions={kpiDefinitions}
+            updates={kpiUpdates}
+            scopeKey={scopeKey}
+            scopeLabel={scopeLabel}
+            currentUser={currentUser}
+            onCreateDefinition={handleCreateKpiDefinition}
+            onCreateUpdate={handleCreateKpiUpdate}
+          />
+        )}
+
         {activeTab === 'settings' && currentUser.role === 'super' && (
           <SettingsView
             onConnectionChange={handleConnectionChange}
@@ -543,6 +622,8 @@ function App() {
             channels={channels}
             onAddChannel={handleAddChannel}
             onDeleteChannel={handleDeleteChannel}
+            clients={clients}
+            onAddClientBrand={handleAddClientBrand}
           />
         )}
       </div>
@@ -561,6 +642,7 @@ function App() {
         team={team}
         channels={channels}
         clients={clients}
+        defaultClientBrand={selectedBrand}
         variablesConfig={variablesConfig}
         customTags={customTags}
         activeUser={currentUser.name}

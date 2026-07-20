@@ -14,7 +14,7 @@ Dokumen ini berfungsi sebagai acuan kelanjutan proyek (*continuity guide*) bagi 
 ---
 
 ## 🗂️ 2. Skema Struktur Database Google Sheets
-Database spreadsheet terdiri dari **5 tab** dengan kolom-kolom persis seperti berikut di baris pertama:
+Database spreadsheet terdiri dari **7 tab** dengan kolom-kolom persis seperti berikut di baris pertama:
 
 ### A. Tab `Content` (26 Kolom, A s/d Z)
 `id` | `title` | `brief` | `status` | `channel` | `format` | `priority` | `assignee` | `publishDate` | `assetsLink` | `tags` | `budget` | `platformNotes` | `targetAudience` | `createdBy` | `checklist` | `views` | `likes` | `engagement` | `createdAt` | `updatedAt` | `taskType` | `category` | `dueDate` | `client` | `brand`
@@ -37,6 +37,12 @@ Database spreadsheet terdiri dari **5 tab** dengan kolom-kolom persis seperti be
 ### E. Tab `Clients` (5 Kolom, A s/d E)
 `id` | `client` | `brand` | `color` | `active`
 
+### F. Tab `KPI Definitions` (14 Kolom, A s/d N)
+`id` | `clientBrandId` | `client` | `brand` | `name` | `category` | `unit` | `baseline` | `target` | `direction` | `cadence` | `weight` | `active` | `createdAt`
+
+### G. Tab `KPI Updates` (8 Kolom, A s/d H)
+`id` | `kpiId` | `period` | `actual` | `notes` | `sourceLink` | `updatedBy` | `updatedAt`
+
 ---
 
 ## 🧭 3. Task Umum & Multi-Client
@@ -46,6 +52,14 @@ Database spreadsheet terdiri dari **5 tab** dengan kolom-kolom persis seperti be
 *   Task `Content` tetap memakai channel, format, publish date, dan metrik performa.
 *   Pasangan client–brand dikelola dari tab `Clients`, dapat dibuat langsung dari form task, dan dapat difilter secara global di workspace.
 *   Data lama yang tidak memiliki `taskType` dibaca sebagai `Content` agar backward-compatible.
+*   Scope switcher mendukung level All Clients, satu client, atau satu brand dan berlaku konsisten pada Overview, Tasks, Calendar, serta Analytics.
+*   View task bawaan: All Work, Content, General, My Work, dan Overdue.
+
+### Analytics & KPI
+
+*   KPI target didefinisikan per client/brand oleh role `super` di tab `KPI Definitions`.
+*   Role `team` dan `super` dapat menambahkan aktual KPI; setiap input menjadi riwayat baru di `KPI Updates` agar tren tidak hilang.
+*   Analytics menampilkan metrik operasional otomatis dari task serta KPI manual target-versus-actual.
 
 ---
 

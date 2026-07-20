@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getScriptUrl, saveScriptUrl, validateScriptUrl } from '../services/sheets';
-import type { TeamMember, Channel, VariablesConfig } from '../services/sheets';
+import type { TeamMember, Channel, VariablesConfig, ClientBrand } from '../services/sheets';
 import {
   Link,
   CheckCircle,
@@ -13,7 +13,8 @@ import {
   Sliders,
   Radio,
   Trash2,
-  Plus
+  Plus,
+  Building2
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -34,6 +35,8 @@ interface SettingsViewProps {
   channels: Channel[];
   onAddChannel: (name: string, color: string) => Promise<Channel>;
   onDeleteChannel: (id: string) => void;
+  clients: ClientBrand[];
+  onAddClientBrand: (client: string, brand: string, color: string) => Promise<ClientBrand>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -49,9 +52,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onDeleteCreator,
   channels,
   onAddChannel,
-  onDeleteChannel
+  onDeleteChannel,
+  clients,
+  onAddClientBrand
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'variables' | 'tags' | 'team' | 'channels' | 'connection'>('variables');
+  const [activeSubTab, setActiveSubTab] = useState<'variables' | 'tags' | 'team' | 'channels' | 'clients' | 'connection'>('variables');
   
   // Connection state
   const [url, setUrl] = useState(getScriptUrl() || '');
@@ -70,6 +75,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [channelName, setChannelName] = useState('');
   const [channelColor, setChannelColor] = useState('#2563eb');
   const [isAddingChannel, setIsAddingChannel] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [brandName, setBrandName] = useState('');
+  const [brandColor, setBrandColor] = useState('#2563eb');
+  const [isAddingClientBrand, setIsAddingClientBrand] = useState(false);
 
   const currentUrl = getScriptUrl();
 
@@ -156,6 +165,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
+  const handleAddClientBrandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientName.trim() || !brandName.trim()) return;
+    setIsAddingClientBrand(true);
+    try {
+      await onAddClientBrand(clientName.trim(), brandName.trim(), brandColor);
+      setClientName('');
+      setBrandName('');
+      setBrandColor('#2563eb');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsAddingClientBrand(false);
+    }
+  };
+
   const copyScriptCode = () => {
     const code = `function doGet(e) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -164,6 +189,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const channels = getSheetData(sheet.getSheetByName("Channels"));
   const comments = getSheetData(sheet.getSheetByName("Comments"));
   const clients = getSheetData(sheet.getSheetByName("Clients"));
+  const kpiDefinitions = getSheetData(sheet.getSheetByName("KPI Definitions"));
+  const kpiUpdates = getSheetData(sheet.getSheetByName("KPI Updates"));
   const publicTeam = team.map(function(member) {
     return {
       id: member.id,
@@ -179,7 +206,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     team: publicTeam,
     channels: channels,
     comments: comments,
-    clients: clients
+    clients: clients,
+    kpiDefinitions: kpiDefinitions,
+    kpiUpdates: kpiUpdates
   };
   
   return ContentService.createTextOutput(JSON.stringify(payload))
@@ -283,6 +312,31 @@ function doPost(e) {
         clientBrand.color || "#2563eb", clientBrand.active !== false
       ]);
       result = { success: true, clientBrand: clientBrand };
+    }
+    else if (action === "createKpiDefinition") {
+      const kpiSheet = sheet.getSheetByName("KPI Definitions");
+      const definition = postData.definition;
+      definition.id = definition.id || Utilities.getUUID();
+      definition.createdAt = definition.createdAt || new Date().toISOString();
+      kpiSheet.appendRow([
+        definition.id, definition.clientBrandId, definition.client, definition.brand,
+        definition.name, definition.category || "Business", definition.unit || "Number",
+        Number(definition.baseline || 0), Number(definition.target || 0),
+        definition.direction || "increase", definition.cadence || "Monthly",
+        Number(definition.weight || 1), definition.active !== false, definition.createdAt
+      ]);
+      result = { success: true, definition: definition };
+    }
+    else if (action === "createKpiUpdate") {
+      const updateSheet = sheet.getSheetByName("KPI Updates");
+      const update = postData.update;
+      update.id = update.id || Utilities.getUUID();
+      update.updatedAt = new Date().toISOString();
+      updateSheet.appendRow([
+        update.id, update.kpiId, update.period, Number(update.actual || 0),
+        update.notes || "", update.sourceLink || "", update.updatedBy || "", update.updatedAt
+      ]);
+      result = { success: true, update: update };
     }
     else if (action === "createComment") {
       const commentSheet = sheet.getSheetByName("Comments");
@@ -429,6 +483,13 @@ function getSheetData(sheet) {
           >
             <Radio size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
             Publish Channels
+          </button>
+          <button
+            className={`settings-nav-item ${activeSubTab === 'clients' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('clients')}
+          >
+            <Building2 size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+            Clients & Brands
           </button>
           <button
             className={`settings-nav-item ${activeSubTab === 'connection' ? 'active' : ''}`}
@@ -710,6 +771,38 @@ function getSheetData(sheet) {
             </div>
           )}
 
+          {/* CLIENTS & BRANDS TAB */}
+          {activeSubTab === 'clients' && (
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title">Clients & Brands</h3>
+              </div>
+              <p className="text-secondary" style={{ fontSize: '13px' }}>
+                Registry ini menjadi scope utama untuk Overview, task views, Calendar, dan Analytics.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+                {clients.map((entry) => (
+                  <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
+                    <span style={{ width: '12px', height: '34px', borderRadius: '5px', backgroundColor: entry.color }} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <strong style={{ fontSize: '13px' }}>{entry.brand}</strong>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{entry.client} · {entry.active ? 'Active' : 'Inactive'}</span>
+                    </div>
+                  </div>
+                ))}
+                {clients.length === 0 && <div className="text-secondary" style={{ fontSize: '13px' }}>No client or brand registered yet.</div>}
+              </div>
+
+              <form onSubmit={handleAddClientBrandSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 46px auto', gap: '12px', marginTop: '16px', borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', alignItems: 'center' }}>
+                <input className="form-input" placeholder="Client name *" value={clientName} onChange={(event) => setClientName(event.target.value)} required />
+                <input className="form-input" placeholder="Brand name *" value={brandName} onChange={(event) => setBrandName(event.target.value)} required />
+                <input type="color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} style={{ width: '42px', height: '42px', padding: 0, border: '1px solid var(--border-strong)', borderRadius: '6px' }} />
+                <button type="submit" className="btn btn-primary" disabled={isAddingClientBrand}>{isAddingClientBrand ? 'Saving...' : 'Add Client / Brand'}</button>
+              </form>
+            </div>
+          )}
+
           {/* CONNECTION TAB */}
           {activeSubTab === 'connection' && (
             <>
@@ -771,7 +864,7 @@ function getSheetData(sheet) {
                   <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
                     <strong>1. Configure Google Sheets Tabs:</strong>
                     <p className="text-secondary" style={{ fontSize: '13px', marginTop: '4px' }}>
-                      Buka spreadsheet Anda dan buat 5 tab dengan judul persis berikut:
+                      Buka spreadsheet Anda dan buat 7 tab dengan judul persis berikut:
                     </p>
                     <ul style={{ listStyleType: 'disc', paddingLeft: '24px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
                       <li>
@@ -812,6 +905,22 @@ function getSheetData(sheet) {
                         Tulis header berikut di baris pertama (kolom A-E):
                         <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)' }}>
                           id | contentId | author | text | createdAt
+                        </div>
+                      </li>
+                      <li style={{ marginTop: '10px' }}>
+                        Nama tab: <strong style={{ color: 'var(--text-primary)' }}>KPI Definitions</strong>
+                        <br />
+                        Tulis header berikut di baris pertama (kolom A-N):
+                        <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                          id | clientBrandId | client | brand | name | category | unit | baseline | target | direction | cadence | weight | active | createdAt
+                        </div>
+                      </li>
+                      <li style={{ marginTop: '10px' }}>
+                        Nama tab: <strong style={{ color: 'var(--text-primary)' }}>KPI Updates</strong>
+                        <br />
+                        Tulis header berikut di baris pertama (kolom A-H):
+                        <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                          id | kpiId | period | actual | notes | sourceLink | updatedBy | updatedAt
                         </div>
                       </li>
                     </ul>

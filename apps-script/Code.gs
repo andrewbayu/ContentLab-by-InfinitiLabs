@@ -5,6 +5,8 @@ function doGet(e) {
   const channels = getSheetData(sheet.getSheetByName("Channels"));
   const comments = getSheetData(sheet.getSheetByName("Comments"));
   const clients = getSheetData(sheet.getSheetByName("Clients"));
+  const kpiDefinitions = getSheetData(sheet.getSheetByName("KPI Definitions"));
+  const kpiUpdates = getSheetData(sheet.getSheetByName("KPI Updates"));
   const publicTeam = team.map(function(member) {
     return {
       id: member.id,
@@ -20,7 +22,9 @@ function doGet(e) {
     team: publicTeam,
     channels: channels,
     comments: comments,
-    clients: clients
+    clients: clients,
+    kpiDefinitions: kpiDefinitions,
+    kpiUpdates: kpiUpdates
   };
   
   return ContentService.createTextOutput(JSON.stringify(payload))
@@ -124,6 +128,31 @@ function doPost(e) {
         clientBrand.color || "#2563eb", clientBrand.active !== false
       ]);
       result = { success: true, clientBrand: clientBrand };
+    }
+    else if (action === "createKpiDefinition") {
+      const kpiSheet = sheet.getSheetByName("KPI Definitions");
+      const definition = postData.definition;
+      definition.id = definition.id || Utilities.getUUID();
+      definition.createdAt = definition.createdAt || new Date().toISOString();
+      kpiSheet.appendRow([
+        definition.id, definition.clientBrandId, definition.client, definition.brand,
+        definition.name, definition.category || "Business", definition.unit || "Number",
+        Number(definition.baseline || 0), Number(definition.target || 0),
+        definition.direction || "increase", definition.cadence || "Monthly",
+        Number(definition.weight || 1), definition.active !== false, definition.createdAt
+      ]);
+      result = { success: true, definition: definition };
+    }
+    else if (action === "createKpiUpdate") {
+      const updateSheet = sheet.getSheetByName("KPI Updates");
+      const update = postData.update;
+      update.id = update.id || Utilities.getUUID();
+      update.updatedAt = new Date().toISOString();
+      updateSheet.appendRow([
+        update.id, update.kpiId, update.period, Number(update.actual || 0),
+        update.notes || "", update.sourceLink || "", update.updatedBy || "", update.updatedAt
+      ]);
+      result = { success: true, update: update };
     }
     else if (action === "createComment") {
       const commentSheet = sheet.getSheetByName("Comments");

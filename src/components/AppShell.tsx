@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { TeamMember } from '../services/sheets';
+import type { ClientBrand, TeamMember } from '../services/sheets';
 import { 
   LayoutDashboard, 
   Kanban, 
@@ -10,7 +10,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  Calendar
+  Calendar,
+  BarChart3
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -21,6 +22,9 @@ interface AppShellProps {
   isMock: boolean;
   currentUser: TeamMember | null;
   onLogout: () => void;
+  clients: ClientBrand[];
+  scopeKey: string;
+  onScopeChange: (scopeKey: string) => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -31,6 +35,9 @@ export const AppShell: React.FC<AppShellProps> = ({
   isMock,
   currentUser,
   onLogout,
+  clients,
+  scopeKey,
+  onScopeChange,
 }) => {
   // Desktop state: visible by default (isSidebarCollapsed = false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -46,6 +53,11 @@ export const AppShell: React.FC<AppShellProps> = ({
     setIsSidebarCollapsed(!isSidebarCollapsed);
     setIsMobileOpen(!isMobileOpen);
   };
+
+  const clientsByName = clients.filter((entry) => entry.active).reduce<Record<string, ClientBrand[]>>((groups, entry) => {
+    groups[entry.client] = [...(groups[entry.client] || []), entry];
+    return groups;
+  }, {});
 
   return (
     <div className="app-layout">
@@ -82,13 +94,26 @@ export const AppShell: React.FC<AppShellProps> = ({
           </button>
         </div>
 
+        <div className="scope-switcher-wrap">
+          <label>Workspace scope</label>
+          <select value={scopeKey} onChange={(event) => onScopeChange(event.target.value)}>
+            <option value="all">InfinitiLabs · All Clients</option>
+            {Object.entries(clientsByName).map(([client, brands]) => (
+              <optgroup key={client} label={client}>
+                <option value={`client:${client}`}>All {client}</option>
+                {brands.map((entry) => <option key={entry.id} value={`brand:${entry.id}`}>↳ {entry.brand}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
         <nav className="sidebar-nav">
           <button
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => handleNavClick('dashboard')}
           >
             <LayoutDashboard className="nav-item-icon" />
-            Dashboard
+            Overview
           </button>
           
           <button
@@ -113,6 +138,14 @@ export const AppShell: React.FC<AppShellProps> = ({
           >
             <ListTodo className="nav-item-icon" />
             Task List
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => handleNavClick('analytics')}
+          >
+            <BarChart3 className="nav-item-icon" />
+            Analytics & KPI
           </button>
 
           {currentUser?.role === 'super' && (
@@ -182,10 +215,11 @@ export const AppShell: React.FC<AppShellProps> = ({
             </button>
 
             <h2 className="header-title">
-              {activeTab === 'dashboard' && 'Dashboard Analytics'}
+              {activeTab === 'dashboard' && 'Workspace Overview'}
               {activeTab === 'board' && 'Task Kanban Board'}
               {activeTab === 'calendar' && 'Task Calendar Planner'}
               {activeTab === 'list' && 'Task List'}
+              {activeTab === 'analytics' && 'Analytics & KPI'}
               {activeTab === 'settings' && 'Settings Center'}
             </h2>
           </div>

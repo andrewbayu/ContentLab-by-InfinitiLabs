@@ -1,5 +1,7 @@
 export type TaskType = 'Content' | 'General';
 export type UserRole = 'super' | 'team';
+export type KpiDirection = 'increase' | 'decrease';
+export type KpiCadence = 'Weekly' | 'Monthly' | 'Quarterly';
 export type TaskStatus =
   | 'Idea'
   | 'Scripting/Writing'
@@ -73,6 +75,34 @@ export interface ClientBrand {
   active: boolean;
 }
 
+export interface KpiDefinition {
+  id: string;
+  clientBrandId: string;
+  client: string;
+  brand: string;
+  name: string;
+  category: string;
+  unit: string;
+  baseline: number;
+  target: number;
+  direction: KpiDirection;
+  cadence: KpiCadence;
+  weight: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface KpiUpdate {
+  id: string;
+  kpiId: string;
+  period: string;
+  actual: number;
+  notes: string;
+  sourceLink: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
 export interface VariablesConfig {
   brief: boolean;
   publishDate: boolean;
@@ -87,6 +117,8 @@ const MOCK_CONTENT_KEY = 'contentlab_mock_content';
 const MOCK_CHANNELS_KEY = 'contentlab_mock_channels';
 const MOCK_COMMENTS_KEY = 'contentlab_mock_comments';
 const MOCK_CLIENTS_KEY = 'contentlab_mock_clients';
+const MOCK_KPI_DEFINITIONS_KEY = 'contentlab_mock_kpi_definitions';
+const MOCK_KPI_UPDATES_KEY = 'contentlab_mock_kpi_updates';
 const VARIABLES_CONFIG_KEY = 'contentlab_variables_config';
 const CUSTOM_TAGS_KEY = 'contentlab_custom_tags';
 
@@ -117,6 +149,9 @@ const INITIAL_MOCK_CHANNELS: Channel[] = [
 const INITIAL_MOCK_CLIENTS: ClientBrand[] = [
   { id: 'cb1', client: 'Internal', brand: 'InfinitiLabs', color: '#2563eb', active: true },
 ];
+
+const INITIAL_MOCK_KPI_DEFINITIONS: KpiDefinition[] = [];
+const INITIAL_MOCK_KPI_UPDATES: KpiUpdate[] = [];
 
 const INITIAL_MOCK_CONTENT: ContentItem[] = [
   {
@@ -250,17 +285,21 @@ export function saveCustomTags(tags: string[]): void {
   localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
 }
 
-function getLocalData(): { content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[]; clients: ClientBrand[] } {
+function getLocalData(): { content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[]; clients: ClientBrand[]; kpiDefinitions: KpiDefinition[]; kpiUpdates: KpiUpdate[] } {
   let content = INITIAL_MOCK_CONTENT;
   let team = INITIAL_MOCK_TEAM;
   let channels = INITIAL_MOCK_CHANNELS;
   let comments = INITIAL_MOCK_COMMENTS;
   let clients = INITIAL_MOCK_CLIENTS;
+  let kpiDefinitions = INITIAL_MOCK_KPI_DEFINITIONS;
+  let kpiUpdates = INITIAL_MOCK_KPI_UPDATES;
 
   const savedContent = localStorage.getItem(MOCK_CONTENT_KEY);
   const savedChannels = localStorage.getItem(MOCK_CHANNELS_KEY);
   const savedComments = localStorage.getItem(MOCK_COMMENTS_KEY);
   const savedClients = localStorage.getItem(MOCK_CLIENTS_KEY);
+  const savedKpiDefinitions = localStorage.getItem(MOCK_KPI_DEFINITIONS_KEY);
+  const savedKpiUpdates = localStorage.getItem(MOCK_KPI_UPDATES_KEY);
 
   if (savedContent) {
     content = JSON.parse(savedContent).map((item: ContentItem) => ({
@@ -291,17 +330,31 @@ function getLocalData(): { content: ContentItem[]; team: TeamMember[]; channels:
     localStorage.setItem(MOCK_CLIENTS_KEY, JSON.stringify(clients));
   }
 
-  return { content, team, channels, comments, clients };
+  if (savedKpiDefinitions) {
+    kpiDefinitions = JSON.parse(savedKpiDefinitions);
+  } else {
+    localStorage.setItem(MOCK_KPI_DEFINITIONS_KEY, JSON.stringify(kpiDefinitions));
+  }
+
+  if (savedKpiUpdates) {
+    kpiUpdates = JSON.parse(savedKpiUpdates);
+  } else {
+    localStorage.setItem(MOCK_KPI_UPDATES_KEY, JSON.stringify(kpiUpdates));
+  }
+
+  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates };
 }
 
-function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[]) {
+function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[], kpiDefinitions?: KpiDefinition[], kpiUpdates?: KpiUpdate[]) {
   localStorage.setItem(MOCK_CONTENT_KEY, JSON.stringify(content));
   if (channels) localStorage.setItem(MOCK_CHANNELS_KEY, JSON.stringify(channels));
   if (comments) localStorage.setItem(MOCK_COMMENTS_KEY, JSON.stringify(comments));
   if (clients) localStorage.setItem(MOCK_CLIENTS_KEY, JSON.stringify(clients));
+  if (kpiDefinitions) localStorage.setItem(MOCK_KPI_DEFINITIONS_KEY, JSON.stringify(kpiDefinitions));
+  if (kpiUpdates) localStorage.setItem(MOCK_KPI_UPDATES_KEY, JSON.stringify(kpiUpdates));
 }
 
-export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[]; clients: ClientBrand[] }> {
+export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[]; clients: ClientBrand[]; kpiDefinitions: KpiDefinition[]; kpiUpdates: KpiUpdate[] }> {
   const url = getScriptUrl();
   if (!url) {
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -373,7 +426,35 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       active: String(item.active ?? 'true').toLowerCase() !== 'false',
     }));
 
-    return { content, team, channels, comments, clients };
+    const kpiDefinitions = (data.kpiDefinitions || []).map((item: any) => ({
+      id: String(item.id || ''),
+      clientBrandId: String(item.clientBrandId || ''),
+      client: String(item.client || ''),
+      brand: String(item.brand || ''),
+      name: String(item.name || ''),
+      category: String(item.category || 'Business'),
+      unit: String(item.unit || 'Number'),
+      baseline: Number(item.baseline || 0),
+      target: Number(item.target || 0),
+      direction: String(item.direction || 'increase').toLowerCase() === 'decrease' ? 'decrease' : 'increase',
+      cadence: ['Weekly', 'Quarterly'].includes(String(item.cadence)) ? String(item.cadence) : 'Monthly',
+      weight: Number(item.weight || 1),
+      active: String(item.active ?? 'true').toLowerCase() !== 'false',
+      createdAt: String(item.createdAt || new Date().toISOString()),
+    })) as KpiDefinition[];
+
+    const kpiUpdates = (data.kpiUpdates || []).map((item: any) => ({
+      id: String(item.id || ''),
+      kpiId: String(item.kpiId || ''),
+      period: String(item.period ? String(item.period).split('T')[0] : ''),
+      actual: Number(item.actual || 0),
+      notes: String(item.notes || ''),
+      sourceLink: String(item.sourceLink || ''),
+      updatedBy: String(item.updatedBy || ''),
+      updatedAt: String(item.updatedAt || new Date().toISOString()),
+    }));
+
+    return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates };
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, falling back to local mock data:', error);
     return getLocalData();
@@ -704,6 +785,60 @@ export async function createClientBrand(
     saveLocalData(content, team, channels, comments, [...clients, newClientBrand]);
     return newClientBrand;
   }
+}
+
+export async function createKpiDefinition(
+  definition: Omit<KpiDefinition, 'id' | 'createdAt'>
+): Promise<KpiDefinition> {
+  const url = getScriptUrl();
+  const newDefinition: KpiDefinition = {
+    ...definition,
+    id: 'kpi-' + Math.random().toString(36).substring(2, 10),
+    createdAt: new Date().toISOString(),
+  };
+
+  if (!url) {
+    const data = getLocalData();
+    saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, [...data.kpiDefinitions, newDefinition], data.kpiUpdates);
+    return newDefinition;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'createKpiDefinition', definition: newDefinition }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to create KPI');
+  return newDefinition;
+}
+
+export async function createKpiUpdate(
+  update: Omit<KpiUpdate, 'id' | 'updatedAt'>
+): Promise<KpiUpdate> {
+  const url = getScriptUrl();
+  const newUpdate: KpiUpdate = {
+    ...update,
+    id: 'kpiu-' + Math.random().toString(36).substring(2, 10),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (!url) {
+    const data = getLocalData();
+    saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, data.kpiDefinitions, [...data.kpiUpdates, newUpdate]);
+    return newUpdate;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'createKpiUpdate', update: newUpdate }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to update KPI');
+  return newUpdate;
 }
 
 export async function validateScriptUrl(url: string): Promise<boolean> {

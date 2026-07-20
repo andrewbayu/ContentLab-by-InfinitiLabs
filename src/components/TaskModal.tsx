@@ -12,6 +12,7 @@ interface TaskModalProps {
   team: TeamMember[];
   channels: Channel[];
   clients: ClientBrand[];
+  defaultClientBrand?: ClientBrand;
   variablesConfig: VariablesConfig;
   customTags: string[];
   activeUser: string;
@@ -40,6 +41,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   team,
   channels,
   clients,
+  defaultClientBrand,
   variablesConfig,
   customTags,
   activeUser,
@@ -152,8 +154,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setStatus(initialStatus || (inferredType === 'General' ? 'To Do' : 'Idea'));
       setCategory('');
       setDueDate('');
-      setClient('');
-      setBrand('');
+      setClient(defaultClientBrand?.client || '');
+      setBrand(defaultClientBrand?.brand || '');
       
       // Reset optional fields
       setSelectedTags([]);
@@ -174,7 +176,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setCommentText('');
     setShowMentionSuggestions(false);
     setNewChecklistItemText('');
-  }, [item, initialStatus, isOpen, team, channels, activeUser]);
+  }, [item, initialStatus, isOpen, team, channels, activeUser, defaultClientBrand]);
 
   if (!isOpen) return null;
 
