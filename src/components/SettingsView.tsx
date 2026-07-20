@@ -78,7 +78,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!url.trim()) {
       saveScriptUrl('');
       onConnectionChange();
-      addToast('Disconnected. Switched back to Mock Sandbox mode.', 'info');
+      addToast('Disconnected from Google Sheets.', 'info');
       return;
     }
 
@@ -99,7 +99,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     saveScriptUrl('');
     setUrl('');
     onConnectionChange();
-    addToast('Disconnected. Switched to Mock Sandbox.', 'info');
+    addToast('Disconnected from Google Sheets.', 'info');
   };
 
   const handleVariableToggle = (key: keyof VariablesConfig) => {
@@ -162,11 +162,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const content = getSheetData(sheet.getSheetByName("Content"));
   const team = getSheetData(sheet.getSheetByName("Team"));
   const channels = getSheetData(sheet.getSheetByName("Channels"));
+  const comments = getSheetData(sheet.getSheetByName("Comments"));
+  const clients = getSheetData(sheet.getSheetByName("Clients"));
+  const publicTeam = team.map(function(member) {
+    return {
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      avatar: member.avatar,
+      role: String(member.role || "team").toLowerCase() === "super" ? "super" : "team"
+    };
+  });
   
   const payload = {
     content: content,
-    team: team,
-    channels: channels
+    team: publicTeam,
+    channels: channels,
+    comments: comments,
+    clients: clients
   };
   
   return ContentService.createTextOutput(JSON.stringify(payload))
@@ -184,7 +197,7 @@ function doPost(e) {
     if (action === "createContent") {
       const contentSheet = sheet.getSheetByName("Content");
       const item = postData.item;
-      item.id = Utilities.getUUID();
+      item.id = item.id || Utilities.getUUID();
       item.createdAt = new Date().toISOString();
       item.updatedAt = new Date().toISOString();
       
@@ -194,7 +207,8 @@ function doPost(e) {
         item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
         item.targetAudience || "", item.createdBy || "", item.checklist || "",
         item.views || "", item.likes || "", item.engagement || "",
-        item.createdAt, item.updatedAt
+        item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
+        item.dueDate || "", item.client || "", item.brand || ""
       ]);
       result = { success: true, item: item };
     } 
@@ -212,13 +226,14 @@ function doPost(e) {
       }
       
       if (rowIndex !== -1) {
-        contentSheet.getRange(rowIndex, 1, 1, 21).setValues([[
+        contentSheet.getRange(rowIndex, 1, 1, 26).setValues([[
           item.id, item.title, item.brief, item.status, 
           item.channel, item.format, item.priority, item.assignee, item.publishDate,
           item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
           item.targetAudience || "", item.createdBy || "", item.checklist || "",
           item.views || "", item.likes || "", item.engagement || "",
-          item.createdAt, item.updatedAt
+          item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
+          item.dueDate || "", item.client || "", item.brand || ""
         ]]);
         result = { success: true, item: item };
       } else {
@@ -247,7 +262,8 @@ function doPost(e) {
       const teamSheet = sheet.getSheetByName("Team");
       const member = postData.member;
       teamSheet.appendRow([
-        member.id, member.name, member.email, member.avatar
+        member.id, member.name, member.email, member.avatar,
+        member.password || "", member.role || "team"
       ]);
       result = { success: true, member: member };
     }
@@ -258,6 +274,15 @@ function doPost(e) {
         channel.id, channel.name, channel.color
       ]);
       result = { success: true, channel: channel };
+    }
+    else if (action === "createClientBrand") {
+      const clientsSheet = sheet.getSheetByName("Clients");
+      const clientBrand = postData.clientBrand;
+      clientsSheet.appendRow([
+        clientBrand.id, clientBrand.client, clientBrand.brand,
+        clientBrand.color || "#2563eb", clientBrand.active !== false
+      ]);
+      result = { success: true, clientBrand: clientBrand };
     }
     else if (action === "createComment") {
       const commentSheet = sheet.getSheetByName("Comments");
@@ -323,7 +348,8 @@ function doPost(e) {
             id: member.id,
             name: member.name,
             email: member.email,
-            avatar: member.avatar
+            avatar: member.avatar,
+            role: String(member.role || "team").toLowerCase() === "super" ? "super" : "team"
           };
           break;
         }
@@ -708,7 +734,7 @@ function getSheetData(sheet) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', backgroundColor: 'rgba(217, 119, 6, 0.06)', border: '1px solid rgba(217, 119, 6, 0.2)', borderRadius: '6px' }}>
                     <AlertCircle size={20} style={{ color: '#d97706', flexShrink: 0 }} />
                     <div style={{ flexGrow: 1 }}>
-                      <div style={{ fontWeight: 600, color: '#d97706', fontSize: '14px' }}>Currently in Sandbox Mode</div>
+                      <div style={{ fontWeight: 600, color: '#d97706', fontSize: '14px' }}>Google Sheets Not Connected</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         All actions are saved in your local browser sandbox. Link your spreadsheet script below to save to your sheet in real time.
                       </div>
@@ -745,23 +771,31 @@ function getSheetData(sheet) {
                   <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
                     <strong>1. Configure Google Sheets Tabs:</strong>
                     <p className="text-secondary" style={{ fontSize: '13px', marginTop: '4px' }}>
-                      Buka spreadsheet Anda dan buat 4 tab dengan judul persis berikut:
+                      Buka spreadsheet Anda dan buat 5 tab dengan judul persis berikut:
                     </p>
                     <ul style={{ listStyleType: 'disc', paddingLeft: '24px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
                       <li>
                         Nama tab: <strong style={{ color: 'var(--text-primary)' }}>Content</strong>
                         <br />
-                        Tulis header berikut di baris pertama (kolom A-U):
+                        Tulis header berikut di baris pertama (kolom A-Z):
                         <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)', fontSize: '11px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                          id | title | brief | status | channel | format | priority | assignee | publishDate | assetsLink | tags | budget | platformNotes | targetAudience | createdBy | checklist | views | likes | engagement | createdAt | updatedAt
+                          id | title | brief | status | channel | format | priority | assignee | publishDate | assetsLink | tags | budget | platformNotes | targetAudience | createdBy | checklist | views | likes | engagement | createdAt | updatedAt | taskType | category | dueDate | client | brand
                         </div>
                       </li>
                       <li style={{ marginTop: '10px' }}>
                         Nama tab: <strong style={{ color: 'var(--text-primary)' }}>Team</strong>
                         <br />
-                        Tulis header berikut di baris pertama (kolom A-D):
+                        Tulis header berikut di baris pertama (kolom A-F):
                         <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)' }}>
-                          id | name | email | avatar
+                          id | name | email | avatar | password | role
+                        </div>
+                      </li>
+                      <li style={{ marginTop: '10px' }}>
+                        Nama tab: <strong style={{ color: 'var(--text-primary)' }}>Clients</strong>
+                        <br />
+                        Tulis header berikut di baris pertama (kolom A-E):
+                        <div style={{ fontFamily: 'monospace', backgroundColor: 'var(--bg-app)', padding: '6px', borderRadius: '4px', marginTop: '4px', color: 'var(--primary)' }}>
+                          id | client | brand | color | active
                         </div>
                       </li>
                       <li style={{ marginTop: '10px' }}>

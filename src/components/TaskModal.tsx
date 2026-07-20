@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem } from '../services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from '../services/sheets';
 import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2 } from 'lucide-react';
 
 interface TaskModalProps {
@@ -11,6 +11,7 @@ interface TaskModalProps {
   initialStatus?: ContentItem['status'];
   team: TeamMember[];
   channels: Channel[];
+  clients: ClientBrand[];
   variablesConfig: VariablesConfig;
   customTags: string[];
   activeUser: string;
@@ -18,6 +19,8 @@ interface TaskModalProps {
   onAddComment: (contentId: string, text: string) => void;
   onAddCreator: (name: string, email: string) => Promise<TeamMember>;
   onAddChannel: (name: string, color: string) => Promise<Channel>;
+  onAddClientBrand: (client: string, brand: string, color: string) => Promise<ClientBrand>;
+  canManageRegistries: boolean;
 }
 
 interface ChecklistItem {
@@ -36,6 +39,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   initialStatus,
   team,
   channels,
+  clients,
   variablesConfig,
   customTags,
   activeUser,
@@ -43,6 +47,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   onAddComment,
   onAddCreator,
   onAddChannel,
+  onAddClientBrand,
+  canManageRegistries,
 }) => {
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
@@ -53,6 +59,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [assignee, setAssignee] = useState('');
   const [publishDate, setPublishDate] = useState('');
   const [assetsLink, setAssetsLink] = useState('');
+  const [taskType, setTaskType] = useState<TaskType>('Content');
+  const [category, setCategory] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [client, setClient] = useState('');
+  const [brand, setBrand] = useState('');
 
   // Extra optional variables
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -81,6 +92,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelColor, setNewChannelColor] = useState('#2563eb');
   const [isAddingChannel, setIsAddingChannel] = useState(false);
+  const [showAddClientForm, setShowAddClientForm] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newBrandName, setNewBrandName] = useState('');
+  const [newBrandColor, setNewBrandColor] = useState('#2563eb');
+  const [isAddingClient, setIsAddingClient] = useState(false);
 
   // Filter comments for this specific item
   const itemComments = comments.filter((c) => c.contentId === item?.id);
@@ -97,6 +113,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setAssignee(item.assignee);
       setPublishDate(item.publishDate || '');
       setAssetsLink(item.assetsLink || '');
+      setTaskType(item.taskType || 'Content');
+      setCategory(item.category || '');
+      setDueDate(item.dueDate || '');
+      setClient(item.client || '');
+      setBrand(item.brand || '');
       
       // Load optional fields
       const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
@@ -126,6 +147,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setAssignee(activeUser || (team.length > 0 ? team[0].name : ''));
       setPublishDate('');
       setAssetsLink('');
+      const inferredType: TaskType = initialStatus && ['To Do', 'In Progress', 'Done'].includes(initialStatus) ? 'General' : 'Content';
+      setTaskType(inferredType);
+      setStatus(initialStatus || (inferredType === 'General' ? 'To Do' : 'Idea'));
+      setCategory('');
+      setDueDate('');
+      setClient('');
+      setBrand('');
       
       // Reset optional fields
       setSelectedTags([]);
@@ -142,6 +170,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     // Reset nested forms & comment box
     setShowAddCreatorForm(false);
     setShowAddChannelForm(false);
+    setShowAddClientForm(false);
     setCommentText('');
     setShowMentionSuggestions(false);
     setNewChecklistItemText('');
@@ -158,11 +187,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       title,
       brief: variablesConfig.brief ? brief : '',
       status,
-      channel,
-      format,
+      channel: taskType === 'Content' ? channel : '',
+      format: taskType === 'Content' ? format : 'Article',
       priority,
       assignee,
-      publishDate: variablesConfig.publishDate ? publishDate : '',
+      publishDate: taskType === 'Content' && variablesConfig.publishDate ? publishDate : '',
       assetsLink,
       tags: variablesConfig.tags ? selectedTags.join(',') : '',
       budget: variablesConfig.budget ? budget : '',
@@ -170,14 +199,19 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       targetAudience: variablesConfig.targetAudience ? targetAudience : '',
       // new fields
       checklist: JSON.stringify(checklistItems),
-      views: status === 'Published' ? views : '',
-      likes: status === 'Published' ? likes : '',
-      engagement: status === 'Published' ? engagement : '',
+      views: taskType === 'Content' && status === 'Published' ? views : '',
+      likes: taskType === 'Content' && status === 'Published' ? likes : '',
+      engagement: taskType === 'Content' && status === 'Published' ? engagement : '',
+      taskType,
+      category: taskType === 'General' ? category : '',
+      dueDate: taskType === 'General' ? dueDate : '',
+      client,
+      brand,
     });
   };
 
   const handleDelete = () => {
-    if (item && onDelete && window.confirm('Are you sure you want to delete this content plan?')) {
+    if (item && onDelete && window.confirm('Are you sure you want to delete this task?')) {
       onDelete(item.id);
     }
   };
@@ -226,12 +260,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const handleLoadDefaultChecklist = () => {
-    const defaults: ChecklistItem[] = [
-      { id: 'sub-def-1', label: 'Scripting / Draft Outline', done: false, link: '' },
-      { id: 'sub-def-2', label: 'Graphic / Video Assets Edit', done: false, link: '' },
-      { id: 'sub-def-3', label: 'Thumbnail Cover Design', done: false, link: '' },
-      { id: 'sub-def-4', label: 'Publish Posting Caption Draft', done: false, link: '' }
-    ];
+    const defaults: ChecklistItem[] = taskType === 'Content'
+      ? [
+          { id: 'sub-def-1', label: 'Scripting / Draft Outline', done: false, link: '' },
+          { id: 'sub-def-2', label: 'Graphic / Video Assets Edit', done: false, link: '' },
+          { id: 'sub-def-3', label: 'Thumbnail Cover Design', done: false, link: '' },
+          { id: 'sub-def-4', label: 'Publish Posting Caption Draft', done: false, link: '' }
+        ]
+      : [
+          { id: 'sub-def-1', label: 'Define next action', done: false, link: '' },
+          { id: 'sub-def-2', label: 'Complete work', done: false, link: '' },
+          { id: 'sub-def-3', label: 'Review and close', done: false, link: '' }
+        ];
     setChecklistItems(defaults);
   };
 
@@ -342,11 +382,48 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     }
   };
 
+  const handleTaskTypeChange = (nextType: TaskType) => {
+    setTaskType(nextType);
+    if (nextType === 'General' && !['To Do', 'In Progress', 'Done'].includes(status)) {
+      setStatus('To Do');
+    }
+    if (nextType === 'Content' && ['To Do', 'In Progress', 'Done'].includes(status)) {
+      setStatus('Idea');
+    }
+  };
+
+  const handleClientBrandChange = (value: string) => {
+    if (value === '__add_new__') {
+      setShowAddClientForm(true);
+      return;
+    }
+    const selected = clients.find((entry) => entry.id === value);
+    setClient(selected?.client || '');
+    setBrand(selected?.brand || '');
+    setShowAddClientForm(false);
+  };
+
+  const handleCreateClientBrand = async () => {
+    if (!newClientName.trim() || !newBrandName.trim()) return;
+    setIsAddingClient(true);
+    try {
+      const created = await onAddClientBrand(newClientName.trim(), newBrandName.trim(), newBrandColor);
+      setClient(created.client);
+      setBrand(created.brand);
+      setNewClientName('');
+      setNewBrandName('');
+      setNewBrandColor('#2563eb');
+      setShowAddClientForm(false);
+    } finally {
+      setIsAddingClient(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{item ? 'Edit Content Plan' : 'Create Content Plan'}</h3>
+          <h3>{item ? 'Edit Task' : 'Create Task'}</h3>
           <button className="btn btn-secondary btn-icon-only" style={{ border: 'none' }} onClick={onClose}>
             <X size={18} />
           </button>
@@ -372,13 +449,49 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </div>
               )}
 
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Task Type</label>
+                  <div className="task-type-toggle">
+                    <button type="button" className={`task-type-option ${taskType === 'Content' ? 'active' : ''}`} onClick={() => handleTaskTypeChange('Content')}>Content</button>
+                    <button type="button" className={`task-type-option ${taskType === 'General' ? 'active' : ''}`} onClick={() => handleTaskTypeChange('General')}>General</button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Client / Brand</label>
+                  <select
+                    className="form-select"
+                    value={clients.find((entry) => entry.client === client && entry.brand === brand)?.id || ''}
+                    onChange={(e) => handleClientBrandChange(e.target.value)}
+                  >
+                    <option value="">Internal / Unassigned</option>
+                    {clients.filter((entry) => entry.active).map((entry) => (
+                      <option key={entry.id} value={entry.id}>{entry.client} — {entry.brand}</option>
+                    ))}
+                    {canManageRegistries && <option value="__add_new__">➕ Add Client / Brand...</option>}
+                  </select>
+                </div>
+              </div>
+
+              {canManageRegistries && showAddClientForm && (
+                <div className="inline-registry-form">
+                  <input className="form-input" placeholder="Client name" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
+                  <input className="form-input" placeholder="Brand name" value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} />
+                  <input type="color" value={newBrandColor} onChange={(e) => setNewBrandColor(e.target.value)} title="Brand color" />
+                  <button type="button" className="btn btn-primary btn-icon-only" onClick={handleCreateClientBrand} disabled={isAddingClient}>
+                    {isAddingClient ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setShowAddClientForm(false)}><X size={14} /></button>
+                </div>
+              )}
+
               {/* Title */}
               <div className="form-group">
-                <label className="form-label">Content Title *</label>
+                <label className="form-label">{taskType === 'Content' ? 'Content Title' : 'Task Title'} *</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. 5 Tips for Video Recording"
+                  placeholder={taskType === 'Content' ? 'e.g. 5 Tips for Video Recording' : 'e.g. Follow up client invoice'}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
@@ -388,7 +501,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               {/* Brief / Copy (Togglable) */}
               {variablesConfig.brief && (
                 <div className="form-group">
-                  <label className="form-label">Content Brief & Description</label>
+                  <label className="form-label">{taskType === 'Content' ? 'Content Brief & Description' : 'Task Description'}</label>
                   <textarea
                     className="form-textarea"
                     placeholder="Write outline, ideas, or brief visual layouts..."
@@ -402,22 +515,32 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               {/* Status and Format Row */}
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Production Status</label>
+                  <label className="form-label">Status</label>
                   <select
                     className="form-select"
                     value={status}
                     onChange={(e) => setStatus(e.target.value as ContentItem['status'])}
                   >
-                    <option value="Idea">Idea</option>
-                    <option value="Scripting/Writing">Scripting/Writing</option>
-                    <option value="Production/Design">Production/Design</option>
-                    <option value="Review/Editing">Review/Editing</option>
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Published">Published</option>
+                    {taskType === 'Content' ? (
+                      <>
+                        <option value="Idea">Idea</option>
+                        <option value="Scripting/Writing">Scripting/Writing</option>
+                        <option value="Production/Design">Production/Design</option>
+                        <option value="Review/Editing">Review/Editing</option>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Published">Published</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="To Do">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Done">Done</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
-                <div className="form-group">
+                {taskType === 'Content' ? <div className="form-group">
                   <label className="form-label">Content Format</label>
                   <select
                     className="form-select"
@@ -430,10 +553,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     <option value="Graphic">Single Image/Infographic</option>
                     <option value="Article">Blog Post / Article</option>
                   </select>
-                </div>
+                </div> : <div className="form-group">
+                  <label className="form-label">Category</label>
+                  <input className="form-input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Admin, Finance, Client Follow-up" />
+                </div>}
               </div>
 
               {/* Platform Channel Section with dynamic adding */}
+              {taskType === 'Content' && (
               <div className="form-group" style={{ position: 'relative' }}>
                 <label className="form-label">Publishing Channel</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -449,14 +576,16 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         {ch.name}
                       </option>
                     ))}
-                    <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                      ➕ Add Custom Channel...
-                    </option>
+                    {canManageRegistries && (
+                      <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
+                        ➕ Add Custom Channel...
+                      </option>
+                    )}
                   </select>
                 </div>
 
                 {/* Inline Add Channel Form */}
-                {showAddChannelForm && (
+                {canManageRegistries && showAddChannelForm && (
                   <div style={{
                     marginTop: '8px',
                     padding: '12px',
@@ -512,6 +641,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Creator / Assignee Section with dynamic adding */}
               <div className="form-group">
@@ -527,13 +657,15 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       {member.name}
                     </option>
                   ))}
-                  <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                    ➕ Add New Creator...
-                  </option>
+                  {canManageRegistries && (
+                    <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
+                      ➕ Add New Creator...
+                    </option>
+                  )}
                 </select>
 
                 {/* Inline Add Creator Form */}
-                {showAddCreatorForm && (
+                {canManageRegistries && showAddCreatorForm && (
                   <div style={{
                     marginTop: '8px',
                     padding: '12px',
@@ -597,7 +729,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   </select>
                 </div>
 
-                {variablesConfig.publishDate ? (
+                {taskType === 'Content' && variablesConfig.publishDate ? (
                   <div className="form-group">
                     <label className="form-label">Target Publish Date</label>
                     <input
@@ -607,13 +739,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       onChange={(e) => setPublishDate(e.target.value)}
                     />
                   </div>
+                ) : taskType === 'General' ? (
+                  <div className="form-group">
+                    <label className="form-label">Due Date</label>
+                    <input type="date" className="form-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  </div>
                 ) : (
                   <div className="form-group" style={{ visibility: 'hidden' }} />
                 )}
               </div>
 
               {/* KPI Performance Metrics - ONLY SHOWN IF STATUS IS PUBLISHED */}
-              {status === 'Published' && (
+              {taskType === 'Content' && status === 'Published' && (
                 <div style={{
                   padding: '16px',
                   backgroundColor: 'rgba(22, 163, 74, 0.04)',

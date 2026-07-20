@@ -45,25 +45,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // --- GENERAL CALCULATIONS (STUDIO OVERVIEW) ---
   const totalCount = items.length;
+  const isComplete = (item: ContentItem) => item.status === 'Published' || item.status === 'Done';
+  const getTargetDate = (item: ContentItem) => item.taskType === 'General' ? (item.dueDate || '') : item.publishDate;
   
   const inProduction = items.filter(
     (item) =>
       item.status === 'Scripting/Writing' ||
       item.status === 'Production/Design' ||
-      item.status === 'Review/Editing'
+      item.status === 'Review/Editing' ||
+      item.status === 'In Progress'
   ).length;
 
-  const publishedItems = items.filter((item) => item.status === 'Published');
-  const publishedCount = items.filter(
-    (item) => item.status === 'Published' || item.status === 'Scheduled'
-  ).length;
+  const publishedItems = items.filter((item) => item.taskType === 'Content' && item.status === 'Published');
+  const publishedCount = items.filter((item) => isComplete(item) || item.status === 'Scheduled').length;
 
   const todayStr = new Date().toISOString().split('T')[0];
   const overdueItems = items.filter(
     (item) =>
-      item.status !== 'Published' &&
-      item.publishDate &&
-      item.publishDate < todayStr
+      !isComplete(item) &&
+      getTargetDate(item) &&
+      getTargetDate(item) < todayStr
   );
   const overdueCount = overdueItems.length;
 
@@ -122,18 +123,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // General Channel distribution
   const channelCounts: Record<string, number> = {};
-  items.forEach((item) => {
+  items.filter((item) => item.taskType === 'Content').forEach((item) => {
     channelCounts[item.channel] = (channelCounts[item.channel] || 0) + 1;
   });
   const channelsList = Object.entries(channelCounts).sort((a, b) => b[1] - a[1]);
 
   // General Upcoming Schedule
   const upcomingContent = [...items]
-    .filter((item) => item.status !== 'Published')
+    .filter((item) => !isComplete(item))
     .sort((a, b) => {
-      if (!a.publishDate) return 1;
-      if (!b.publishDate) return -1;
-      return a.publishDate.localeCompare(b.publishDate);
+      if (!getTargetDate(a)) return 1;
+      if (!getTargetDate(b)) return -1;
+      return getTargetDate(a).localeCompare(getTargetDate(b));
     })
     .slice(0, 4);
 
@@ -143,7 +144,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // 1. Personal Active Tasks (Backlog)
   const myActiveTasks = myItems.filter(
-    (item) => item.status !== 'Published'
+    (item) => !isComplete(item)
   ).length;
 
   // 2. Personal Pending Subtasks Checklists & Combined List
@@ -161,7 +162,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const myAllSubtasks: PersonalChecklistItem[] = [];
 
   myItems.forEach((item) => {
-    if (item.status === 'Published') return; // skip published content subtasks
+    if (isComplete(item)) return;
     try {
       const list = item.checklist ? JSON.parse(item.checklist) : [];
       list.forEach((sub: any) => {
@@ -190,18 +191,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // 3. Personal views generated
   let myPublishedViews = 0;
   myItems.forEach((item) => {
-    if (item.status === 'Published') {
+    if (item.taskType === 'Content' && item.status === 'Published') {
       myPublishedViews += parseInt(item.views || '0', 10);
     }
   });
 
   // 4. My Upcoming Publications
   const myUpcoming = myItems
-    .filter((item) => item.status !== 'Published')
+    .filter((item) => !isComplete(item))
     .sort((a, b) => {
-      if (!a.publishDate) return 1;
-      if (!b.publishDate) return -1;
-      return a.publishDate.localeCompare(b.publishDate);
+      if (!getTargetDate(a)) return 1;
+      if (!getTargetDate(b)) return -1;
+      return getTargetDate(a).localeCompare(getTargetDate(b));
     })
     .slice(0, 4);
 
@@ -231,6 +232,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       case 'Review/Editing': return 'status-review-text';
       case 'Scheduled': return 'status-scheduled-text';
       case 'Published': return 'status-published-text';
+      case 'To Do': return 'status-idea-text';
+      case 'In Progress': return 'status-prod-text';
+      case 'Done': return 'status-published-text';
       default: return '';
     }
   };
@@ -445,12 +449,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div className="activity-details" style={{ flexGrow: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span className="activity-text" style={{ fontWeight: 600 }}>{item.title}</span>
-                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.brand || item.channel || item.taskType}</span>
                         </div>
                         <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px' }}>
-                          {variablesConfig.publishDate && (
+                          {(item.taskType === 'General' || variablesConfig.publishDate) && (
                             <span className="activity-time">
-                              Publish Date: <strong>{item.publishDate || 'TBD'}</strong>
+                              {item.taskType === 'General' ? 'Due Date' : 'Publish Date'}: <strong>{getTargetDate(item) || 'TBD'}</strong>
                             </span>
                           )}
                           <span className={getStatusClass(item.status)} style={{ fontWeight: 500 }}>
@@ -473,7 +477,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   ))
                 ) : (
                   <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                    Belum ada publikasi terdekat yang ditugaskan kepada Anda.
+                    Belum ada task terdekat yang ditugaskan kepada Anda.
                   </div>
                 )}
               </div>
@@ -501,7 +505,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-title">In Production</span>
+                <span className="metric-title">In Progress</span>
                 <Clock size={18} style={{ color: '#2563eb' }} />
               </div>
               <span className="metric-value">{inProduction}</span>
@@ -512,7 +516,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-title">Live & Scheduled</span>
+                <span className="metric-title">Completed & Scheduled</span>
                 <CheckCircle size={18} style={{ color: '#16a34a' }} />
               </div>
               <span className="metric-value">{publishedCount}</span>
@@ -604,7 +608,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div className="activity-details" style={{ flexGrow: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span className="activity-text" style={{ fontWeight: 650 }}>{item.title}</span>
-                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.brand || item.channel || item.taskType}</span>
                         </div>
                         <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '11px', color: 'var(--text-secondary)' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Eye size={10} /> <strong>{formatNumber(parseInt(item.views || '0', 10))}</strong> Views</span>
@@ -688,9 +692,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
                         </div>
                         <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px' }}>
-                          {variablesConfig.publishDate && (
+                          {(item.taskType === 'General' || variablesConfig.publishDate) && (
                             <span className="activity-time">
-                              Publish Date: <strong>{item.publishDate || 'TBD'}</strong>
+                              {item.taskType === 'General' ? 'Due Date' : 'Publish Date'}: <strong>{getTargetDate(item) || 'TBD'}</strong>
                             </span>
                           )}
                           <span className={getStatusClass(item.status)} style={{ fontWeight: 500 }}>
@@ -703,7 +707,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   ))
                 ) : (
                   <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
-                    No upcoming publications. Create a task or update schedules!
+                    No upcoming tasks. Create a task or update target dates!
                   </div>
                 )}
               </div>

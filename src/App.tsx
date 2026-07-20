@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from './components/AppShell';
 import { DashboardView } from './components/DashboardView';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -14,6 +14,7 @@ import {
   deleteContent,
   createChannel,
   deleteChannel,
+  createClientBrand,
   createTeamMember,
   deleteTeamMember,
   createComment,
@@ -23,7 +24,7 @@ import {
   saveCustomTags,
   isMockMode
 } from './services/sheets';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem } from './services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from './services/sheets';
 import { RefreshCw, CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -34,11 +35,12 @@ interface Toast {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    localStorage.getItem('contentlab_is_authenticated') === 'true'
+    !isMockMode() && localStorage.getItem('contentlab_is_authenticated') === 'true'
   );
 
   // Active Authenticated User profile state
   const [currentUser, setCurrentUser] = useState<TeamMember | null>(() => {
+    if (isMockMode()) return null;
     const saved = localStorage.getItem('contentlab_logged_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -47,6 +49,10 @@ function App() {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [clients, setClients] = useState<ClientBrand[]>([]);
+  const [taskTypeFilter, setTaskTypeFilter] = useState<'All' | TaskType>('All');
+  const [clientFilter, setClientFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
   
   // Custom configurations & tags registry
   const [variablesConfig, setVariablesConfig] = useState<VariablesConfig>(getVariablesConfig());
@@ -70,14 +76,19 @@ function App() {
       setTeam(data.team);
       setChannels(data.channels);
       setComments(data.comments || []);
+      setClients(data.clients || []);
 
-      // If the currently logged in user is not in the fetched team (e.g. data updated), 
-      // we gracefully keep their local session or update it.
-      if (currentUser && data.team.length > 0) {
+      // Keep only sessions that still exist in the live Team registry.
+      if (currentUser) {
         const found = data.team.find((t) => t.id === currentUser.id || t.email === currentUser.email);
         if (found) {
           setCurrentUser(found);
           localStorage.setItem('contentlab_logged_user', JSON.stringify(found));
+        } else {
+          localStorage.removeItem('contentlab_is_authenticated');
+          localStorage.removeItem('contentlab_logged_user');
+          setCurrentUser(null);
+          setIsAuthenticated(false);
         }
       }
     } catch (error) {
@@ -93,6 +104,12 @@ function App() {
       loadData();
     }
   }, [isMock, isAuthenticated]);
+
+  useEffect(() => {
+    if (activeTab === 'settings' && currentUser?.role !== 'super') {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, currentUser?.role]);
 
   // Handle connection settings change
   const handleConnectionChange = () => {
@@ -121,7 +138,7 @@ function App() {
     addToast('Signed out of ContentLab.', 'info');
   };
 
-  // Save Content Plan
+  // Save task
   const handleSaveItem = async (
     itemPayload: Omit<ContentItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
   ) => {
@@ -133,7 +150,7 @@ function App() {
     try {
       if (isEdit && itemPayload.id) {
         const existing = items.find((i) => i.id === itemPayload.id);
-        if (!existing) throw new Error('Content item not found');
+        if (!existing) throw new Error('Task not found');
 
         const updatedPayload: ContentItem = {
           ...existing,
@@ -158,7 +175,7 @@ function App() {
       }
     } catch (e) {
       console.error(e);
-      addToast(`Failed to save content. Sync failed.`, 'error');
+      addToast('Failed to save task. Sync failed.', 'error');
       loadData(false);
     } finally {
       setIsLoading(false);
@@ -174,7 +191,7 @@ function App() {
 
     const updatedItem: ContentItem = {
       ...targetItem,
-      publishDate: newDate,
+      ...(targetItem.taskType === 'General' ? { dueDate: newDate } : { publishDate: newDate }),
       updatedAt: new Date().toISOString(),
     };
 
@@ -214,7 +231,7 @@ function App() {
     }
   };
 
-  // Delete Content Plan
+  // Delete task
   const handleDeleteItem = async (id: string) => {
     setIsModalOpen(false);
     const originalItems = [...items];
@@ -224,10 +241,10 @@ function App() {
 
     try {
       await deleteContent(id);
-      addToast(`Successfully deleted "${itemToDelete?.title || 'Content Plan'}"`, 'success');
+      addToast(`Successfully deleted "${itemToDelete?.title || 'Task'}"`, 'success');
     } catch (e) {
       console.error(e);
-      addToast('Failed to delete content in Google Sheet. Reverting...', 'error');
+      addToast('Failed to delete task in Google Sheet. Reverting...', 'error');
       setItems(originalItems);
     } finally {
       setSelectedItem(null);
@@ -253,6 +270,7 @@ function App() {
 
   // Crew Handlers
   const handleAddCreator = async (name: string, email: string): Promise<TeamMember> => {
+    if (currentUser?.role !== 'super') throw new Error('Super access required');
     setIsLoading(true);
     try {
       const created = await createTeamMember({ name, email });
@@ -269,6 +287,7 @@ function App() {
   };
 
   const handleDeleteCreator = async (id: string) => {
+    if (currentUser?.role !== 'super') return;
     setIsLoading(true);
     try {
       await deleteTeamMember(id);
@@ -283,6 +302,7 @@ function App() {
 
   // Channel Handlers
   const handleAddChannel = async (name: string, color: string): Promise<Channel> => {
+    if (currentUser?.role !== 'super') throw new Error('Super access required');
     setIsLoading(true);
     try {
       const created = await createChannel({ name, color });
@@ -299,6 +319,7 @@ function App() {
   };
 
   const handleDeleteChannel = async (id: string) => {
+    if (currentUser?.role !== 'super') return;
     setIsLoading(true);
     try {
       await deleteChannel(id);
@@ -306,6 +327,23 @@ function App() {
       addToast('Channel removed from registry.', 'success');
     } catch (e) {
       addToast('Failed to remove platform channel.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddClientBrand = async (client: string, brand: string, color: string): Promise<ClientBrand> => {
+    if (currentUser?.role !== 'super') throw new Error('Super access required');
+    setIsLoading(true);
+    try {
+      const created = await createClientBrand({ client, brand, color, active: true });
+      setClients((prev) => [...prev, created]);
+      addToast(`Added ${client} / ${brand}`, 'success');
+      return created;
+    } catch (e) {
+      console.error(e);
+      addToast('Failed to add client/brand.', 'error');
+      throw e;
     } finally {
       setIsLoading(false);
     }
@@ -348,6 +386,23 @@ function App() {
     setInitialStatusForModal(undefined);
     setIsModalOpen(true);
   };
+
+  const filteredItems = useMemo(() => items.filter((item) => {
+    if (taskTypeFilter !== 'All' && item.taskType !== taskTypeFilter) return false;
+    if (clientFilter && item.client !== clientFilter) return false;
+    if (brandFilter && item.brand !== brandFilter) return false;
+    return true;
+  }), [items, taskTypeFilter, clientFilter, brandFilter]);
+
+  const availableClients = useMemo(
+    () => Array.from(new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))),
+    [clients]
+  );
+
+  const availableBrands = useMemo(
+    () => clients.filter((entry) => entry.active && (!clientFilter || entry.client === clientFilter)),
+    [clients, clientFilter]
+  );
 
   // Render Login page if not authenticated
   if (!isAuthenticated || !currentUser) {
@@ -414,9 +469,27 @@ function App() {
 
       {/* Pages Container */}
       <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {activeTab !== 'settings' && (
+          <div className="workspace-filter-bar">
+            <select className="select-filter" value={taskTypeFilter} onChange={(e) => setTaskTypeFilter(e.target.value as 'All' | TaskType)}>
+              <option value="All">All Tasks</option>
+              <option value="Content">Content Tasks</option>
+              <option value="General">General Tasks</option>
+            </select>
+            <select className="select-filter" value={clientFilter} onChange={(e) => { setClientFilter(e.target.value); setBrandFilter(''); }}>
+              <option value="">All Clients</option>
+              {availableClients.map((client) => <option key={client} value={client}>{client}</option>)}
+            </select>
+            <select className="select-filter" value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}>
+              <option value="">All Brands</option>
+              {availableBrands.map((entry) => <option key={entry.id} value={entry.brand}>{entry.brand}</option>)}
+            </select>
+            <span className="workspace-filter-count">{filteredItems.length} of {items.length} tasks</span>
+          </div>
+        )}
         {activeTab === 'dashboard' && (
           <DashboardView
-            items={items}
+            items={filteredItems}
             onEditItem={handleOpenEditModal}
             channels={channels}
             variablesConfig={variablesConfig}
@@ -426,7 +499,7 @@ function App() {
         
         {activeTab === 'board' && (
           <KanbanBoard
-            items={items}
+            items={filteredItems}
             onMoveItem={handleMoveItem}
             onEditItem={handleOpenEditModal}
             onOpenCreateModalWithStatus={handleOpenCreateModalWithStatus}
@@ -438,7 +511,7 @@ function App() {
 
         {activeTab === 'calendar' && (
           <CalendarView
-            items={items}
+            items={filteredItems}
             channels={channels}
             onEditItem={handleOpenEditModal}
             onMoveDate={handleMoveDate}
@@ -447,7 +520,7 @@ function App() {
 
         {activeTab === 'list' && (
           <ListView
-            items={items}
+            items={filteredItems}
             onEditItem={handleOpenEditModal}
             channels={channels}
             variablesConfig={variablesConfig}
@@ -455,7 +528,7 @@ function App() {
           />
         )}
 
-        {activeTab === 'settings' && (
+        {activeTab === 'settings' && currentUser.role === 'super' && (
           <SettingsView
             onConnectionChange={handleConnectionChange}
             addToast={addToast}
@@ -487,6 +560,7 @@ function App() {
         initialStatus={initialStatusForModal}
         team={team}
         channels={channels}
+        clients={clients}
         variablesConfig={variablesConfig}
         customTags={customTags}
         activeUser={currentUser.name}
@@ -494,6 +568,8 @@ function App() {
         onAddComment={handleAddComment}
         onAddCreator={handleAddCreator}
         onAddChannel={handleAddChannel}
+        onAddClientBrand={handleAddClientBrand}
+        canManageRegistries={currentUser.role === 'super'}
       />
 
       {/* Toast Alert System overlay */}

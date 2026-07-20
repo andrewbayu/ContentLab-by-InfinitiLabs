@@ -10,7 +10,7 @@ interface ListViewProps {
   activeUser: string;
 }
 
-type SortField = 'title' | 'channel' | 'format' | 'status' | 'priority' | 'publishDate';
+type SortField = 'title' | 'client' | 'taskType' | 'status' | 'priority' | 'publishDate';
 type SortOrder = 'asc' | 'desc';
 
 export const ListView: React.FC<ListViewProps> = ({
@@ -57,7 +57,10 @@ export const ListView: React.FC<ListViewProps> = ({
         const matchesSearch =
           item.title.toLowerCase().includes(search.toLowerCase()) ||
           item.brief.toLowerCase().includes(search.toLowerCase()) ||
-          (item.tags && item.tags.toLowerCase().includes(search.toLowerCase()));
+          (item.tags && item.tags.toLowerCase().includes(search.toLowerCase())) ||
+          (item.client && item.client.toLowerCase().includes(search.toLowerCase())) ||
+          (item.brand && item.brand.toLowerCase().includes(search.toLowerCase())) ||
+          (item.category && item.category.toLowerCase().includes(search.toLowerCase()));
         const matchesStatus = !statusFilter || item.status === statusFilter;
         const matchesChannel = !channelFilter || item.channel === channelFilter;
         const matchesAssignee = !assigneeFilter || item.assignee === assigneeFilter;
@@ -125,6 +128,9 @@ export const ListView: React.FC<ListViewProps> = ({
       case 'Review/Editing': return { backgroundColor: 'var(--status-review-bg)', color: 'var(--status-review-text)' };
       case 'Scheduled': return { backgroundColor: 'var(--status-scheduled-bg)', color: 'var(--status-scheduled-text)' };
       case 'Published': return { backgroundColor: 'var(--status-published-bg)', color: 'var(--status-published-text)' };
+      case 'To Do': return { backgroundColor: 'var(--status-idea-bg)', color: 'var(--status-idea-text)' };
+      case 'In Progress': return { backgroundColor: 'var(--status-prod-bg)', color: 'var(--status-prod-text)' };
+      case 'Done': return { backgroundColor: 'var(--status-published-bg)', color: 'var(--status-published-text)' };
       default: return {};
     }
   };
@@ -210,6 +216,9 @@ export const ListView: React.FC<ListViewProps> = ({
             <option value="Review/Editing">Review/Editing</option>
             <option value="Scheduled">Scheduled</option>
             <option value="Published">Published</option>
+            <option value="To Do">To Do</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Done">Done</option>
           </select>
 
           <select
@@ -255,16 +264,16 @@ export const ListView: React.FC<ListViewProps> = ({
                     {/* Top Platform Color Accent Banner Line */}
                     <div
                       className="card-header-banner"
-                      style={{ backgroundColor: channelStyle.hexColor }}
+                      style={{ backgroundColor: item.taskType === 'Content' ? channelStyle.hexColor : '#7c3aed' }}
                     />
                     
                     <div className="scheduler-card-body">
                       {/* Badge Tags Row */}
                       <div className="scheduler-card-meta">
-                        <span className="tag-badge" style={channelStyle}>
-                          {item.channel}
-                        </span>
-                        <span className="format-tag">{item.format}</span>
+                        <span className="format-tag">{item.taskType}</span>
+                        {item.brand && <span className="tag-badge">{item.client ? `${item.client} · ` : ''}{item.brand}</span>}
+                        {item.taskType === 'Content' && <span className="tag-badge" style={channelStyle}>{item.channel}</span>}
+                        <span className="format-tag">{item.taskType === 'Content' ? item.format : (item.category || 'General')}</span>
                       </div>
 
                       {/* Title */}
@@ -303,10 +312,10 @@ export const ListView: React.FC<ListViewProps> = ({
 
                     {/* Bottom Info Bar Footer */}
                     <div className="scheduler-card-footer">
-                      {variablesConfig.publishDate && item.publishDate ? (
+                      {(item.taskType === 'General' ? item.dueDate : (variablesConfig.publishDate ? item.publishDate : '')) ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
                           <Calendar size={13} />
-                          <span>{item.publishDate}</span>
+                          <span>{item.taskType === 'General' ? item.dueDate : item.publishDate}</span>
                         </div>
                       ) : (
                         <div className="text-muted">No date set</div>
@@ -347,7 +356,7 @@ export const ListView: React.FC<ListViewProps> = ({
               })
             ) : (
               <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
-                No content matching the filters found.
+                No tasks matching the filters found.
               </div>
             )}
           </div>
@@ -360,11 +369,11 @@ export const ListView: React.FC<ListViewProps> = ({
                   <th onClick={() => handleSort('title')}>
                     Title <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
                   </th>
-                  <th onClick={() => handleSort('channel')}>
-                    Channel <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
+                  <th onClick={() => handleSort('client')}>
+                    Client / Brand <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
                   </th>
-                  <th onClick={() => handleSort('format')}>
-                    Format <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
+                  <th onClick={() => handleSort('taskType')}>
+                    Type / Context <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
                   </th>
                   <th onClick={() => handleSort('status')}>
                     Status <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
@@ -374,7 +383,7 @@ export const ListView: React.FC<ListViewProps> = ({
                   </th>
                   {variablesConfig.publishDate && (
                     <th onClick={() => handleSort('publishDate')}>
-                      Publish Date <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
+                      Target Date <ArrowUpDown size={12} style={{ marginLeft: '4px' }} />
                     </th>
                   )}
                   <th>Creator</th>
@@ -396,12 +405,10 @@ export const ListView: React.FC<ListViewProps> = ({
                         )}
                       </td>
                       <td>
-                        <span className="tag-badge" style={getChannelStyle(item.channel)}>
-                          {item.channel}
-                        </span>
+                        <span className="tag-badge">{[item.client, item.brand].filter(Boolean).join(' / ') || 'Unassigned'}</span>
                       </td>
                       <td>
-                        <span className="format-tag">{item.format}</span>
+                        <span className="format-tag">{item.taskType} · {item.taskType === 'Content' ? `${item.channel} / ${item.format}` : (item.category || 'General')}</span>
                       </td>
                       <td>
                         <span className="status-badge" style={getStatusStyle(item.status)}>
@@ -429,7 +436,7 @@ export const ListView: React.FC<ListViewProps> = ({
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                             <Calendar size={13} className="text-muted" />
-                            <span>{item.publishDate || 'TBD'}</span>
+                            <span>{(item.taskType === 'General' ? item.dueDate : item.publishDate) || 'TBD'}</span>
                           </div>
                         </td>
                       )}
@@ -476,7 +483,7 @@ export const ListView: React.FC<ListViewProps> = ({
                 ) : (
                   <tr>
                     <td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
-                      No content matching the filters found.
+                      No tasks matching the filters found.
                     </td>
                   </tr>
                 )}

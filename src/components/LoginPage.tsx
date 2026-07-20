@@ -68,7 +68,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <input
               type="text"
               className="form-input"
-              placeholder="Andi Pratama atau andi@contentlab.io"
+              placeholder="Nama atau email akun Anda"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -83,7 +83,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="form-input"
-                placeholder="pass123"
+                placeholder="Masukkan password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -125,9 +125,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </form>
 
         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '-8px', lineHeight: 1.4 }}>
-          <strong>Tips Sandbox Mode:</strong>
-          <br />
-          Gunakan user: <code>Andi Pratama</code> &amp; pass: <code>pass123</code>
+          Gunakan nama atau email yang terdaftar di tab <code>Team</code>.
         </div>
       </div>
     </div>

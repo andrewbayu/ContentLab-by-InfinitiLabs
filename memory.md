@@ -14,17 +14,19 @@ Dokumen ini berfungsi sebagai acuan kelanjutan proyek (*continuity guide*) bagi 
 ---
 
 ## 🗂️ 2. Skema Struktur Database Google Sheets
-Database spreadsheet terdiri dari **4 tab** dengan kolom-kolom persis seperti berikut di baris pertama:
+Database spreadsheet terdiri dari **5 tab** dengan kolom-kolom persis seperti berikut di baris pertama:
 
-### A. Tab `Content` (21 Kolom, A s/d U)
-`id` | `title` | `brief` | `status` | `channel` | `format` | `priority` | `assignee` | `publishDate` | `assetsLink` | `tags` | `budget` | `platformNotes` | `targetAudience` | `createdBy` | `checklist` | `views` | `likes` | `engagement` | `createdAt` | `updatedAt`
+### A. Tab `Content` (26 Kolom, A s/d Z)
+`id` | `title` | `brief` | `status` | `channel` | `format` | `priority` | `assignee` | `publishDate` | `assetsLink` | `tags` | `budget` | `platformNotes` | `targetAudience` | `createdBy` | `checklist` | `views` | `likes` | `engagement` | `createdAt` | `updatedAt` | `taskType` | `category` | `dueDate` | `client` | `brand`
 
 *   `checklist`: Berisi stringified JSON array dari subtask produksi, contoh:
     `[{"id":"sub1","label":"Draft Outline","done":false,"link":"https://..."}]`
 *   `views` / `likes` / `engagement`: Berisi metrik performa konten untuk status `Published`.
 
-### B. Tab `Team` (5 Kolom, A s/d E)
-`id` | `name` | `email` | `avatar` | `password`
+### B. Tab `Team` (6 Kolom, A s/d F)
+`id` | `name` | `email` | `avatar` | `password` | `role`
+
+*   `role`: hanya menerima `super` atau `team`. Nilai kosong dibaca sebagai `team` untuk keamanan dan kompatibilitas data lama.
 
 ### C. Tab `Channels` (3 Kolom, A s/d C)
 `id` | `name` | `color`
@@ -32,9 +34,22 @@ Database spreadsheet terdiri dari **4 tab** dengan kolom-kolom persis seperti be
 ### D. Tab `Comments` (5 Kolom, A s/d E)
 `id` | `contentId` | `author` | `text` | `createdAt`
 
+### E. Tab `Clients` (5 Kolom, A s/d E)
+`id` | `client` | `brand` | `color` | `active`
+
 ---
 
-## 🔒 3. Sistem Autentikasi & Multi-User
+## 🧭 3. Task Umum & Multi-Client
+
+*   Setiap item memiliki `taskType`: `Content` atau `General`.
+*   Task `General` memakai `category`, `dueDate`, serta status `To Do`, `In Progress`, dan `Done`.
+*   Task `Content` tetap memakai channel, format, publish date, dan metrik performa.
+*   Pasangan client–brand dikelola dari tab `Clients`, dapat dibuat langsung dari form task, dan dapat difilter secara global di workspace.
+*   Data lama yang tidak memiliki `taskType` dibaca sebagai `Content` agar backward-compatible.
+
+---
+
+## 🔒 4. Sistem Autentikasi & Multi-User
 Aplikasi ini menerapkan autentikasi individual yang diverifikasi langsung ke tab `Team` spreadsheet.
 
 *   **Penyebab Kendala Login (Error: "Username atau password salah")**:
@@ -42,14 +57,17 @@ Aplikasi ini menerapkan autentikasi individual yang diverifikasi langsung ke tab
     *   Ketika Apps Script lama menerima request login, ia langsung mengembalikan `{ success: false }` secara default, yang diterjemahkan di frontend menjadi `"Username atau password salah"`.
     *   **Solusi**: Pengguna harus memperbarui kode Google Apps Script ke versi terbaru dan men-deploy ulang dengan memilih **New Version** (Versi Baru) di menu deployment Apps Script.
 
-### Kredensial Uji Coba Sandbox Mode (Lokal)
-Jika aplikasi belum dihubungkan ke spreadsheet, gunakan kredensial berikut di browser untuk menguji secara offline:
-*   **Username**: `Andi Pratama` | `Siti Rahma`
-*   **Password**: `pass123`
+Tidak ada akun demo atau login sandbox. Seluruh autentikasi wajib menggunakan akun yang terdaftar di tab `Team` pada Google Sheet aktif.
+
+### Role & Hak Akses
+
+*   `super`: admin internal dengan akses penuh, termasuk **Settings Manager** serta pengelolaan anggota tim, channel, dan client/brand.
+*   `team`: dapat memakai dashboard, kanban, calendar, list, task, dan komentar, tetapi tidak dapat membuka **Settings Manager** atau membuat registry baru dari form task.
+*   Setidaknya satu akun aktif harus memiliki role `super` agar pengaturan workspace tetap dapat diakses.
 
 ---
 
-## 🛠️ 4. Langkah Sinkronisasi Google Apps Script
+## 🛠️ 5. Langkah Sinkronisasi Google Apps Script
 Setiap kali memperbarui kode Apps Script di editor Google Sheets:
 1.  Klik **Save** (💾).
 2.  Klik **Deploy** (pojok kanan atas) > **Manage Deployments**.

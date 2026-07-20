@@ -81,7 +81,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Get color for channel
   const getChannelColor = (channelName: string) => {
     const found = channels.find((c) => c.name.toLowerCase() === channelName.toLowerCase());
-    return found ? found.color : 'var(--text-secondary)';
+    return found ? found.color : '#7c3aed';
   };
 
   // Check if date matches
@@ -89,7 +89,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const mStr = String(m + 1).padStart(2, '0');
     const dStr = String(d).padStart(2, '0');
     const dateStr = `${y}-${mStr}-${dStr}`;
-    return items.filter((item) => item.publishDate === dateStr);
+    return items.filter((item) => (item.taskType === 'General' ? item.dueDate : item.publishDate) === dateStr);
   };
 
   const isToday = (d: number, isCurrent: boolean) => {

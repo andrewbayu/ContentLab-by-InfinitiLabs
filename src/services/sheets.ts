@@ -1,8 +1,21 @@
+export type TaskType = 'Content' | 'General';
+export type UserRole = 'super' | 'team';
+export type TaskStatus =
+  | 'Idea'
+  | 'Scripting/Writing'
+  | 'Production/Design'
+  | 'Review/Editing'
+  | 'Scheduled'
+  | 'Published'
+  | 'To Do'
+  | 'In Progress'
+  | 'Done';
+
 export interface ContentItem {
   id: string;
   title: string;
   brief: string;
-  status: 'Idea' | 'Scripting/Writing' | 'Production/Design' | 'Review/Editing' | 'Scheduled' | 'Published';
+  status: TaskStatus;
   channel: string;
   format: 'Video' | 'Carousel' | 'Graphic' | 'Article' | 'Short';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
@@ -20,6 +33,11 @@ export interface ContentItem {
   views?: string;         // performance view counts
   likes?: string;         // performance likes
   engagement?: string;    // performance engagement (comments/shares)
+  taskType: TaskType;
+  category?: string;
+  dueDate?: string;       // YYYY-MM-DD for non-content tasks
+  client?: string;
+  brand?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,12 +56,21 @@ export interface TeamMember {
   email: string;
   avatar: string;
   password?: string; // New field for multi-user authentication
+  role: UserRole;
 }
 
 export interface Channel {
   id: string;
   name: string;
   color: string;
+}
+
+export interface ClientBrand {
+  id: string;
+  client: string;
+  brand: string;
+  color: string;
+  active: boolean;
 }
 
 export interface VariablesConfig {
@@ -57,9 +84,9 @@ export interface VariablesConfig {
 
 const SCRIPT_URL_KEY = 'contentlab_google_sheets_url';
 const MOCK_CONTENT_KEY = 'contentlab_mock_content';
-const MOCK_TEAM_KEY = 'contentlab_mock_team';
 const MOCK_CHANNELS_KEY = 'contentlab_mock_channels';
 const MOCK_COMMENTS_KEY = 'contentlab_mock_comments';
+const MOCK_CLIENTS_KEY = 'contentlab_mock_clients';
 const VARIABLES_CONFIG_KEY = 'contentlab_variables_config';
 const CUSTOM_TAGS_KEY = 'contentlab_custom_tags';
 
@@ -76,12 +103,7 @@ const DEFAULT_VARIABLES_CONFIG: VariablesConfig = {
 // Default custom tags
 const DEFAULT_TAGS = ['Promo', 'Sponsor', 'Educational', 'Branding', 'Trending'];
 
-// Initial Mock Data with default passwords for sandbox testing
-const INITIAL_MOCK_TEAM: TeamMember[] = [
-  { id: 't1', name: 'Andi Pratama', email: 'andi@contentlab.io', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80', password: 'pass123' },
-  { id: 't2', name: 'Siti Rahma', email: 'siti@contentlab.io', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80', password: 'pass123' },
-  { id: 't3', name: 'Budi Santoso', email: 'budi@contentlab.io', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80', password: 'pass123' },
-];
+const INITIAL_MOCK_TEAM: TeamMember[] = [];
 
 const INITIAL_MOCK_CHANNELS: Channel[] = [
   { id: 'ch1', name: 'YouTube', color: '#2563eb' },
@@ -90,6 +112,10 @@ const INITIAL_MOCK_CHANNELS: Channel[] = [
   { id: 'ch4', name: 'LinkedIn', color: '#0a66c2' },
   { id: 'ch5', name: 'Blog', color: '#059669' },
   { id: 'ch6', name: 'Newsletter', color: '#d97706' },
+];
+
+const INITIAL_MOCK_CLIENTS: ClientBrand[] = [
+  { id: 'cb1', client: 'Internal', brand: 'InfinitiLabs', color: '#2563eb', active: true },
 ];
 
 const INITIAL_MOCK_CONTENT: ContentItem[] = [
@@ -105,6 +131,9 @@ const INITIAL_MOCK_CONTENT: ContentItem[] = [
     publishDate: '2026-08-01',
     assetsLink: 'https://docs.google.com/document/d/example1',
     tags: 'Educational,Branding',
+    taskType: 'Content',
+    client: 'Internal',
+    brand: 'InfinitiLabs',
     createdBy: 'Andi Pratama',
     checklist: JSON.stringify([
       { id: 'sub1', label: 'Outline Script', done: true, link: 'https://docs.google.com/document/d/outline1' },
@@ -126,6 +155,9 @@ const INITIAL_MOCK_CONTENT: ContentItem[] = [
     publishDate: '2026-07-25',
     assetsLink: 'https://drive.google.com/drive/example2',
     tags: 'Trending,Promo',
+    taskType: 'Content',
+    client: 'Internal',
+    brand: 'InfinitiLabs',
     checklist: JSON.stringify([
       { id: 'sub4', label: 'Draft Video CapCut', done: true, link: 'https://drive.google.com/drive/draft1' },
       { id: 'sub5', label: 'Teks Caption', done: true, link: '' },
@@ -150,6 +182,9 @@ const INITIAL_MOCK_CONTENT: ContentItem[] = [
     views: '8500',
     likes: '620',
     engagement: '142',
+    taskType: 'Content',
+    client: 'Internal',
+    brand: 'InfinitiLabs',
     createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
   }
@@ -215,28 +250,28 @@ export function saveCustomTags(tags: string[]): void {
   localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
 }
 
-function getLocalData(): { content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[] } {
+function getLocalData(): { content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[]; clients: ClientBrand[] } {
   let content = INITIAL_MOCK_CONTENT;
   let team = INITIAL_MOCK_TEAM;
   let channels = INITIAL_MOCK_CHANNELS;
   let comments = INITIAL_MOCK_COMMENTS;
+  let clients = INITIAL_MOCK_CLIENTS;
 
   const savedContent = localStorage.getItem(MOCK_CONTENT_KEY);
-  const savedTeam = localStorage.getItem(MOCK_TEAM_KEY);
   const savedChannels = localStorage.getItem(MOCK_CHANNELS_KEY);
   const savedComments = localStorage.getItem(MOCK_COMMENTS_KEY);
+  const savedClients = localStorage.getItem(MOCK_CLIENTS_KEY);
 
   if (savedContent) {
-    content = JSON.parse(savedContent);
+    content = JSON.parse(savedContent).map((item: ContentItem) => ({
+      ...item,
+      taskType: item.taskType || 'Content',
+    }));
   } else {
     localStorage.setItem(MOCK_CONTENT_KEY, JSON.stringify(content));
   }
 
-  if (savedTeam) {
-    team = JSON.parse(savedTeam);
-  } else {
-    localStorage.setItem(MOCK_TEAM_KEY, JSON.stringify(team));
-  }
+  localStorage.removeItem('contentlab_mock_team');
 
   if (savedChannels) {
     channels = JSON.parse(savedChannels);
@@ -250,17 +285,23 @@ function getLocalData(): { content: ContentItem[]; team: TeamMember[]; channels:
     localStorage.setItem(MOCK_COMMENTS_KEY, JSON.stringify(comments));
   }
 
-  return { content, team, channels, comments };
+  if (savedClients) {
+    clients = JSON.parse(savedClients);
+  } else {
+    localStorage.setItem(MOCK_CLIENTS_KEY, JSON.stringify(clients));
+  }
+
+  return { content, team, channels, comments, clients };
 }
 
-function saveLocalData(content: ContentItem[], team?: TeamMember[], channels?: Channel[], comments?: CommentItem[]) {
+function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[]) {
   localStorage.setItem(MOCK_CONTENT_KEY, JSON.stringify(content));
-  if (team) localStorage.setItem(MOCK_TEAM_KEY, JSON.stringify(team));
   if (channels) localStorage.setItem(MOCK_CHANNELS_KEY, JSON.stringify(channels));
   if (comments) localStorage.setItem(MOCK_COMMENTS_KEY, JSON.stringify(comments));
+  if (clients) localStorage.setItem(MOCK_CLIENTS_KEY, JSON.stringify(clients));
 }
 
-export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[] }> {
+export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamMember[]; channels: Channel[]; comments: CommentItem[]; clients: ClientBrand[] }> {
   const url = getScriptUrl();
   if (!url) {
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -292,6 +333,11 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       views: item.views ? String(item.views) : '',
       likes: item.likes ? String(item.likes) : '',
       engagement: item.engagement ? String(item.engagement) : '',
+      taskType: String(item.taskType || 'Content') as ContentItem['taskType'],
+      category: item.category ? String(item.category) : '',
+      dueDate: String(item.dueDate ? item.dueDate.split('T')[0] : ''),
+      client: item.client ? String(item.client) : '',
+      brand: item.brand ? String(item.brand) : '',
       createdAt: String(item.createdAt || new Date().toISOString()),
       updatedAt: String(item.updatedAt || new Date().toISOString()),
     }));
@@ -302,6 +348,7 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       email: String(item.email || ''),
       avatar: String(item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'),
       password: item.password ? String(item.password) : '',
+      role: String(item.role || 'team').toLowerCase() === 'super' ? 'super' : 'team',
     }));
 
     const channels = (data.channels || []).map((item: any) => ({
@@ -318,7 +365,15 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       createdAt: String(item.createdAt || new Date().toISOString()),
     }));
 
-    return { content, team, channels, comments };
+    const clients = (data.clients || []).map((item: any) => ({
+      id: String(item.id || ''),
+      client: String(item.client || ''),
+      brand: String(item.brand || ''),
+      color: String(item.color || '#2563eb'),
+      active: String(item.active ?? 'true').toLowerCase() !== 'false',
+    }));
+
+    return { content, team, channels, comments, clients };
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, falling back to local mock data:', error);
     return getLocalData();
@@ -333,19 +388,7 @@ export async function loginUser(
   const url = getScriptUrl();
 
   if (!url) {
-    // Sandbox fallback: check mock local team list
-    const { team } = getLocalData();
-    const user = team.find(
-      (m) => 
-        (m.name.toLowerCase() === username.toLowerCase() || 
-         m.email.toLowerCase() === username.toLowerCase()) && 
-        m.password === password
-    );
-    if (user) {
-      const { password: _, ...userWithoutPassword } = user;
-      return { success: true, user: userWithoutPassword };
-    }
-    return { success: false, error: 'Username atau password mock tidak valid (gunakan Andi Pratama / pass123)' };
+    return { success: false, error: 'Workspace belum terhubung ke Google Sheets.' };
   }
 
   try {
@@ -362,20 +405,12 @@ export async function loginUser(
       }),
     });
     const result = await response.json();
+    if (result?.success && result.user) {
+      result.user.role = String(result.user.role || 'team').toLowerCase() === 'super' ? 'super' : 'team';
+    }
     return result;
   } catch (e) {
-    console.error('Failed to authenticate with spreadsheet script, falling back to local check:', e);
-    const { team } = getLocalData();
-    const user = team.find(
-      (m) => 
-        (m.name.toLowerCase() === username.toLowerCase() || 
-         m.email.toLowerCase() === username.toLowerCase()) && 
-        m.password === password
-    );
-    if (user) {
-      const { password: _, ...userWithoutPassword } = user;
-      return { success: true, user: userWithoutPassword };
-    }
+    console.error('Failed to authenticate with spreadsheet script:', e);
     return { success: false, error: 'Gagal menghubungi server Google Sheets.' };
   }
 }
@@ -545,21 +580,19 @@ export async function createComment(
 }
 
 export async function createTeamMember(
-  member: Omit<TeamMember, 'id' | 'avatar'>
+  member: Omit<TeamMember, 'id' | 'avatar' | 'role'> & { role?: UserRole }
 ): Promise<TeamMember> {
   const url = getScriptUrl();
   const newMember: TeamMember = {
     ...member,
     id: Math.random().toString(36).substring(2, 9),
     avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&w=150&h=150&q=80`,
-    password: 'pass123', // default password
+    password: '',
+    role: member.role || 'team',
   };
 
   if (!url) {
-    const { content, team, channels, comments } = getLocalData();
-    const updated = [...team, newMember];
-    saveLocalData(content, updated, channels, comments);
-    return newMember;
+    throw new Error('Google Sheets is not connected');
   }
 
   try {
@@ -578,11 +611,8 @@ export async function createTeamMember(
     }
     throw new Error(result.error || 'Server failed to create team member');
   } catch (error) {
-    console.error('Failed to create team member, using mock save:', error);
-    const { content, team, channels, comments } = getLocalData();
-    const updated = [...team, newMember];
-    saveLocalData(content, updated, channels, comments);
-    return newMember;
+    console.error('Failed to create team member:', error);
+    throw error;
   }
 }
 
@@ -638,6 +668,42 @@ export async function deleteChannel(id: string): Promise<boolean> {
   const updated = channels.filter((c) => c.id !== id);
   saveLocalData(content, team, updated, comments);
   return true;
+}
+
+export async function createClientBrand(
+  clientBrand: Omit<ClientBrand, 'id'>
+): Promise<ClientBrand> {
+  const url = getScriptUrl();
+  const newClientBrand: ClientBrand = {
+    ...clientBrand,
+    id: Math.random().toString(36).substring(2, 9),
+  };
+
+  if (!url) {
+    const { content, team, channels, comments, clients } = getLocalData();
+    saveLocalData(content, team, channels, comments, [...clients, newClientBrand]);
+    return newClientBrand;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'createClientBrand',
+        clientBrand: newClientBrand,
+      }),
+    });
+    const result = await response.json();
+    if (result && result.success) return newClientBrand;
+    throw new Error(result.error || 'Server failed to create client/brand');
+  } catch (error) {
+    console.error('Failed to create client/brand, using mock save:', error);
+    const { content, team, channels, comments, clients } = getLocalData();
+    saveLocalData(content, team, channels, comments, [...clients, newClientBrand]);
+    return newClientBrand;
+  }
 }
 
 export async function validateScriptUrl(url: string): Promise<boolean> {

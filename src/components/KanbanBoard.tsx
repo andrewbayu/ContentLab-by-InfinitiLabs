@@ -19,6 +19,9 @@ const COLUMNS: { label: string; status: ContentItem['status'] }[] = [
   { label: 'Review / Editing', status: 'Review/Editing' },
   { label: 'Scheduled', status: 'Scheduled' },
   { label: 'Published', status: 'Published' },
+  { label: 'To Do', status: 'To Do' },
+  { label: 'In Progress', status: 'In Progress' },
+  { label: 'Done', status: 'Done' },
 ];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -171,13 +174,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         onClick={() => onEditItem(item)}
                       >
                         <div className="card-tags">
-                          <span className="tag-badge" style={getChannelStyle(item.channel)}>
-                            {item.channel}
-                          </span>
-                          <span className="format-tag">
-                            {getFormatIcon(item.format)}
-                            <span style={{ marginLeft: '4px' }}>{item.format}</span>
-                          </span>
+                          <span className="format-tag">{item.taskType}</span>
+                          {item.brand && <span className="tag-badge">{item.client ? `${item.client} · ` : ''}{item.brand}</span>}
+                          {item.taskType === 'Content' && <>
+                            <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+                            <span className="format-tag">{getFormatIcon(item.format)}<span style={{ marginLeft: '4px' }}>{item.format}</span></span>
+                          </>}
                         </div>
 
                         <h4 className="card-title">{item.title}</h4>
@@ -202,10 +204,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                         <div className="card-footer">
                           <div style={{ display: 'flex', gap: '10px' }}>
-                            {variablesConfig.publishDate && item.publishDate && (
+                            {(item.taskType === 'General' ? item.dueDate : (variablesConfig.publishDate ? item.publishDate : '')) && (
                               <div className="card-meta-item">
                                 <Calendar className="card-meta-icon" />
-                                <span>{item.publishDate}</span>
+                                <span>{item.taskType === 'General' ? item.dueDate : item.publishDate}</span>
                               </div>
                             )}
                             {item.assetsLink && (

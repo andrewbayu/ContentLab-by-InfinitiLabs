@@ -104,7 +104,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             onClick={() => handleNavClick('calendar')}
           >
             <Calendar className="nav-item-icon" />
-            Content Calendar
+            Task Calendar
           </button>
 
           <button
@@ -112,16 +112,18 @@ export const AppShell: React.FC<AppShellProps> = ({
             onClick={() => handleNavClick('list')}
           >
             <ListTodo className="nav-item-icon" />
-            Content List
+            Task List
           </button>
 
-          <button
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => handleNavClick('settings')}
-          >
-            <Settings className="nav-item-icon" />
-            Settings Manager
-          </button>
+          {currentUser?.role === 'super' && (
+            <button
+              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => handleNavClick('settings')}
+            >
+              <Settings className="nav-item-icon" />
+              Settings Manager
+            </button>
+          )}
 
           {/* Spacer to push logout to bottom */}
           <div style={{ flexGrow: 1 }} />
@@ -158,7 +160,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               textAlign: 'center',
               fontWeight: 600
             }}>
-              Sandbox Mode (Local)
+              Sheets Not Connected
             </div>
           </div>
         )}
@@ -181,9 +183,9 @@ export const AppShell: React.FC<AppShellProps> = ({
 
             <h2 className="header-title">
               {activeTab === 'dashboard' && 'Dashboard Analytics'}
-              {activeTab === 'board' && 'Content Kanban Board'}
-              {activeTab === 'calendar' && 'Content Calendar Planner'}
-              {activeTab === 'list' && 'Content Schedule List'}
+              {activeTab === 'board' && 'Task Kanban Board'}
+              {activeTab === 'calendar' && 'Task Calendar Planner'}
+              {activeTab === 'list' && 'Task List'}
               {activeTab === 'settings' && 'Settings Center'}
             </h2>
           </div>
@@ -206,14 +208,16 @@ export const AppShell: React.FC<AppShellProps> = ({
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', textAlign: 'left' }}>
                   <span style={{ fontWeight: 650, color: 'var(--text-primary)', lineHeight: 1.2 }}>{currentUser.name}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Active Crew</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    {currentUser.role === 'super' ? 'Super Admin' : 'Team Member'}
+                  </span>
                 </div>
               </div>
             )}
 
             <button className="btn btn-primary" onClick={onOpenCreateModal}>
               <Plus size={16} />
-              <span>Create Content</span>
+              <span>Create Task</span>
             </button>
           </div>
         </header>
