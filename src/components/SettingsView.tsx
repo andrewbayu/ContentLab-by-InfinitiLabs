@@ -304,7 +304,36 @@ function doPost(e) {
         console.error("Mail error log:", mailErr);
       }
       
-      result = { success: true, comment: comment };
+      result = { success: true, comment: comment };    
+    } else if (action === "login") {
+      const teamSheet = sheet.getSheetByName("Team");
+      const teamData = getSheetData(teamSheet);
+      const username = postData.username.trim().toLowerCase();
+      const password = String(postData.password).trim();
+      
+      let matchedUser = null;
+      for (let i = 0; i < teamData.length; i++) {
+        const member = teamData[i];
+        const memberName = String(member.name || "").trim().toLowerCase();
+        const memberEmail = String(member.email || "").trim().toLowerCase();
+        const memberPassword = String(member.password || "").trim();
+        
+        if ((memberName === username || memberEmail === username) && memberPassword === password) {
+          matchedUser = {
+            id: member.id,
+            name: member.name,
+            email: member.email,
+            avatar: member.avatar
+          };
+          break;
+        }
+      }
+      
+      if (matchedUser) {
+        result = { success: true, user: matchedUser };
+      } else {
+        result = { success: false, error: "Username atau password salah" };
+      }
     }
     
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -322,7 +351,8 @@ function getSheetData(sheet) {
   const values = range.getValues();
   if (values.length <= 1) return [];
   
-  const headers = values[0];
+  // Trim headers to prevent trailing space header mismatch
+  const headers = values[0].map(function(h) { return String(h).trim(); });
   const data = [];
   
   for (let i = 1; i < values.length; i++) {
