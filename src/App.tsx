@@ -267,6 +267,13 @@ function App() {
     const originalItems = [...items];
     const targetItem = items.find((item) => item.id === id);
     if (!targetItem || targetItem.status === newStatus) return;
+    const allowedStatuses: ContentItem['status'][] = targetItem.taskType === 'General'
+      ? ['To Do', 'In Progress', 'Done']
+      : ['Idea', 'Scripting/Writing', 'Production/Design', 'Review/Editing', 'Scheduled', 'Published'];
+    if (!allowedStatuses.includes(newStatus)) {
+      addToast('Status tersebut tidak sesuai dengan jenis task.', 'error');
+      return;
+    }
     if (!['Idea', 'To Do'].includes(newStatus) && !targetItem.ownerId && !targetItem.assignee) {
       setSelectedItem(targetItem);
       setIsModalOpen(true);
@@ -624,6 +631,7 @@ function App() {
             channels={channels}
             variablesConfig={variablesConfig}
             currentUser={currentUser}
+            taskView={taskView}
           />
         )}
 

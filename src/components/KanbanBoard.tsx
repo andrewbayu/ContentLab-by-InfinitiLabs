@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { isUserInvolved } from '../services/sheets';
-import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
-import { Calendar, Link, Plus, FileText, Video, RefreshCw, UserCheck } from 'lucide-react';
+import type { ContentItem, Channel, VariablesConfig, TeamMember, TaskType } from '../services/sheets';
+import { Calendar, Link, Plus, FileText, Video, RefreshCw, UserCheck, Clapperboard, ListChecks } from 'lucide-react';
 
 interface KanbanBoardProps {
   items: ContentItem[];
@@ -11,21 +11,30 @@ interface KanbanBoardProps {
   onEditItem: (item: ContentItem) => void;
   onOpenCreateModalWithStatus: (status: ContentItem['status']) => void;
   currentUser: TeamMember;
+  taskView: 'all' | 'content' | 'general' | 'mine' | 'overdue';
 }
 
-const COLUMNS: { label: string; status: ContentItem['status'] }[] = [
+interface KanbanColumn {
+  label: string;
+  status: ContentItem['status'];
+}
+
+const CONTENT_COLUMNS: KanbanColumn[] = [
   { label: 'Ideas / Backlog', status: 'Idea' },
   { label: 'Scripting / Writing', status: 'Scripting/Writing' },
   { label: 'Production / Design', status: 'Production/Design' },
   { label: 'Review / Editing', status: 'Review/Editing' },
   { label: 'Scheduled', status: 'Scheduled' },
   { label: 'Published', status: 'Published' },
+];
+
+const GENERAL_COLUMNS: KanbanColumn[] = [
   { label: 'To Do', status: 'To Do' },
   { label: 'In Progress', status: 'In Progress' },
   { label: 'Done', status: 'Done' },
 ];
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({
+export function KanbanBoard({
   items,
   channels,
   variablesConfig,
@@ -33,50 +42,54 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onEditItem,
   onOpenCreateModalWithStatus,
   currentUser,
-}) => {
+  taskView,
+}: KanbanBoardProps) {
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
+  const [draggedItemType, setDraggedItemType] = useState<TaskType | null>(null);
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
+  const [mobileLane, setMobileLane] = useState<TaskType>('Content');
+  const showContentLane = taskView !== 'general';
+  const showGeneralLane = taskView !== 'content';
+  const showLaneSwitch = showContentLane && showGeneralLane;
 
-  // Drag and Drop handlers
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
+  const displayedItems = items.filter((item) => !onlyMyTasks || isUserInvolved(item, currentUser));
+
+  const handleDragStart = (event: React.DragEvent, item: ContentItem) => {
+    event.dataTransfer.setData('text/plain', item.id);
+    event.dataTransfer.effectAllowed = 'move';
+    setDraggedItemType(item.taskType);
   };
 
-  const handleDragOver = (e: React.DragEvent, status: string) => {
-    e.preventDefault();
+  const handleDragOver = (event: React.DragEvent, status: ContentItem['status'], laneType: TaskType) => {
+    if (draggedItemType !== laneType) {
+      event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
     setDraggedOverColumn(status);
   };
 
-  const handleDragLeave = () => {
+  const resetDragState = () => {
     setDraggedOverColumn(null);
+    setDraggedItemType(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetStatus: ContentItem['status']) => {
-    e.preventDefault();
-    setDraggedOverColumn(null);
-    const itemId = e.dataTransfer.getData('text/plain');
-    if (itemId) {
-      onMoveItem(itemId, targetStatus);
-    }
+  const handleDrop = (event: React.DragEvent, targetStatus: ContentItem['status'], laneType: TaskType) => {
+    event.preventDefault();
+    const itemId = event.dataTransfer.getData('text/plain');
+    const draggedItem = displayedItems.find((item) => item.id === itemId);
+    resetDragState();
+    if (draggedItem?.taskType === laneType) onMoveItem(itemId, targetStatus);
   };
 
-  // Filter items assigned to the active user if toggled
-  const displayedItems = items.filter((item) => {
-    if (onlyMyTasks) {
-      return isUserInvolved(item, currentUser);
-    }
-    return true;
-  });
-
-  // Dynamic style mapper helper
   const getChannelStyle = (channelName: string) => {
-    const ch = channels.find((c) => c.name.toLowerCase() === channelName.toLowerCase());
-    if (ch) {
+    const channel = channels.find((entry) => entry.name.toLowerCase() === channelName.toLowerCase());
+    if (channel) {
       return {
-        backgroundColor: `${ch.color}15`,
-        color: ch.color,
-        border: `1px solid ${ch.color}25`,
+        backgroundColor: `${channel.color}15`,
+        color: channel.color,
+        border: `1px solid ${channel.color}25`,
       };
     }
     return {
@@ -103,157 +116,152 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
   };
 
+  const renderCard = (item: ContentItem) => {
+    const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
+    return (
+      <div
+        key={item.id}
+        className="kanban-card"
+        draggable
+        onDragStart={(event) => handleDragStart(event, item)}
+        onDragEnd={resetDragState}
+        onClick={() => onEditItem(item)}
+      >
+        <div className="card-tags">
+          {item.brand && <span className="tag-badge">{item.client ? `${item.client} · ` : ''}{item.brand}</span>}
+          {item.taskType === 'Content' ? (
+            <>
+              <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+              <span className="format-tag">{getFormatIcon(item.format)}<span style={{ marginLeft: '4px' }}>{item.format}</span></span>
+            </>
+          ) : (
+            <span className="format-tag">{item.category || 'General'}</span>
+          )}
+        </div>
+
+        <h4 className="card-title">{item.title}</h4>
+
+        {variablesConfig.brief && item.brief && <p className="card-brief kanban-card-brief">{item.brief}</p>}
+
+        {variablesConfig.tags && tagList.length > 0 && (
+          <div className="kanban-card-tags">
+            {tagList.map((tag) => <span key={tag} className="pill-tag kanban-pill-tag">{tag}</span>)}
+          </div>
+        )}
+
+        <div className="card-footer">
+          <div className="kanban-card-meta">
+            {(item.taskType === 'General' ? item.dueDate : (variablesConfig.publishDate ? item.publishDate : '')) && (
+              <div className="card-meta-item">
+                <Calendar className="card-meta-icon" />
+                <span>{item.taskType === 'General' ? item.dueDate : item.publishDate}</span>
+              </div>
+            )}
+            {item.assetsLink && (
+              <div className="card-meta-item" title="Draft Assets Link">
+                <Link className="card-meta-icon kanban-asset-icon" />
+              </div>
+            )}
+          </div>
+
+          <div className="kanban-card-owner">
+            <span className="priority-dot" title={`Priority: ${item.priority}`} style={{ backgroundColor: getPriorityColor(item.priority) }} />
+            {item.assignee && (
+              <div className="avatar-ring kanban-avatar" title={`PIC: ${item.assignee}`}>
+                {item.assignee.charAt(0)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLane = (laneType: TaskType, columns: KanbanColumn[]) => {
+    const laneItems = displayedItems.filter((item) => item.taskType === laneType);
+    const isContent = laneType === 'Content';
+    const laneStatuses = new Set(columns.map((column) => column.status));
+    return (
+      <section className={`kanban-lane ${showLaneSwitch && mobileLane !== laneType ? 'mobile-lane-hidden' : ''}`} aria-labelledby={`${laneType.toLowerCase()}-lane-title`}>
+        <div className="kanban-lane-heading">
+          <div className={`kanban-lane-icon ${isContent ? 'content' : 'general'}`}>
+            {isContent ? <Clapperboard size={15} /> : <ListChecks size={15} />}
+          </div>
+          <div>
+            <div className="kanban-lane-title-row">
+              <h3 id={`${laneType.toLowerCase()}-lane-title`}>{isContent ? 'Content Pipeline' : 'General Tasks'}</h3>
+              <span>{laneItems.length}</span>
+            </div>
+            <p>{isContent ? 'Plan, produce, review, and publish content' : 'Track operational and non-content work'}</p>
+          </div>
+        </div>
+
+        <div className={`kanban-board kanban-board-${laneType.toLowerCase()}`}>
+          {columns.map((column) => {
+            const columnItems = laneItems.filter((item) => item.status === column.status || (
+              column.status === columns[0].status && !laneStatuses.has(item.status)
+            ));
+            const isOver = draggedOverColumn === column.status && draggedItemType === laneType;
+            return (
+              <div
+                key={column.status}
+                className={`kanban-column ${isOver ? 'drag-over' : ''}`}
+                onDragOver={(event) => handleDragOver(event, column.status, laneType)}
+                onDragLeave={() => setDraggedOverColumn(null)}
+                onDrop={(event) => handleDrop(event, column.status, laneType)}
+              >
+                <div className="kanban-column-header">
+                  <div className="column-title-area">
+                    <span className="column-title">{column.label}</span>
+                    <span className="column-badge">{columnItems.length}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-icon-only kanban-add-button"
+                    onClick={() => onOpenCreateModalWithStatus(column.status)}
+                    title={`Add to ${column.label}`}
+                    aria-label={`Add ${laneType === 'Content' ? 'content' : 'task'} to ${column.label}`}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+
+                <div className="kanban-cards-container">
+                  {columnItems.length > 0 ? columnItems.map(renderCard) : <div className="kanban-empty-column">Drop items here</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
   return (
-    <div className="page-container" style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      
-      {/* Board toolbar filter for Active User tasks */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '4px 10px 12px 10px', borderBottom: '1px solid var(--border-subtle)' }}>
+    <div className="page-container kanban-page">
+      <div className="kanban-toolbar">
+        {showLaneSwitch && (
+          <div className="kanban-mobile-switch" role="tablist" aria-label="Kanban lane">
+            <button type="button" role="tab" aria-selected={mobileLane === 'Content'} className={mobileLane === 'Content' ? 'active' : ''} onClick={() => setMobileLane('Content')}>Content</button>
+            <button type="button" role="tab" aria-selected={mobileLane === 'General'} className={mobileLane === 'General' ? 'active' : ''} onClick={() => setMobileLane('General')}>Tasks</button>
+          </div>
+        )}
         <button
           type="button"
-          onClick={() => setOnlyMyTasks(!onlyMyTasks)}
-          className="btn"
-          style={{
-            borderColor: onlyMyTasks ? 'var(--primary)' : 'var(--border-strong)',
-            backgroundColor: onlyMyTasks ? 'var(--primary-glow)' : 'white',
-            color: onlyMyTasks ? 'var(--primary)' : 'var(--text-secondary)',
-            fontSize: '13px',
-            padding: '6px 12px',
-            opacity: 1,
-            cursor: 'pointer'
-          }}
+          onClick={() => setOnlyMyTasks((current) => !current)}
+          className={`btn kanban-my-work ${onlyMyTasks ? 'active' : ''}`}
           title="Tampilkan task saat saya menjadi PIC, collaborator, atau reviewer"
+          aria-pressed={onlyMyTasks}
         >
-          <UserCheck size={14} style={{ marginRight: '6px', display: 'inline', verticalAlign: 'middle' }} />
-          <span>{onlyMyTasks ? 'Showing Only My Tasks' : 'Filter by My Tasks'}</span>
+          <UserCheck size={14} />
+          <span>{onlyMyTasks ? 'My Work Only' : 'Filter My Work'}</span>
         </button>
       </div>
 
-      <div className="kanban-board" style={{ flexGrow: 1, display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '8px', marginTop: '16px' }}>
-        {COLUMNS.map((col) => {
-          const colItems = displayedItems.filter((item) => item.status === col.status);
-          const isOver = draggedOverColumn === col.status;
-
-          return (
-            <div
-              key={col.status}
-              className="kanban-column"
-              onDragOver={(e) => handleDragOver(e, col.status)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, col.status)}
-              style={{
-                backgroundColor: isOver ? 'rgba(37, 99, 235, 0.03)' : '',
-                borderColor: isOver ? 'var(--primary)' : '',
-                transition: 'background-color 200ms ease, border-color 200ms ease',
-              }}
-            >
-              <div className="kanban-column-header">
-                <div className="column-title-area">
-                  <span className="column-title">{col.label}</span>
-                  <span className="column-badge">{colItems.length}</span>
-                </div>
-                <button 
-                  className="btn btn-secondary btn-icon-only" 
-                  onClick={() => onOpenCreateModalWithStatus(col.status)}
-                  style={{ padding: '4px', borderRadius: '4px' }}
-                  title={`Add to ${col.label}`}
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-
-              <div className="kanban-cards-container">
-                {colItems.length > 0 ? (
-                  colItems.map((item) => {
-                    const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
-                    return (
-                      <div
-                        key={item.id}
-                        className="kanban-card"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, item.id)}
-                        onClick={() => onEditItem(item)}
-                      >
-                        <div className="card-tags">
-                          <span className="format-tag">{item.taskType}</span>
-                          {item.brand && <span className="tag-badge">{item.client ? `${item.client} · ` : ''}{item.brand}</span>}
-                          {item.taskType === 'Content' && <>
-                            <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
-                            <span className="format-tag">{getFormatIcon(item.format)}<span style={{ marginLeft: '4px' }}>{item.format}</span></span>
-                          </>}
-                        </div>
-
-                        <h4 className="card-title">{item.title}</h4>
-                        
-                        {variablesConfig.brief && item.brief && (
-                          <p className="card-brief" style={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>{item.brief}</p>
-                        )}
-
-                        {variablesConfig.tags && tagList.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
-                            {tagList.map(t => (
-                              <span key={t} className="pill-tag" style={{ fontSize: '9px', padding: '1px 6px' }}>{t}</span>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="card-footer">
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            {(item.taskType === 'General' ? item.dueDate : (variablesConfig.publishDate ? item.publishDate : '')) && (
-                              <div className="card-meta-item">
-                                <Calendar className="card-meta-icon" />
-                                <span>{item.taskType === 'General' ? item.dueDate : item.publishDate}</span>
-                              </div>
-                            )}
-                            {item.assetsLink && (
-                              <div className="card-meta-item" title="Draft Assets Link">
-                                <Link className="card-meta-icon" style={{ color: 'var(--primary)' }} />
-                              </div>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span 
-                              title={`Priority: ${item.priority}`}
-                              style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                backgroundColor: getPriorityColor(item.priority)
-                              }}
-                            />
-                            {item.assignee && (
-                              <div className="avatar-ring" style={{ width: '22px', height: '22px', fontSize: '10px' }} title={`PIC: ${item.assignee}`}>
-                                {item.assignee.charAt(0)}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div style={{
-                    padding: '32px 16px',
-                    textAlign: 'center',
-                    color: 'var(--text-muted)',
-                    fontSize: '12px',
-                    border: '1px dashed var(--border-subtle)',
-                    borderRadius: '8px',
-                  }}>
-                    Drop items here
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="kanban-lanes">
+        {showContentLane && renderLane('Content', CONTENT_COLUMNS)}
+        {showGeneralLane && renderLane('General', GENERAL_COLUMNS)}
       </div>
     </div>
   );
-};
+}
