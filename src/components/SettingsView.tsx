@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getScriptUrl, saveScriptUrl, validateScriptUrl } from '../services/sheets';
+import { getGlobalScriptUrl, getScriptUrl, hasLocalScriptUrlOverride, saveScriptUrl, validateScriptUrl } from '../services/sheets';
 import type { TeamMember, Channel, VariablesConfig, ClientBrand } from '../services/sheets';
 import {
   Link,
@@ -81,13 +81,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isAddingClientBrand, setIsAddingClientBrand] = useState(false);
 
   const currentUrl = getScriptUrl();
+  const globalUrl = getGlobalScriptUrl();
+  const hasLocalOverride = hasLocalScriptUrlOverride();
 
   const handleSaveConnection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
       saveScriptUrl('');
+      setUrl(globalUrl || '');
       onConnectionChange();
-      addToast('Disconnected from Google Sheets.', 'info');
+      addToast(globalUrl ? 'Using global Google Sheets connection.' : 'Disconnected from Google Sheets.', 'info');
       return;
     }
 
@@ -106,9 +109,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleDisconnect = () => {
     saveScriptUrl('');
-    setUrl('');
+    setUrl(globalUrl || '');
     onConnectionChange();
-    addToast('Disconnected from Google Sheets.', 'info');
+    addToast(globalUrl ? 'Browser override removed. Using global connection.' : 'Disconnected from Google Sheets.', 'info');
   };
 
   const handleVariableToggle = (key: keyof VariablesConfig) => {
@@ -876,12 +879,16 @@ function deleteTaskMembers(spreadsheet, taskId) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', backgroundColor: 'rgba(22, 163, 74, 0.06)', border: '1px solid rgba(22, 163, 74, 0.2)', borderRadius: '6px' }}>
                     <CheckCircle size={20} style={{ color: '#16a34a', flexShrink: 0 }} />
                     <div style={{ flexGrow: 1 }}>
-                      <div style={{ fontWeight: 600, color: '#16a34a', fontSize: '14px' }}>Connected to Google Sheets API</div>
+                      <div style={{ fontWeight: 600, color: '#16a34a', fontSize: '14px' }}>
+                        {hasLocalOverride ? 'Connected using browser override' : 'Connected using global workspace configuration'}
+                      </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all', fontFamily: 'monospace' }}>{currentUrl}</div>
                     </div>
-                    <button className="btn btn-danger" onClick={handleDisconnect}>
-                      Disconnect
-                    </button>
+                    {hasLocalOverride && (
+                      <button className="btn btn-secondary" onClick={handleDisconnect}>
+                        Reset to Global
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', backgroundColor: 'rgba(217, 119, 6, 0.06)', border: '1px solid rgba(217, 119, 6, 0.2)', borderRadius: '6px' }}>
@@ -897,18 +904,18 @@ function deleteTaskMembers(spreadsheet, taskId) {
 
                 <form onSubmit={handleSaveConnection} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
                   <div className="form-group">
-                    <label className="form-label">Apps Script Deployed Web App URL</label>
+                    <label className="form-label">Optional Browser Override</label>
                     <input
                       type="url"
                       className="form-input"
                       placeholder="https://script.google.com/macros/s/.../exec"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      required
                     />
+                    <span className="form-help">Kosongkan untuk memakai konfigurasi global. Override hanya berlaku pada browser ini.</span>
                   </div>
                   <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={isValidating}>
-                    {isValidating ? 'Validating Connection...' : 'Connect Spreadsheet'}
+                    {isValidating ? 'Validating Connection...' : 'Save Override'}
                   </button>
                 </form>
               </div>
@@ -1041,7 +1048,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                         Klik <strong style={{ color: 'var(--text-primary)' }}>Deploy</strong>, lalu berikan izin akses akun Google Anda jika diminta.
                       </li>
                       <li>
-                        Salin **Web App URL** yang didapatkan, lalu tempelkan pada kolom status koneksi di bagian atas halaman ini!
+                        Simpan Web App URL sebagai <strong>VITE_GOOGLE_SHEETS_URL</strong> pada konfigurasi deployment. Kolom override di atas hanya untuk pengujian browser tertentu.
                       </li>
                     </ol>
                   </div>

@@ -7,6 +7,8 @@ Dokumen ini berfungsi sebagai acuan kelanjutan proyek (*continuity guide*) bagi 
 ## 🚀 1. Overview Proyek
 **ContentLab** adalah studio perencana & pelacak konten pemasaran (*content marketing planner*) kolaboratif. Aplikasi ini dibangun sebagai aplikasi web statis modern (React + Vite + TypeScript) dengan database terintegrasi langsung ke **Google Sheets** menggunakan perantara **Google Apps Script Web App API**.
 
+Endpoint Apps Script production dikonfigurasi secara global melalui `VITE_GOOGLE_SHEETS_URL`. `localStorage` hanya menjadi override opsional untuk pengujian admin, sehingga browser anggota tim baru dapat langsung login tanpa setup koneksi.
+
 *   **Repositori GitHub**: `https://github.com/andrewbayu/ContentLab-by-InfinitiLabs`
 *   **Target Deployment**: Vercel
 *   **Tema Desain**: Light Mode (Putih-Biru minimalis)

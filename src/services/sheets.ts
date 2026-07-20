@@ -135,6 +135,7 @@ export interface VariablesConfig {
 }
 
 const SCRIPT_URL_KEY = 'contentlab_google_sheets_url';
+const GLOBAL_SCRIPT_URL = String(import.meta.env.VITE_GOOGLE_SHEETS_URL || '').trim();
 const MOCK_CONTENT_KEY = 'contentlab_mock_content';
 const MOCK_CHANNELS_KEY = 'contentlab_mock_channels';
 const MOCK_COMMENTS_KEY = 'contentlab_mock_comments';
@@ -265,7 +266,15 @@ const INITIAL_MOCK_COMMENTS: CommentItem[] = [
 ];
 
 export function getScriptUrl(): string | null {
-  return localStorage.getItem(SCRIPT_URL_KEY);
+  return localStorage.getItem(SCRIPT_URL_KEY) || GLOBAL_SCRIPT_URL || null;
+}
+
+export function getGlobalScriptUrl(): string | null {
+  return GLOBAL_SCRIPT_URL || null;
+}
+
+export function hasLocalScriptUrlOverride(): boolean {
+  return !!localStorage.getItem(SCRIPT_URL_KEY);
 }
 
 export function saveScriptUrl(url: string): void {
