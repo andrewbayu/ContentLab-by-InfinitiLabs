@@ -21,8 +21,6 @@ import {
   saveVariablesConfig,
   getCustomTags,
   saveCustomTags,
-  getActiveUser,
-  saveActiveUser,
   isMockMode
 } from './services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem } from './services/sheets';
@@ -39,15 +37,20 @@ function App() {
     localStorage.getItem('contentlab_is_authenticated') === 'true'
   );
 
+  // Active Authenticated User profile state
+  const [currentUser, setCurrentUser] = useState<TeamMember | null>(() => {
+    const saved = localStorage.getItem('contentlab_logged_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [items, setItems] = useState<ContentItem[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [comments, setComments] = useState<CommentItem[]>([]);
   
-  // Custom configurations & active user
+  // Custom configurations & tags registry
   const [variablesConfig, setVariablesConfig] = useState<VariablesConfig>(getVariablesConfig());
   const [customTags, setCustomTags] = useState<string[]>(getCustomTags());
-  const [activeUser, setActiveUser] = useState<string>(getActiveUser());
   
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -57,7 +60,7 @@ function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isMock, setIsMock] = useState<boolean>(isMockMode());
 
-  // Load spreadsheet data
+  // Load spreadsheet database
   const loadData = async (showLoading = true) => {
     if (!isAuthenticated) return;
     if (showLoading) setIsLoading(true);
@@ -67,6 +70,16 @@ function App() {
       setTeam(data.team);
       setChannels(data.channels);
       setComments(data.comments || []);
+
+      // If the currently logged in user is not in the fetched team (e.g. data updated), 
+      // we gracefully keep their local session or update it.
+      if (currentUser && data.team.length > 0) {
+        const found = data.team.find((t) => t.id === currentUser.id || t.email === currentUser.email);
+        if (found) {
+          setCurrentUser(found);
+          localStorage.setItem('contentlab_logged_user', JSON.stringify(found));
+        }
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
       addToast('Error loading data from Google Sheets.', 'error');
@@ -81,12 +94,12 @@ function App() {
     }
   }, [isMock, isAuthenticated]);
 
-  // Handle connection script changes
+  // Handle connection settings change
   const handleConnectionChange = () => {
     setIsMock(isMockMode());
   };
 
-  // Toast System
+  // Toast Alerts
   const addToast = (message: string, type: Toast['type'] = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -102,11 +115,13 @@ function App() {
   // Logout Handler
   const handleLogout = () => {
     localStorage.removeItem('contentlab_is_authenticated');
+    localStorage.removeItem('contentlab_logged_user');
+    setCurrentUser(null);
     setIsAuthenticated(false);
     addToast('Signed out of ContentLab.', 'info');
   };
 
-  // Create or Update content planner
+  // Save Content Plan
   const handleSaveItem = async (
     itemPayload: Omit<ContentItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
   ) => {
@@ -135,7 +150,7 @@ function App() {
       } else {
         const createdPayload = {
           ...itemPayload,
-          createdBy: activeUser || 'Anonymous'
+          createdBy: currentUser?.name || 'Anonymous'
         };
         const created = await createContent(createdPayload);
         setItems((prev) => [created, ...prev]);
@@ -151,7 +166,31 @@ function App() {
     }
   };
 
-  // Move content item status (drag and drop)
+  // Reschedule publish date
+  const handleMoveDate = async (id: string, newDate: string) => {
+    const originalItems = [...items];
+    const targetItem = items.find((item) => item.id === id);
+    if (!targetItem || targetItem.publishDate === newDate) return;
+
+    const updatedItem: ContentItem = {
+      ...targetItem,
+      publishDate: newDate,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setItems((prev) => prev.map((item) => (item.id === id ? updatedItem : item)));
+
+    try {
+      await updateContent(updatedItem);
+      addToast(`Rescheduled to ${newDate}`, 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Sync failed. Reverting date...', 'error');
+      setItems(originalItems);
+    }
+  };
+
+  // Drag and drop kanban status change
   const handleMoveItem = async (id: string, newStatus: ContentItem['status']) => {
     const originalItems = [...items];
     const targetItem = items.find((item) => item.id === id);
@@ -175,31 +214,7 @@ function App() {
     }
   };
 
-  // Move content publish date (drag and drop in calendar)
-  const handleMoveDate = async (id: string, newDate: string) => {
-    const originalItems = [...items];
-    const targetItem = items.find((item) => item.id === id);
-    if (!targetItem || targetItem.publishDate === newDate) return;
-
-    const updatedItem: ContentItem = {
-      ...targetItem,
-      publishDate: newDate,
-      updatedAt: new Date().toISOString(),
-    };
-
-    setItems((prev) => prev.map((item) => (item.id === id ? updatedItem : item)));
-
-    try {
-      await updateContent(updatedItem);
-      addToast(`Publish date rescheduled to ${newDate}`, 'success');
-    } catch (e) {
-      console.error(e);
-      addToast('Sync failed. Reverting date...', 'error');
-      setItems(originalItems);
-    }
-  };
-
-  // Delete content planner
+  // Delete Content Plan
   const handleDeleteItem = async (id: string) => {
     setIsModalOpen(false);
     const originalItems = [...items];
@@ -219,23 +234,20 @@ function App() {
     }
   };
 
-  // Discussion comments
+  // Discussion comment thread action
   const handleAddComment = async (contentId: string, text: string) => {
-    if (!activeUser) {
-      addToast('Harap pilih profil Anda di pojok kanan atas sebelum mengirim komentar!', 'error');
-      return;
-    }
+    if (!currentUser) return;
     try {
       const created = await createComment({
         contentId,
-        author: activeUser,
+        author: currentUser.name,
         text
       });
       setComments((prev) => [...prev, created]);
-      addToast('Komentar diskusi terkirim!', 'success');
+      addToast('Comment posted successfully!', 'success');
     } catch (e) {
       console.error(e);
-      addToast('Gagal mengirim komentar.', 'error');
+      addToast('Failed to save comment.', 'error');
     }
   };
 
@@ -299,13 +311,13 @@ function App() {
     }
   };
 
-  // Variable Toggles Handlers
+  // Variable toggles
   const handleSaveVariablesConfig = (config: VariablesConfig) => {
     saveVariablesConfig(config);
     setVariablesConfig(config);
   };
 
-  // Custom Tags Handlers
+  // Custom tags
   const handleAddTag = (tag: string) => {
     const updated = [...customTags, tag];
     saveCustomTags(updated);
@@ -317,12 +329,6 @@ function App() {
     saveCustomTags(updated);
     setCustomTags(updated);
     addToast(`Tag "${tag}" deleted.`, 'success');
-  };
-
-  const handleActiveUserChange = (user: string) => {
-    setActiveUser(user);
-    saveActiveUser(user);
-    addToast(`Switched active profile to "${user || 'None'}"`, 'info');
   };
 
   const handleOpenCreateModal = () => {
@@ -343,12 +349,18 @@ function App() {
     setIsModalOpen(true);
   };
 
-  // Render Login view if user is not authenticated
-  if (!isAuthenticated) {
+  // Render Login page if not authenticated
+  if (!isAuthenticated || !currentUser) {
     return (
       <>
-        <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />
-        {/* Toast Alert System overlay for login failure notifications */}
+        <LoginPage 
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            setIsAuthenticated(true);
+            addToast(`Selamat datang kembali, ${user.name}!`, 'success');
+          }} 
+        />
+        {/* Toast Alert overlay for login notifications */}
         <div className="toast-container">
           {toasts.map((toast) => (
             <div key={toast.id} className={`toast toast-${toast.type}`}>
@@ -371,9 +383,7 @@ function App() {
       setActiveTab={setActiveTab}
       onOpenCreateModal={handleOpenCreateModal}
       isMock={isMock}
-      activeUser={activeUser}
-      setActiveUser={handleActiveUserChange}
-      team={team}
+      currentUser={currentUser}
       onLogout={handleLogout}
     >
       {/* Loading Overlay */}
@@ -410,6 +420,7 @@ function App() {
             onEditItem={handleOpenEditModal}
             channels={channels}
             variablesConfig={variablesConfig}
+            currentUser={currentUser}
           />
         )}
         
@@ -421,17 +432,7 @@ function App() {
             onOpenCreateModalWithStatus={handleOpenCreateModalWithStatus}
             channels={channels}
             variablesConfig={variablesConfig}
-            activeUser={activeUser}
-          />
-        )}
-
-        {activeTab === 'list' && (
-          <ListView
-            items={items}
-            onEditItem={handleOpenEditModal}
-            channels={channels}
-            variablesConfig={variablesConfig}
-            activeUser={activeUser}
+            activeUser={currentUser.name}
           />
         )}
 
@@ -441,6 +442,16 @@ function App() {
             channels={channels}
             onEditItem={handleOpenEditModal}
             onMoveDate={handleMoveDate}
+          />
+        )}
+
+        {activeTab === 'list' && (
+          <ListView
+            items={items}
+            onEditItem={handleOpenEditModal}
+            channels={channels}
+            variablesConfig={variablesConfig}
+            activeUser={currentUser.name}
           />
         )}
 
@@ -478,7 +489,7 @@ function App() {
         channels={channels}
         variablesConfig={variablesConfig}
         customTags={customTags}
-        activeUser={activeUser}
+        activeUser={currentUser.name}
         comments={comments}
         onAddComment={handleAddComment}
         onAddCreator={handleAddCreator}

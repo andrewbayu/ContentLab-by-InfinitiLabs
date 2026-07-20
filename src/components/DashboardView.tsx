@@ -1,12 +1,29 @@
-import React from 'react';
-import type { ContentItem, Channel, VariablesConfig } from '../services/sheets';
-import { Layers, CheckCircle, Clock, AlertTriangle, Calendar, Eye, ThumbsUp, Award, Zap, BarChart3 } from 'lucide-react';
+import React, { useState } from 'react';
+import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
+import { 
+  Layers, 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  Calendar, 
+  Eye, 
+  ThumbsUp, 
+  Award, 
+  Zap, 
+  BarChart3, 
+  User, 
+  CheckSquare, 
+  ArrowRight,
+  ExternalLink,
+  Sparkles
+} from 'lucide-react';
 
 interface DashboardViewProps {
   items: ContentItem[];
   channels: Channel[];
   variablesConfig: VariablesConfig;
   onEditItem: (item: ContentItem) => void;
+  currentUser: TeamMember;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -14,7 +31,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   channels,
   variablesConfig,
   onEditItem,
+  currentUser,
 }) => {
+  const [dashboardTab, setDashboardTab] = useState<'personal' | 'studio'>('personal');
+
+  // Time-based greeting helper
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Selamat Pagi';
+    if (hour < 17) return 'Selamat Siang';
+    return 'Selamat Sore / Malam';
+  };
+
+  // --- GENERAL CALCULATIONS (STUDIO OVERVIEW) ---
   const totalCount = items.length;
   
   const inProduction = items.filter(
@@ -29,7 +58,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     (item) => item.status === 'Published' || item.status === 'Scheduled'
   ).length;
 
-  // Calculate Overdue
   const todayStr = new Date().toISOString().split('T')[0];
   const overdueItems = items.filter(
     (item) =>
@@ -39,7 +67,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   );
   const overdueCount = overdueItems.length;
 
-  // 1. Calculate KPI Metrics (Views, Likes, Engagement)
+  // Calculate General KPI Metrics
   let totalViews = 0;
   let totalLikes = 0;
   let totalEngagement = 0;
@@ -62,19 +90,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ? Math.round(totalEngagement / itemsWithMetricsCount) 
     : 0;
 
-  // 2. Top Performing Leaderboard (Sorted by views)
+  // Sort by views for General Leaderboard
   const topPerforming = [...publishedItems]
     .filter((item) => parseInt(item.views || '0', 10) > 0)
     .sort((a, b) => parseInt(b.views || '0', 10) - parseInt(a.views || '0', 10))
     .slice(0, 4);
 
-  // 3. Platform Format Efficiency (Average views per format)
+  // Format Efficiency (average views)
   const formatStats: Record<string, { totalViews: number; count: number }> = {};
-  
   publishedItems.forEach((item) => {
     const formatType = item.format;
     const v = parseInt(item.views || '0', 10);
-    
     if (v > 0) {
       if (!formatStats[formatType]) {
         formatStats[formatType] = { totalViews: 0, count: 0 };
@@ -92,18 +118,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }))
     .sort((a, b) => b.avgViews - a.avgViews);
 
-  // Find max average views for scaling the meters
   const maxAvgViews = formatList.length > 0 ? Math.max(...formatList.map((f) => f.avgViews)) : 100;
 
-  // Calculate Channel distribution
+  // General Channel distribution
   const channelCounts: Record<string, number> = {};
   items.forEach((item) => {
     channelCounts[item.channel] = (channelCounts[item.channel] || 0) + 1;
   });
-
   const channelsList = Object.entries(channelCounts).sort((a, b) => b[1] - a[1]);
 
-  // Upcoming Schedule (uncompleted items sorted by publish date closest to today)
+  // General Upcoming Schedule
   const upcomingContent = [...items]
     .filter((item) => item.status !== 'Published')
     .sort((a, b) => {
@@ -113,7 +137,76 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     })
     .slice(0, 4);
 
-  // Status/Channel badges colors helper
+
+  // --- PERSONAL CALCULATIONS (WORKSPACE SAYA) ---
+  const myItems = items.filter((item) => item.assignee === currentUser.name);
+
+  // 1. Personal Active Tasks (Backlog)
+  const myActiveTasks = myItems.filter(
+    (item) => item.status !== 'Published'
+  ).length;
+
+  // 2. Personal Pending Subtasks Checklists & Combined List
+  interface PersonalChecklistItem {
+    itemId: string;
+    itemTitle: string;
+    subtaskId: string;
+    label: string;
+    done: boolean;
+    link?: string;
+    parentItem: ContentItem;
+  }
+
+  let myPendingSubtaskCount = 0;
+  const myAllSubtasks: PersonalChecklistItem[] = [];
+
+  myItems.forEach((item) => {
+    if (item.status === 'Published') return; // skip published content subtasks
+    try {
+      const list = item.checklist ? JSON.parse(item.checklist) : [];
+      list.forEach((sub: any) => {
+        const itemObj: PersonalChecklistItem = {
+          itemId: item.id,
+          itemTitle: item.title,
+          subtaskId: sub.id,
+          label: sub.label,
+          done: !!sub.done,
+          link: sub.link || '',
+          parentItem: item
+        };
+        myAllSubtasks.push(itemObj);
+        if (!sub.done) {
+          myPendingSubtaskCount++;
+        }
+      });
+    } catch(e) {
+      console.error(e);
+    }
+  });
+
+  // Filter only pending ones for the action list dashboard
+  const myPendingChecklistItems = myAllSubtasks.filter(itm => !itm.done).slice(0, 5);
+
+  // 3. Personal views generated
+  let myPublishedViews = 0;
+  myItems.forEach((item) => {
+    if (item.status === 'Published') {
+      myPublishedViews += parseInt(item.views || '0', 10);
+    }
+  });
+
+  // 4. My Upcoming Publications
+  const myUpcoming = myItems
+    .filter((item) => item.status !== 'Published')
+    .sort((a, b) => {
+      if (!a.publishDate) return 1;
+      if (!b.publishDate) return -1;
+      return a.publishDate.localeCompare(b.publishDate);
+    })
+    .slice(0, 4);
+
+
+  // Style helpers
   const getChannelStyle = (channelName: string) => {
     const ch = channels.find((c) => c.name.toLowerCase() === channelName.toLowerCase());
     if (ch) {
@@ -142,7 +235,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  // Number formatter
   const formatNumber = (num: number) => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
@@ -152,266 +244,513 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="page-container" style={{ overflowY: 'auto' }}>
       
-      {/* 📊 CORE OPERATIONAL METRICS */}
-      <div className="metrics-grid" style={{ marginBottom: '24px' }}>
-        <div className="metric-card">
-          <div className="metric-header">
-            <span className="metric-title">Total Plannings</span>
-            <Layers size={18} className="text-secondary" />
-          </div>
-          <span className="metric-value">{totalCount}</span>
-          <span className="metric-trend text-secondary">Active ideas & posts</span>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-header">
-            <span className="metric-title">In Production</span>
-            <Clock size={18} style={{ color: '#2563eb' }} />
-          </div>
-          <span className="metric-value">{inProduction}</span>
-          <span className="metric-trend text-secondary">
-            {totalCount > 0 ? Math.round((inProduction / totalCount) * 100) : 0}% of total backlog
-          </span>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-header">
-            <span className="metric-title">Live & Scheduled</span>
-            <CheckCircle size={18} style={{ color: '#16a34a' }} />
-          </div>
-          <span className="metric-value">{publishedCount}</span>
-          <span className="metric-trend text-secondary">
-            {totalCount > 0 ? Math.round((publishedCount / totalCount) * 100) : 0}% success rate
-          </span>
-        </div>
-
-        <div className="metric-card" style={overdueCount > 0 ? { borderColor: 'rgba(220, 38, 38, 0.4)' } : {}}>
-          <div className="metric-header">
-            <span className="metric-title">Overdue Publish</span>
-            <AlertTriangle size={18} style={{ color: overdueCount > 0 ? '#dc2626' : '#94a3b8' }} />
-          </div>
-          <span className="metric-value" style={overdueCount > 0 ? { color: '#dc2626' } : {}}>{overdueCount}</span>
-          <span className="metric-trend" style={overdueCount > 0 ? { color: '#dc2626' } : { color: 'var(--text-muted)' }}>
-            {overdueCount > 0 ? 'Needs immediate attention' : 'All schedules on track'}
-          </span>
-        </div>
-      </div>
-
-      {/* 🚀 PUBLISHED PERFORMANCE KPI METRICS ROW */}
-      <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <BarChart3 size={16} className="text-secondary" />
-        <span>Published Performance KPI (Real-time Sheets Data)</span>
-      </h3>
-
-      <div className="metrics-grid" style={{ marginBottom: '28px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.02) 0%, rgba(255,255,255,1) 100%)', borderColor: 'rgba(37, 99, 235, 0.1)' }}>
-          <div className="metric-header">
-            <span className="metric-title">Total Views</span>
-            <Eye size={18} style={{ color: '#2563eb' }} />
-          </div>
-          <span className="metric-value" style={{ color: '#2563eb' }}>{formatNumber(totalViews)}</span>
-          <span className="metric-trend text-secondary">Accumulated video & post plays</span>
-        </div>
-
-        <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(219, 39, 119, 0.02) 0%, rgba(255,255,255,1) 100%)', borderColor: 'rgba(219, 39, 119, 0.1)' }}>
-          <div className="metric-header">
-            <span className="metric-title">Total Likes</span>
-            <ThumbsUp size={18} style={{ color: '#db2777' }} />
-          </div>
-          <span className="metric-value" style={{ color: '#db2777' }}>{formatNumber(totalLikes)}</span>
-          <span className="metric-trend text-secondary">Viewer positive reactions</span>
-        </div>
-
-        <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, rgba(255,255,255,1) 100%)', borderColor: 'rgba(16, 185, 129, 0.1)' }}>
-          <div className="metric-header">
-            <span className="metric-title">Average Engagement</span>
-            <Zap size={18} style={{ color: '#10b981' }} />
-          </div>
-          <span className="metric-value" style={{ color: '#10b981' }}>{formatNumber(avgEngagement)}</span>
-          <span className="metric-trend text-secondary">Avg comments & shares / content</span>
-        </div>
-      </div>
-
-      {/* 📈 PERFORMANCE INSIGHTS GRID */}
-      <div className="dashboard-insights" style={{ marginBottom: '28px' }}>
+      {/* 🧭 NAVIGATION SUB-TABS */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '16px',
+        marginBottom: '24px'
+      }}>
+        <button
+          onClick={() => setDashboardTab('personal')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '1px solid',
+            borderColor: dashboardTab === 'personal' ? 'var(--primary)' : 'var(--border-strong)',
+            backgroundColor: dashboardTab === 'personal' ? 'var(--primary-glow)' : 'white',
+            color: dashboardTab === 'personal' ? 'var(--primary)' : 'var(--text-secondary)',
+            fontWeight: 650,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <User size={14} />
+          Workspace Saya
+        </button>
         
-        {/* Leaderboard: Top Performing Content */}
-        <div className="insight-panel">
-          <div className="insight-header">
-            <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Award size={16} style={{ color: '#d97706' }} />
-              Top Performing Content
-            </h3>
-            <span className="text-secondary" style={{ fontSize: '12px' }}>By views</span>
-          </div>
-
-          <div className="recent-activity-list">
-            {topPerforming.length > 0 ? (
-              topPerforming.map((item, idx) => (
-                <div 
-                  key={item.id} 
-                  className="activity-item clickable-row" 
-                  onClick={() => onEditItem(item)}
-                  style={{ cursor: 'pointer', padding: '12px 14px' }}
-                >
-                  <div 
-                    className="activity-icon-container" 
-                    style={{ 
-                      backgroundColor: idx === 0 ? 'rgba(217, 119, 6, 0.1)' : 'rgba(0,0,0,0.04)',
-                      color: idx === 0 ? '#d97706' : 'var(--text-secondary)',
-                      fontWeight: 'bold',
-                      fontSize: '12px'
-                    }}
-                  >
-                    #{idx + 1}
-                  </div>
-                  <div className="activity-details" style={{ flexGrow: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="activity-text" style={{ fontWeight: 650 }}>{item.title}</span>
-                      <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Eye size={10} /> <strong>{formatNumber(parseInt(item.views || '0', 10))}</strong> Views</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><ThumbsUp size={10} /> <strong>{formatNumber(parseInt(item.likes || '0', 10))}</strong> Likes</span>
-                      <span>Creator: {item.assignee || 'Unassigned'}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                Belum ada performa data yang tercatat. Masukkan views & likes pada konten status "Published"!
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Content Format Efficiency */}
-        <div className="insight-panel">
-          <div className="insight-header">
-            <h3 className="insight-title">Format Efficiency</h3>
-            <span className="text-secondary" style={{ fontSize: '12px' }}>Avg views per format</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', justifyContent: 'center', height: '100%' }}>
-            {formatList.length > 0 ? (
-              formatList.map((f) => {
-                const percentage = Math.round((f.avgViews / maxAvgViews) * 100) || 5;
-                return (
-                  <div key={f.name} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ fontWeight: 600 }}>{f.name} ({f.count} posts)</span>
-                      <span className="text-secondary" style={{ fontWeight: 600 }}>{formatNumber(f.avgViews)} views</span>
-                    </div>
-                    <div style={{ height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: '9999px', overflow: 'hidden' }}>
-                      <div 
-                        style={{ 
-                          width: `${percentage}%`, 
-                          height: '100%', 
-                          borderRadius: '9999px',
-                          backgroundColor: 'var(--primary)'
-                        }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                Masukkan data KPI views pada list konten untuk melihat perbandingan format.
-              </div>
-            )}
-          </div>
-        </div>
-
+        <button
+          onClick={() => setDashboardTab('studio')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '1px solid',
+            borderColor: dashboardTab === 'studio' ? 'var(--primary)' : 'var(--border-strong)',
+            backgroundColor: dashboardTab === 'studio' ? 'var(--primary-glow)' : 'white',
+            color: dashboardTab === 'studio' ? 'var(--primary)' : 'var(--text-secondary)',
+            fontWeight: 650,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <BarChart3 size={14} />
+          Studio Overview
+        </button>
       </div>
 
-      {/* 🗂️ PRE-EXISTING OPERATIONAL DRILLDOWN */}
-      <div className="dashboard-insights">
-        {/* Upcoming Content Schedule */}
-        <div className="insight-panel">
-          <div className="insight-header">
-            <h3 className="insight-title">Upcoming Publications</h3>
-            <span className="text-secondary" style={{ fontSize: '12px' }}>Next in queue</span>
+      {/* =========================================
+          TAB: WORKSPACE SAYA (PERSONAL VIEW)
+          ========================================= */}
+      {dashboardTab === 'personal' && (
+        <div style={{ animation: 'fadeIn var(--transition-fast)' }}>
+          {/* Greeting Box banner */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            backgroundColor: 'var(--primary-glow)',
+            border: '1px solid rgba(37, 99, 235, 0.15)',
+            borderRadius: 'var(--radius-md)',
+            padding: '20px 24px',
+            marginBottom: '24px'
+          }}>
+            <img 
+              src={currentUser.avatar} 
+              alt={currentUser.name} 
+              style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2.5px solid white', boxShadow: 'var(--shadow-sm)' }}
+            />
+            <div style={{ textAlign: 'left' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 750, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {getGreeting()}, {currentUser.name}! <Sparkles size={16} style={{ color: 'var(--primary)' }} />
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                Selamat datang kembali. Mari cek progres tugas dan revisi konten Anda hari ini.
+              </p>
+            </div>
           </div>
 
-          <div className="recent-activity-list">
-            {upcomingContent.length > 0 ? (
-              upcomingContent.map((item) => (
-                <div 
-                  key={item.id} 
-                  className="activity-item clickable-row" 
-                  onClick={() => onEditItem(item)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="activity-icon-container">
-                    <Calendar size={16} />
-                  </div>
-                  <div className="activity-details" style={{ flexGrow: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="activity-text" style={{ fontWeight: 600 }}>{item.title}</span>
-                      <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px' }}>
-                      {variablesConfig.publishDate && (
-                        <span className="activity-time">
-                          Publish Date: <strong>{item.publishDate || 'TBD'}</strong>
+          {/* Personal Metrics row */}
+          <div className="metrics-grid" style={{ marginBottom: '28px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">Tugas Aktif Saya</span>
+                <Clock size={18} style={{ color: '#2563eb' }} />
+              </div>
+              <span className="metric-value">{myActiveTasks}</span>
+              <span className="metric-trend text-secondary">Konten dalam tahap produksi</span>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">Checklist Pending</span>
+                <CheckSquare size={18} style={{ color: '#db2777' }} />
+              </div>
+              <span className="metric-value" style={myPendingSubtaskCount > 0 ? { color: '#db2777' } : {}}>{myPendingSubtaskCount}</span>
+              <span className="metric-trend text-secondary">Aset draf yang harus ditautkan</span>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">Views Konten Saya</span>
+                <Eye size={18} style={{ color: '#10b981' }} />
+              </div>
+              <span className="metric-value" style={{ color: '#10b981' }}>{formatNumber(myPublishedViews)}</span>
+              <span className="metric-trend text-secondary">Dari konten Anda yang rilis</span>
+            </div>
+          </div>
+
+          {/* Personal Content Insights */}
+          <div className="dashboard-insights">
+            
+            {/* My Pending Checklists Tasks */}
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckSquare size={16} className="text-secondary" />
+                  Action Items (Checklist Aset Pending)
+                </h3>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>Tautkan draf Anda</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {myPendingChecklistItems.length > 0 ? (
+                  myPendingChecklistItems.map((chk) => (
+                    <div 
+                      key={chk.subtaskId}
+                      style={{
+                        padding: '12px',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 650, color: 'var(--text-primary)' }}>
+                          {chk.label}
                         </span>
-                      )}
-                      <span className={getStatusClass(item.status)} style={{ fontWeight: 500 }}>
-                        {item.status}
+                        
+                        {/* Parent item badge */}
+                        <span 
+                          onClick={() => onEditItem(chk.parentItem)}
+                          className="tag-badge clickable-row"
+                          style={{
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            backgroundColor: 'white',
+                            borderColor: 'var(--border-strong)',
+                            color: 'var(--primary)',
+                            padding: '2px 8px'
+                          }}
+                          title="Buka detail rencana konten"
+                        >
+                          {chk.itemTitle} <ArrowRight size={10} style={{ marginLeft: '3px', display: 'inline-block' }} />
+                        </span>
+                      </div>
+                      
+                      {/* Quick link status info */}
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        Status Konten: <strong>{chk.parentItem.status}</strong> | Channel: <strong>{chk.parentItem.channel}</strong>
                       </span>
-                      <span className="text-muted">| Creator: {item.assignee || 'Unassigned'}</span>
                     </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', border: '1px dashed var(--border-subtle)', borderRadius: '6px', backgroundColor: '#f8fafc' }}>
+                    Semua checklist aset Anda sudah selesai. Kerja yang luar biasa! 🎉
                   </div>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
-                No upcoming publications. Create a task or update schedules!
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Channel Distribution */}
-        <div className="insight-panel">
-          <div className="insight-header">
-            <h3 className="insight-title">Channel Distribution</h3>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', height: '100%' }}>
-            {channelsList.length > 0 ? (
-              channelsList.map(([channel, count]) => {
-                const percentage = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
-                const channelStyle = getChannelStyle(channel);
-                return (
-                  <div key={channel} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ fontWeight: 500 }}>{channel}</span>
-                      <span className="text-secondary">{count} items ({percentage}%)</span>
-                    </div>
-                    <div style={{ height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: '9999px', overflow: 'hidden' }}>
-                      <div 
-                        style={{ 
-                          width: `${percentage}%`, 
-                          height: '100%', 
-                          borderRadius: '9999px',
-                          backgroundColor: channelStyle.color
-                        }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
-                No channel data. Create tasks to view metrics.
+            {/* My Upcoming Publications */}
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title">Target Publikasi Saya</h3>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>Terdekat di kalender</span>
               </div>
-            )}
+
+              <div className="recent-activity-list">
+                {myUpcoming.length > 0 ? (
+                  myUpcoming.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className="activity-item clickable-row" 
+                      onClick={() => onEditItem(item)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="activity-icon-container">
+                        <Calendar size={16} />
+                      </div>
+                      <div className="activity-details" style={{ flexGrow: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span className="activity-text" style={{ fontWeight: 600 }}>{item.title}</span>
+                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px' }}>
+                          {variablesConfig.publishDate && (
+                            <span className="activity-time">
+                              Publish Date: <strong>{item.publishDate || 'TBD'}</strong>
+                            </span>
+                          )}
+                          <span className={getStatusClass(item.status)} style={{ fontWeight: 500 }}>
+                            {item.status}
+                          </span>
+                          {item.assetsLink && (
+                            <a 
+                              href={item.assetsLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--primary)', fontWeight: 500 }}
+                            >
+                              Open Folder <ExternalLink size={10} />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Belum ada publikasi terdekat yang ditugaskan kepada Anda.
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
-      </div>
+      )}
+
+      {/* =========================================
+          TAB: STUDIO OVERVIEW (GENERAL VIEW)
+          ========================================= */}
+      {dashboardTab === 'studio' && (
+        <div style={{ animation: 'fadeIn var(--transition-fast)' }}>
+          {/* Operational Metrics Row */}
+          <div className="metrics-grid" style={{ marginBottom: '24px' }}>
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">Total Plannings</span>
+                <Layers size={18} className="text-secondary" />
+              </div>
+              <span className="metric-value">{totalCount}</span>
+              <span className="metric-trend text-secondary">Active ideas & posts</span>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">In Production</span>
+                <Clock size={18} style={{ color: '#2563eb' }} />
+              </div>
+              <span className="metric-value">{inProduction}</span>
+              <span className="metric-trend text-secondary">
+                {totalCount > 0 ? Math.round((inProduction / totalCount) * 100) : 0}% of total backlog
+              </span>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">Live & Scheduled</span>
+                <CheckCircle size={18} style={{ color: '#16a34a' }} />
+              </div>
+              <span className="metric-value">{publishedCount}</span>
+              <span className="metric-trend text-secondary">
+                {totalCount > 0 ? Math.round((publishedCount / totalCount) * 100) : 0}% success rate
+              </span>
+            </div>
+
+            <div className="metric-card" style={overdueCount > 0 ? { borderColor: 'rgba(220, 38, 38, 0.4)' } : {}}>
+              <div className="metric-header">
+                <span className="metric-title">Overdue Publish</span>
+                <AlertTriangle size={18} style={{ color: overdueCount > 0 ? '#dc2626' : '#94a3b8' }} />
+              </div>
+              <span className="metric-value" style={overdueCount > 0 ? { color: '#dc2626' } : {}}>{overdueCount}</span>
+              <span className="metric-trend" style={overdueCount > 0 ? { color: '#dc2626' } : { color: 'var(--text-muted)' }}>
+                {overdueCount > 0 ? 'Needs immediate attention' : 'All schedules on track'}
+              </span>
+            </div>
+          </div>
+
+          {/* Performance KPI Row */}
+          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BarChart3 size={16} className="text-secondary" />
+            <span>Studio Performance KPI</span>
+          </h3>
+
+          <div className="metrics-grid" style={{ marginBottom: '28px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.02) 0%, rgba(255,255,255,1) 100%)', borderColor: 'rgba(37, 99, 235, 0.1)' }}>
+              <div className="metric-header">
+                <span className="metric-title">Total Views</span>
+                <Eye size={18} style={{ color: '#2563eb' }} />
+              </div>
+              <span className="metric-value" style={{ color: '#2563eb' }}>{formatNumber(totalViews)}</span>
+              <span className="metric-trend text-secondary">Accumulated video & post plays</span>
+            </div>
+
+            <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(219, 39, 119, 0.02) 0%, rgba(255,255,255,1) 100%)', borderColor: 'rgba(219, 39, 119, 0.1)' }}>
+              <div className="metric-header">
+                <span className="metric-title">Total Likes</span>
+                <ThumbsUp size={18} style={{ color: '#db2777' }} />
+              </div>
+              <span className="metric-value" style={{ color: '#db2777' }}>{formatNumber(totalLikes)}</span>
+              <span className="metric-trend text-secondary">Viewer positive reactions</span>
+            </div>
+
+            <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, rgba(255,255,255,1) 100%)', borderColor: 'rgba(16, 185, 129, 0.1)' }}>
+              <div className="metric-header">
+                <span className="metric-title">Average Engagement</span>
+                <Zap size={18} style={{ color: '#10b981' }} />
+              </div>
+              <span className="metric-value" style={{ color: '#10b981' }}>{formatNumber(avgEngagement)}</span>
+              <span className="metric-trend text-secondary">Avg comments & shares / content</span>
+            </div>
+          </div>
+
+          {/* Performance Charts Insights Grid */}
+          <div className="dashboard-insights" style={{ marginBottom: '28px' }}>
+            
+            {/* Top Performing Leaderboard */}
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Award size={16} style={{ color: '#d97706' }} />
+                  Leaderboard Konten Terbaik
+                </h3>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>Berdasarkan views</span>
+              </div>
+
+              <div className="recent-activity-list">
+                {topPerforming.length > 0 ? (
+                  topPerforming.map((item, idx) => (
+                    <div 
+                      key={item.id} 
+                      className="activity-item clickable-row" 
+                      onClick={() => onEditItem(item)}
+                      style={{ cursor: 'pointer', padding: '12px 14px' }}
+                    >
+                      <div 
+                        className="activity-icon-container" 
+                        style={{ 
+                          backgroundColor: idx === 0 ? 'rgba(217, 119, 6, 0.1)' : 'rgba(0,0,0,0.04)',
+                          color: idx === 0 ? '#d97706' : 'var(--text-secondary)',
+                          fontWeight: 'bold',
+                          fontSize: '12px'
+                        }}
+                      >
+                        #{idx + 1}
+                      </div>
+                      <div className="activity-details" style={{ flexGrow: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span className="activity-text" style={{ fontWeight: 650 }}>{item.title}</span>
+                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Eye size={10} /> <strong>{formatNumber(parseInt(item.views || '0', 10))}</strong> Views</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><ThumbsUp size={10} /> <strong>{formatNumber(parseInt(item.likes || '0', 10))}</strong> Likes</span>
+                          <span>Creator: {item.assignee || 'Unassigned'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Belum ada performa data yang tercatat. Masukkan views & likes pada konten status "Published"!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Content Format efficiency bars */}
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title">Format Efficiency</h3>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>Avg views per format</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', justifyContent: 'center', height: '100%' }}>
+                {formatList.length > 0 ? (
+                  formatList.map((f) => {
+                    const percentage = Math.round((f.avgViews / maxAvgViews) * 100) || 5;
+                    return (
+                      <div key={f.name} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ fontWeight: 600 }}>{f.name} ({f.count} posts)</span>
+                          <span className="text-secondary" style={{ fontWeight: 600 }}>{formatNumber(f.avgViews)} views</span>
+                        </div>
+                        <div style={{ height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: '9999px', overflow: 'hidden' }}>
+                          <div 
+                            style={{ 
+                              width: `${percentage}%`, 
+                              height: '100%', 
+                              borderRadius: '9999px',
+                              backgroundColor: 'var(--primary)'
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Masukkan data KPI views pada list konten untuk melihat perbandingan format.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Operational drilldowns */}
+          <div className="dashboard-insights">
+            {/* Upcoming Publications */}
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title">Upcoming Publications</h3>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>Next in queue</span>
+              </div>
+
+              <div className="recent-activity-list">
+                {upcomingContent.length > 0 ? (
+                  upcomingContent.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className="activity-item clickable-row" 
+                      onClick={() => onEditItem(item)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="activity-icon-container">
+                        <Calendar size={16} />
+                      </div>
+                      <div className="activity-details" style={{ flexGrow: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span className="activity-text" style={{ fontWeight: 600 }}>{item.title}</span>
+                          <span className="tag-badge" style={getChannelStyle(item.channel)}>{item.channel}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px' }}>
+                          {variablesConfig.publishDate && (
+                            <span className="activity-time">
+                              Publish Date: <strong>{item.publishDate || 'TBD'}</strong>
+                            </span>
+                          )}
+                          <span className={getStatusClass(item.status)} style={{ fontWeight: 500 }}>
+                            {item.status}
+                          </span>
+                          <span className="text-muted">| Creator: {item.assignee || 'Unassigned'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+                    No upcoming publications. Create a task or update schedules!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Channel distribution */}
+            <div className="insight-panel">
+              <div className="insight-header">
+                <h3 className="insight-title">Channel Distribution</h3>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', height: '100%' }}>
+                {channelsList.length > 0 ? (
+                  channelsList.map(([channel, count]) => {
+                    const percentage = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+                    const channelStyle = getChannelStyle(channel);
+                    return (
+                      <div key={channel} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ fontWeight: 500 }}>{channel}</span>
+                          <span className="text-secondary">{count} items ({percentage}%)</span>
+                        </div>
+                        <div style={{ height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: '9999px', overflow: 'hidden' }}>
+                          <div 
+                            style={{ 
+                              width: `${percentage}%`, 
+                              height: '100%', 
+                              borderRadius: '9999px',
+                              backgroundColor: channelStyle.color
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+                    No channel data. Create tasks to view metrics.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
     </div>
   );
 };

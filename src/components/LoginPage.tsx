@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Layers, KeyRound, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { loginUser } from '../services/sheets';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: any) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
@@ -12,21 +13,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim() || !password) return;
+    
     setError(null);
     setIsSubmitting(true);
 
-    // Simulate a brief secure check transition
-    setTimeout(() => {
-      if (username === 'infinitilabs88' && password === '#AdInfinitum') {
+    try {
+      const result = await loginUser(username.trim(), password);
+      if (result.success && result.user) {
+        // Save auth data to localStorage
         localStorage.setItem('contentlab_is_authenticated', 'true');
-        onLoginSuccess();
+        localStorage.setItem('contentlab_logged_user', JSON.stringify(result.user));
+        
+        onLoginSuccess(result.user);
       } else {
-        setError('Incorrect username or password. Please try again.');
-        setIsSubmitting(false);
+        setError(result.error || 'Username atau password salah.');
       }
-    }, 450);
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menghubungi server untuk verifikasi login.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -54,11 +64,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         {/* Credentials Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="form-group">
-            <label className="form-label">Username</label>
+            <label className="form-label">Username atau Email</label>
             <input
               type="text"
               className="form-input"
-              placeholder="Enter username"
+              placeholder="Andi Pratama atau andi@contentlab.io"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -73,7 +83,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="form-input"
-                placeholder="••••••••"
+                placeholder="pass123"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -110,9 +120,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             disabled={isSubmitting}
           >
             <KeyRound size={16} />
-            <span>{isSubmitting ? 'Authenticating...' : 'Sign In'}</span>
+            <span>{isSubmitting ? 'Verifikasi...' : 'Sign In'}</span>
           </button>
         </form>
+
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '-8px', lineHeight: 1.4 }}>
+          <strong>Tips Sandbox Mode:</strong>
+          <br />
+          Gunakan user: <code>Andi Pratama</code> &amp; pass: <code>pass123</code>
+        </div>
       </div>
     </div>
   );

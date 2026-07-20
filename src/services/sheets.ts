@@ -15,7 +15,7 @@ export interface ContentItem {
   platformNotes?: string;
   targetAudience?: string;
   createdBy?: string;
-  // New upgraded features variables
+  // Upgraded features variables
   checklist?: string;     // JSON string representing subtask assets
   views?: string;         // performance view counts
   likes?: string;         // performance likes
@@ -37,6 +37,7 @@ export interface TeamMember {
   name: string;
   email: string;
   avatar: string;
+  password?: string; // New field for multi-user authentication
 }
 
 export interface Channel {
@@ -61,7 +62,6 @@ const MOCK_CHANNELS_KEY = 'contentlab_mock_channels';
 const MOCK_COMMENTS_KEY = 'contentlab_mock_comments';
 const VARIABLES_CONFIG_KEY = 'contentlab_variables_config';
 const CUSTOM_TAGS_KEY = 'contentlab_custom_tags';
-const ACTIVE_USER_KEY = 'contentlab_active_user';
 
 // Default variables configs
 const DEFAULT_VARIABLES_CONFIG: VariablesConfig = {
@@ -76,11 +76,11 @@ const DEFAULT_VARIABLES_CONFIG: VariablesConfig = {
 // Default custom tags
 const DEFAULT_TAGS = ['Promo', 'Sponsor', 'Educational', 'Branding', 'Trending'];
 
-// Initial Mock Data
+// Initial Mock Data with default passwords for sandbox testing
 const INITIAL_MOCK_TEAM: TeamMember[] = [
-  { id: 't1', name: 'Andi Pratama', email: 'andi@contentlab.io', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80' },
-  { id: 't2', name: 'Siti Rahma', email: 'siti@contentlab.io', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80' },
-  { id: 't3', name: 'Budi Santoso', email: 'budi@contentlab.io', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80' },
+  { id: 't1', name: 'Andi Pratama', email: 'andi@contentlab.io', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80', password: 'pass123' },
+  { id: 't2', name: 'Siti Rahma', email: 'siti@contentlab.io', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80', password: 'pass123' },
+  { id: 't3', name: 'Budi Santoso', email: 'budi@contentlab.io', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80', password: 'pass123' },
 ];
 
 const INITIAL_MOCK_CHANNELS: Channel[] = [
@@ -186,19 +186,6 @@ export function saveScriptUrl(url: string): void {
 
 export function isMockMode(): boolean {
   return !getScriptUrl();
-}
-
-// Active User LocalStorage helper
-export function getActiveUser(): string {
-  return localStorage.getItem(ACTIVE_USER_KEY) || '';
-}
-
-export function saveActiveUser(username: string): void {
-  if (username) {
-    localStorage.setItem(ACTIVE_USER_KEY, username);
-  } else {
-    localStorage.removeItem(ACTIVE_USER_KEY);
-  }
 }
 
 // Variables Config Getters & Setters
@@ -314,6 +301,7 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
       name: String(item.name || ''),
       email: String(item.email || ''),
       avatar: String(item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'),
+      password: item.password ? String(item.password) : '',
     }));
 
     const channels = (data.channels || []).map((item: any) => ({
@@ -334,6 +322,61 @@ export async function fetchData(): Promise<{ content: ContentItem[]; team: TeamM
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, falling back to local mock data:', error);
     return getLocalData();
+  }
+}
+
+// True multi-user login verify API call
+export async function loginUser(
+  username: string, 
+  password: string
+): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
+  const url = getScriptUrl();
+
+  if (!url) {
+    // Sandbox fallback: check mock local team list
+    const { team } = getLocalData();
+    const user = team.find(
+      (m) => 
+        (m.name.toLowerCase() === username.toLowerCase() || 
+         m.email.toLowerCase() === username.toLowerCase()) && 
+        m.password === password
+    );
+    if (user) {
+      const { password: _, ...userWithoutPassword } = user;
+      return { success: true, user: userWithoutPassword };
+    }
+    return { success: false, error: 'Username atau password mock tidak valid (gunakan Andi Pratama / pass123)' };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'login',
+        username,
+        password
+      }),
+    });
+    const result = await response.json();
+    return result;
+  } catch (e) {
+    console.error('Failed to authenticate with spreadsheet script, falling back to local check:', e);
+    const { team } = getLocalData();
+    const user = team.find(
+      (m) => 
+        (m.name.toLowerCase() === username.toLowerCase() || 
+         m.email.toLowerCase() === username.toLowerCase()) && 
+        m.password === password
+    );
+    if (user) {
+      const { password: _, ...userWithoutPassword } = user;
+      return { success: true, user: userWithoutPassword };
+    }
+    return { success: false, error: 'Gagal menghubungi server Google Sheets.' };
   }
 }
 
@@ -509,6 +552,7 @@ export async function createTeamMember(
     ...member,
     id: Math.random().toString(36).substring(2, 9),
     avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&w=150&h=150&q=80`,
+    password: 'pass123', // default password
   };
 
   if (!url) {

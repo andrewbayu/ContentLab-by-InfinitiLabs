@@ -7,7 +7,6 @@ import {
   Settings, 
   Plus, 
   Layers, 
-  User, 
   LogOut, 
   Menu, 
   X,
@@ -20,9 +19,7 @@ interface AppShellProps {
   setActiveTab: (tab: string) => void;
   onOpenCreateModal: () => void;
   isMock: boolean;
-  activeUser: string;
-  setActiveUser: (user: string) => void;
-  team: TeamMember[];
+  currentUser: TeamMember | null;
   onLogout: () => void;
 }
 
@@ -32,9 +29,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   setActiveTab,
   onOpenCreateModal,
   isMock,
-  activeUser,
-  setActiveUser,
-  team,
+  currentUser,
   onLogout,
 }) => {
   // Desktop state: visible by default (isSidebarCollapsed = false)
@@ -194,46 +189,27 @@ export const AppShell: React.FC<AppShellProps> = ({
           </div>
           
           <div className="header-actions">
-            {/* Active User Profile Selector Dropdown */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  width: '32px', 
-                  height: '32px', 
-                  borderRadius: '50%', 
-                  backgroundColor: activeUser ? 'var(--primary-glow)' : 'rgba(217, 119, 6, 0.1)', 
-                  border: activeUser ? '1px solid rgba(37, 99, 235, 0.2)' : '1px solid rgba(217, 119, 6, 0.3)',
-                  color: activeUser ? 'var(--primary)' : '#d97706'
-                }}
-                title={activeUser ? `Logged in as ${activeUser}` : "No profile selected"}
-              >
-                <User size={15} />
+            {/* Authenticated User Profile Avatar Info */}
+            {currentUser && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '16px' }}>
+                <img 
+                  src={currentUser.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80"}
+                  alt={currentUser.name} 
+                  style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '50%', 
+                    objectFit: 'cover', 
+                    border: '2px solid var(--primary-glow)',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', textAlign: 'left' }}>
+                  <span style={{ fontWeight: 650, color: 'var(--text-primary)', lineHeight: 1.2 }}>{currentUser.name}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Active Crew</span>
+                </div>
               </div>
-              
-              <select
-                className="select-filter"
-                value={activeUser}
-                onChange={(e) => setActiveUser(e.target.value)}
-                style={{ 
-                  padding: '6px 28px 6px 12px', 
-                  fontSize: '13px', 
-                  minWidth: '150px',
-                  borderColor: activeUser ? 'var(--border-strong)' : '#d97706',
-                  color: activeUser ? 'var(--text-primary)' : '#b45309',
-                  fontWeight: activeUser ? 500 : 600
-                }}
-              >
-                <option value="">Choose Profile...</option>
-                {team.map((member) => (
-                  <option key={member.id} value={member.name}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            )}
 
             <button className="btn btn-primary" onClick={onOpenCreateModal}>
               <Plus size={16} />
