@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ExternalLink, FileText, Link2, Lock, Plus, Search, Star, Trash2, Users, X } from 'lucide-react';
 import type { ClientBrand, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
-import '../documents.css';
+import '../styles/documents.css';
 
 type DocumentDraft = Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>;
 

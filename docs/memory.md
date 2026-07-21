@@ -92,7 +92,7 @@ Tidak ada akun demo atau login sandbox. Seluruh autentikasi wajib menggunakan ak
 ---
 
 ## 🛠️ 5. Langkah Sinkronisasi Google Apps Script
-Source siap copy-paste tersedia di `apps-script/Code.gs` dan juga melalui tombol **Copy Latest Apps Script** di Settings Manager.
+Source siap copy-paste tersedia di `integrations/google-apps-script/Code.gs` dan juga melalui tombol **Copy Latest Apps Script** di Settings Manager.
 
 Setiap kali memperbarui kode Apps Script di editor Google Sheets:
 1.  Klik **Save** (💾).

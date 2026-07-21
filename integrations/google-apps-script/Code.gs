@@ -358,8 +358,8 @@ function getSheetData(sheet) {
 }
 
 function syncTaskMembers(spreadsheet, item, isCreate) {
-  const memberSheet = spreadsheet.getSheetByName("Task Members");
-  if (!memberSheet) return;
+  const memberSheet = ensureTaskMembersSheet(spreadsheet);
+  if (!item || !item.id) return;
 
   const values = memberSheet.getDataRange().getValues();
   let hasCreator = false;
@@ -393,6 +393,17 @@ function syncTaskMembers(spreadsheet, item, isCreate) {
   if (item.reviewerId && String(item.reviewerId) !== String(item.ownerId || "")) {
     appendTaskMember(memberSheet, item.id, item.reviewerId, "reviewer", now, actorId);
   }
+}
+
+function ensureTaskMembersSheet(spreadsheet) {
+  let memberSheet = spreadsheet.getSheetByName("Task Members");
+  if (!memberSheet) {
+    memberSheet = spreadsheet.insertSheet("Task Members");
+    memberSheet.appendRow(["id", "taskId", "userId", "role", "addedAt", "addedBy"]);
+  } else if (memberSheet.getLastRow() === 0) {
+    memberSheet.appendRow(["id", "taskId", "userId", "role", "addedAt", "addedBy"]);
+  }
+  return memberSheet;
 }
 
 function appendTaskMember(memberSheet, taskId, userId, role, addedAt, addedBy) {
