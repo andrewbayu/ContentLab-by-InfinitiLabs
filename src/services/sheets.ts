@@ -3,6 +3,8 @@ export type UserRole = 'super' | 'team';
 export type KpiDirection = 'increase' | 'decrease';
 export type KpiCadence = 'Weekly' | 'Monthly' | 'Quarterly';
 export type TaskMemberRole = 'creator' | 'owner' | 'collaborator' | 'reviewer';
+export type DocumentType = 'Note' | 'Link';
+export type DocumentVisibility = 'personal' | 'team';
 export type TaskStatus =
   | 'Idea'
   | 'Scripting/Writing'
@@ -125,6 +127,23 @@ export interface KpiUpdate {
   updatedAt: string;
 }
 
+export interface DocumentItem {
+  id: string;
+  title: string;
+  type: DocumentType;
+  body: string;
+  url: string;
+  ownerId: string;
+  visibility: DocumentVisibility;
+  client: string;
+  brand: string;
+  taskId: string;
+  tags: string;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VariablesConfig {
   brief: boolean;
   publishDate: boolean;
@@ -142,6 +161,7 @@ export interface WorkspaceData {
   clients: ClientBrand[];
   kpiDefinitions: KpiDefinition[];
   kpiUpdates: KpiUpdate[];
+  documents: DocumentItem[];
 }
 
 export interface CachedWorkspaceData extends WorkspaceData {
@@ -156,6 +176,7 @@ const MOCK_COMMENTS_KEY = 'contentlab_mock_comments';
 const MOCK_CLIENTS_KEY = 'contentlab_mock_clients';
 const MOCK_KPI_DEFINITIONS_KEY = 'contentlab_mock_kpi_definitions';
 const MOCK_KPI_UPDATES_KEY = 'contentlab_mock_kpi_updates';
+const MOCK_DOCUMENTS_KEY = 'contentlab_mock_documents';
 const VARIABLES_CONFIG_KEY = 'contentlab_variables_config';
 const CUSTOM_TAGS_KEY = 'contentlab_custom_tags';
 const WORKSPACE_CACHE_KEY = 'contentlab_workspace_cache_v1';
@@ -190,6 +211,7 @@ const INITIAL_MOCK_CLIENTS: ClientBrand[] = [
 
 const INITIAL_MOCK_KPI_DEFINITIONS: KpiDefinition[] = [];
 const INITIAL_MOCK_KPI_UPDATES: KpiUpdate[] = [];
+const INITIAL_MOCK_DOCUMENTS: DocumentItem[] = [];
 
 const INITIAL_MOCK_CONTENT: ContentItem[] = [
   {
@@ -335,7 +357,10 @@ export function getCachedWorkspaceData(): CachedWorkspaceData | null {
   try {
     const cached = JSON.parse(localStorage.getItem(WORKSPACE_CACHE_KEY) || 'null') as CachedWorkspaceData | null;
     if (!cached || !Array.isArray(cached.content) || !Array.isArray(cached.team)) return null;
-    return cached;
+    return {
+      ...cached,
+      documents: Array.isArray(cached.documents) ? cached.documents : [],
+    };
   } catch {
     localStorage.removeItem(WORKSPACE_CACHE_KEY);
     return null;
@@ -366,6 +391,7 @@ function getLocalData(): WorkspaceData {
   let clients = INITIAL_MOCK_CLIENTS;
   let kpiDefinitions = INITIAL_MOCK_KPI_DEFINITIONS;
   let kpiUpdates = INITIAL_MOCK_KPI_UPDATES;
+  let documents = INITIAL_MOCK_DOCUMENTS;
 
   const savedContent = localStorage.getItem(MOCK_CONTENT_KEY);
   const savedChannels = localStorage.getItem(MOCK_CHANNELS_KEY);
@@ -373,6 +399,7 @@ function getLocalData(): WorkspaceData {
   const savedClients = localStorage.getItem(MOCK_CLIENTS_KEY);
   const savedKpiDefinitions = localStorage.getItem(MOCK_KPI_DEFINITIONS_KEY);
   const savedKpiUpdates = localStorage.getItem(MOCK_KPI_UPDATES_KEY);
+  const savedDocuments = localStorage.getItem(MOCK_DOCUMENTS_KEY);
 
   if (savedContent) {
     content = JSON.parse(savedContent).map((item: ContentItem) => ({
@@ -415,16 +442,23 @@ function getLocalData(): WorkspaceData {
     localStorage.setItem(MOCK_KPI_UPDATES_KEY, JSON.stringify(kpiUpdates));
   }
 
-  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates };
+  if (savedDocuments) {
+    documents = JSON.parse(savedDocuments);
+  } else {
+    localStorage.setItem(MOCK_DOCUMENTS_KEY, JSON.stringify(documents));
+  }
+
+  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents };
 }
 
-function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[], kpiDefinitions?: KpiDefinition[], kpiUpdates?: KpiUpdate[]) {
+function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[], kpiDefinitions?: KpiDefinition[], kpiUpdates?: KpiUpdate[], documents?: DocumentItem[]) {
   localStorage.setItem(MOCK_CONTENT_KEY, JSON.stringify(content));
   if (channels) localStorage.setItem(MOCK_CHANNELS_KEY, JSON.stringify(channels));
   if (comments) localStorage.setItem(MOCK_COMMENTS_KEY, JSON.stringify(comments));
   if (clients) localStorage.setItem(MOCK_CLIENTS_KEY, JSON.stringify(clients));
   if (kpiDefinitions) localStorage.setItem(MOCK_KPI_DEFINITIONS_KEY, JSON.stringify(kpiDefinitions));
   if (kpiUpdates) localStorage.setItem(MOCK_KPI_UPDATES_KEY, JSON.stringify(kpiUpdates));
+  if (documents) localStorage.setItem(MOCK_DOCUMENTS_KEY, JSON.stringify(documents));
 }
 
 export async function fetchData(): Promise<WorkspaceData> {
@@ -562,7 +596,24 @@ export async function fetchData(): Promise<WorkspaceData> {
       updatedAt: String(item.updatedAt || new Date().toISOString()),
     }));
 
-    return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates };
+    const documents = (data.documents || []).map((item: any) => ({
+      id: String(item.id || ''),
+      title: String(item.title || ''),
+      type: String(item.type || 'Note') === 'Link' ? 'Link' : 'Note',
+      body: String(item.body || ''),
+      url: String(item.url || ''),
+      ownerId: String(item.ownerId || ''),
+      visibility: String(item.visibility || 'personal').toLowerCase() === 'team' ? 'team' : 'personal',
+      client: String(item.client || ''),
+      brand: String(item.brand || ''),
+      taskId: String(item.taskId || ''),
+      tags: String(item.tags || ''),
+      pinned: String(item.pinned ?? 'false').toLowerCase() === 'true',
+      createdAt: String(item.createdAt || new Date().toISOString()),
+      updatedAt: String(item.updatedAt || new Date().toISOString()),
+    })) as DocumentItem[];
+
+    return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents };
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, using the latest workspace snapshot:', error);
     const cached = getCachedWorkspaceData();
@@ -952,6 +1003,81 @@ export async function createKpiUpdate(
   const result = await response.json();
   if (!result?.success) throw new Error(result?.error || 'Server failed to update KPI');
   return newUpdate;
+}
+
+export async function createDocument(
+  document: Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<DocumentItem> {
+  const url = getScriptUrl();
+  const now = new Date().toISOString();
+  const newDocument: DocumentItem = {
+    ...document,
+    id: 'doc-' + Math.random().toString(36).substring(2, 10),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (!url) {
+    const data = getLocalData();
+    saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, data.kpiDefinitions, data.kpiUpdates, [newDocument, ...data.documents]);
+    return newDocument;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'createDocument', document: newDocument }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to create document');
+  return result.document || newDocument;
+}
+
+export async function updateDocument(document: DocumentItem): Promise<DocumentItem> {
+  const url = getScriptUrl();
+  const updatedDocument: DocumentItem = {
+    ...document,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (!url) {
+    const data = getLocalData();
+    const documents = data.documents.map((item) => item.id === document.id ? updatedDocument : item);
+    saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, data.kpiDefinitions, data.kpiUpdates, documents);
+    return updatedDocument;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'updateDocument', document: updatedDocument }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to update document');
+  return result.document || updatedDocument;
+}
+
+export async function deleteDocument(id: string): Promise<boolean> {
+  const url = getScriptUrl();
+
+  if (!url) {
+    const data = getLocalData();
+    const documents = data.documents.filter((item) => item.id !== id);
+    saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, data.kpiDefinitions, data.kpiUpdates, documents);
+    return true;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'deleteDocument', id }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to delete document');
+  return true;
 }
 
 export async function validateScriptUrl(url: string): Promise<boolean> {

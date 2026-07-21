@@ -13,7 +13,8 @@ import {
   Calendar,
   BarChart3,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 
 type SyncStatus = 'saved' | 'saving' | 'syncing';
@@ -160,6 +161,14 @@ export const AppShell: React.FC<AppShellProps> = ({
           </button>
 
           <button
+            className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`}
+            onClick={() => handleNavClick('documents')}
+          >
+            <FileText className="nav-item-icon" />
+            Documents &amp; Notes
+          </button>
+
+          <button
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
             onClick={() => handleNavClick('analytics')}
           >
@@ -238,6 +247,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               {activeTab === 'board' && 'Task Kanban Board'}
               {activeTab === 'calendar' && 'Task Calendar Planner'}
               {activeTab === 'list' && 'Task List'}
+              {activeTab === 'documents' && 'Documents & Notes'}
               {activeTab === 'analytics' && 'Analytics & KPI'}
               {activeTab === 'settings' && 'Settings Center'}
             </h2>
@@ -282,10 +292,12 @@ export const AppShell: React.FC<AppShellProps> = ({
               </div>
             )}
 
-            <button className="btn btn-primary" onClick={onOpenCreateModal}>
-              <Plus size={16} />
-              <span>Create Task</span>
-            </button>
+            {activeTab !== 'documents' && (
+              <button className="btn btn-primary" onClick={onOpenCreateModal}>
+                <Plus size={16} />
+                <span>Create Task</span>
+              </button>
+            )}
           </div>
         </header>
 

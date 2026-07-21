@@ -8,6 +8,7 @@ import { TaskModal } from './components/TaskModal';
 import { LoginPage } from './components/LoginPage';
 import { CalendarView } from './components/CalendarView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { DocumentsView } from './components/DocumentsView';
 import {
   fetchData,
   createContent,
@@ -21,6 +22,9 @@ import {
   createComment,
   createKpiDefinition,
   createKpiUpdate,
+  createDocument,
+  updateDocument,
+  deleteDocument,
   getVariablesConfig,
   saveVariablesConfig,
   getCustomTags,
@@ -30,7 +34,7 @@ import {
   isUserInvolved,
   isMockMode
 } from './services/sheets';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate } from './services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem } from './services/sheets';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -61,6 +65,7 @@ function App() {
   const [clients, setClients] = useState<ClientBrand[]>(() => initialCache?.clients || []);
   const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>(() => initialCache?.kpiDefinitions || []);
   const [kpiUpdates, setKpiUpdates] = useState<KpiUpdate[]>(() => initialCache?.kpiUpdates || []);
+  const [documents, setDocuments] = useState<DocumentItem[]>(() => initialCache?.documents || []);
   const [scopeKey, setScopeKey] = useState(() => localStorage.getItem('contentlab_scope_key') || 'all');
   const [taskView, setTaskView] = useState<TaskView>(() => (localStorage.getItem('contentlab_task_view') as TaskView) || 'all');
   
@@ -94,6 +99,7 @@ function App() {
       setClients(data.clients || []);
       setKpiDefinitions(data.kpiDefinitions || []);
       setKpiUpdates(data.kpiUpdates || []);
+      setDocuments(data.documents || []);
       hasWorkspaceData.current = true;
       setLastSyncedAt(saveCachedWorkspaceData(data));
 
@@ -136,10 +142,11 @@ function App() {
         clients,
         kpiDefinitions,
         kpiUpdates,
+        documents,
       });
     }, 120);
     return () => window.clearTimeout(cacheTimer);
-  }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates]);
+  }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents]);
 
   const beginWrite = () => setPendingWrites((count) => count + 1);
   const endWrite = () => setPendingWrites((count) => Math.max(0, count - 1));
@@ -459,6 +466,55 @@ function App() {
     }
   };
 
+  const handleCreateDocument = async (
+    document: Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<DocumentItem> => {
+    beginWrite();
+    try {
+      const created = await createDocument({ ...document, ownerId: currentUser?.id || document.ownerId });
+      setDocuments((previous) => [created, ...previous]);
+      addToast(`Saved "${created.title}".`, 'success');
+      return created;
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to save document.', 'error');
+      throw error;
+    } finally {
+      endWrite();
+    }
+  };
+
+  const handleUpdateDocument = async (document: DocumentItem): Promise<DocumentItem> => {
+    beginWrite();
+    try {
+      const updated = await updateDocument(document);
+      setDocuments((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+      addToast(`Updated "${updated.title}".`, 'success');
+      return updated;
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to update document.', 'error');
+      throw error;
+    } finally {
+      endWrite();
+    }
+  };
+
+  const handleDeleteDocument = async (id: string): Promise<void> => {
+    beginWrite();
+    try {
+      await deleteDocument(id);
+      setDocuments((previous) => previous.filter((document) => document.id !== id));
+      addToast('Document deleted.', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to delete document.', 'error');
+      throw error;
+    } finally {
+      endWrite();
+    }
+  };
+
   // Variable toggles
   const handleSaveVariablesConfig = (config: VariablesConfig) => {
     saveVariablesConfig(config);
@@ -651,6 +707,18 @@ function App() {
             channels={channels}
             variablesConfig={variablesConfig}
             currentUser={currentUser}
+          />
+        )}
+
+        {activeTab === 'documents' && (
+          <DocumentsView
+            documents={documents}
+            currentUser={currentUser}
+            clients={clients}
+            tasks={items}
+            onCreateDocument={handleCreateDocument}
+            onUpdateDocument={handleUpdateDocument}
+            onDeleteDocument={handleDeleteDocument}
           />
         )}
 

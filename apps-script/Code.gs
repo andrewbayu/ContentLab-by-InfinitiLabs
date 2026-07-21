@@ -8,6 +8,7 @@ function doGet(e) {
   const kpiDefinitions = getSheetData(sheet.getSheetByName("KPI Definitions"));
   const kpiUpdates = getSheetData(sheet.getSheetByName("KPI Updates"));
   const taskMembers = getSheetData(sheet.getSheetByName("Task Members"));
+  const documents = getSheetData(sheet.getSheetByName("Documents"));
   const publicTeam = team.map(function(member) {
     return {
       id: member.id,
@@ -26,7 +27,8 @@ function doGet(e) {
     clients: clients,
     kpiDefinitions: kpiDefinitions,
     kpiUpdates: kpiUpdates,
-    taskMembers: taskMembers
+    taskMembers: taskMembers,
+    documents: documents
   };
   
   return ContentService.createTextOutput(JSON.stringify(payload))
@@ -160,6 +162,92 @@ function doPost(e) {
         update.notes || "", update.sourceLink || "", update.updatedBy || "", update.updatedAt
       ]);
       result = { success: true, update: update };
+    }
+    else if (action === "createDocument") {
+      const documentSheet = sheet.getSheetByName("Documents");
+      if (!documentSheet) {
+        result = { success: false, error: "Documents sheet not found" };
+      } else {
+        const document = postData.document || {};
+        const now = new Date().toISOString();
+        document.id = document.id || Utilities.getUUID();
+        document.type = document.type || "Note";
+        document.visibility = document.visibility || "personal";
+        document.tags = Array.isArray(document.tags) ? document.tags.join(",") : (document.tags || "");
+        document.pinned = document.pinned === true;
+        document.createdAt = document.createdAt || now;
+        document.updatedAt = now;
+
+        documentSheet.appendRow([
+          document.id, document.title || "", document.type, document.body || "",
+          document.url || "", document.ownerId || "", document.visibility,
+          document.client || "", document.brand || "", document.taskId || "",
+          document.tags, document.pinned, document.createdAt, document.updatedAt
+        ]);
+        result = { success: true, document: document };
+      }
+    }
+    else if (action === "updateDocument") {
+      const documentSheet = sheet.getSheetByName("Documents");
+      const document = postData.document || {};
+      if (!documentSheet) {
+        result = { success: false, error: "Documents sheet not found" };
+      } else if (!document.id) {
+        result = { success: false, error: "Document id is required" };
+      } else {
+        const documentData = documentSheet.getDataRange().getValues();
+        let documentRowIndex = -1;
+        for (let i = 1; i < documentData.length; i++) {
+          if (String(documentData[i][0]).trim() === String(document.id).trim()) {
+            documentRowIndex = i + 1;
+            break;
+          }
+        }
+
+        if (documentRowIndex === -1) {
+          result = { success: false, error: "Document not found" };
+        } else {
+          document.type = document.type || "Note";
+          document.visibility = document.visibility || "personal";
+          document.tags = Array.isArray(document.tags) ? document.tags.join(",") : (document.tags || "");
+          document.pinned = document.pinned === true;
+          document.createdAt = documentData[documentRowIndex - 1][12] || document.createdAt || new Date().toISOString();
+          document.updatedAt = new Date().toISOString();
+
+          documentSheet.getRange(documentRowIndex, 1, 1, 14).setValues([[
+            document.id, document.title || "", document.type, document.body || "",
+            document.url || "", document.ownerId || "", document.visibility,
+            document.client || "", document.brand || "", document.taskId || "",
+            document.tags, document.pinned, document.createdAt, document.updatedAt
+          ]]);
+          result = { success: true, document: document };
+        }
+      }
+    }
+    else if (action === "deleteDocument") {
+      const documentSheet = sheet.getSheetByName("Documents");
+      const documentId = postData.id;
+      if (!documentSheet) {
+        result = { success: false, error: "Documents sheet not found" };
+      } else if (!documentId) {
+        result = { success: false, error: "Document id is required" };
+      } else {
+        const documentData = documentSheet.getDataRange().getValues();
+        let documentRowIndex = -1;
+        for (let i = 1; i < documentData.length; i++) {
+          if (String(documentData[i][0]).trim() === String(documentId).trim()) {
+            documentRowIndex = i + 1;
+            break;
+          }
+        }
+
+        if (documentRowIndex === -1) {
+          result = { success: false, error: "Document not found" };
+        } else {
+          documentSheet.deleteRow(documentRowIndex);
+          result = { success: true };
+        }
+      }
     }
     else if (action === "createComment") {
       const commentSheet = sheet.getSheetByName("Comments");
