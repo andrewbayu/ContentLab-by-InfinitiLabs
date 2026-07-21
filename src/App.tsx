@@ -686,7 +686,6 @@ function App() {
             onOpenCreateModalWithStatus={handleOpenCreateModalWithStatus}
             channels={channels}
             variablesConfig={variablesConfig}
-            currentUser={currentUser}
             taskView={taskView}
           />
         )}

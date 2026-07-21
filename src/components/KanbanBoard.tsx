@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { isUserInvolved } from '../services/sheets';
-import type { ContentItem, Channel, VariablesConfig, TeamMember, TaskType } from '../services/sheets';
-import { Calendar, Link, Plus, FileText, Video, RefreshCw, UserCheck, Clapperboard, ListChecks } from 'lucide-react';
+import type { ContentItem, Channel, VariablesConfig, TaskType } from '../services/sheets';
+import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks } from 'lucide-react';
 
 interface KanbanBoardProps {
   items: ContentItem[];
@@ -10,7 +9,6 @@ interface KanbanBoardProps {
   onMoveItem: (id: string, newStatus: ContentItem['status']) => void;
   onEditItem: (item: ContentItem) => void;
   onOpenCreateModalWithStatus: (status: ContentItem['status']) => void;
-  currentUser: TeamMember;
   taskView: 'all' | 'content' | 'general' | 'mine' | 'overdue';
 }
 
@@ -41,18 +39,16 @@ export function KanbanBoard({
   onMoveItem,
   onEditItem,
   onOpenCreateModalWithStatus,
-  currentUser,
   taskView,
 }: KanbanBoardProps) {
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
   const [draggedItemType, setDraggedItemType] = useState<TaskType | null>(null);
-  const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [mobileLane, setMobileLane] = useState<TaskType>('Content');
   const showContentLane = taskView !== 'general';
   const showGeneralLane = taskView !== 'content';
   const showLaneSwitch = showContentLane && showGeneralLane;
 
-  const displayedItems = items.filter((item) => !onlyMyTasks || isUserInvolved(item, currentUser));
+  const displayedItems = items;
 
   const handleDragStart = (event: React.DragEvent, item: ContentItem) => {
     event.dataTransfer.setData('text/plain', item.id);
@@ -246,16 +242,6 @@ export function KanbanBoard({
             <button type="button" role="tab" aria-selected={mobileLane === 'General'} className={mobileLane === 'General' ? 'active' : ''} onClick={() => setMobileLane('General')}>Tasks</button>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => setOnlyMyTasks((current) => !current)}
-          className={`btn kanban-my-work ${onlyMyTasks ? 'active' : ''}`}
-          title="Tampilkan task saat saya menjadi PIC, collaborator, atau reviewer"
-          aria-pressed={onlyMyTasks}
-        >
-          <UserCheck size={14} />
-          <span>{onlyMyTasks ? 'My Work Only' : 'Filter My Work'}</span>
-        </button>
       </div>
 
       <div className="kanban-lanes">
