@@ -216,9 +216,8 @@ function App() {
           updatedAt: new Date().toISOString(),
         };
 
-        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? updatedPayload : item)));
-        
-        await updateContent(updatedPayload);
+        const updated = await updateContent(updatedPayload);
+        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? updated : item)));
         addToast(`Successfully updated "${itemPayload.title}"`, 'success');
       } else {
         const createdPayload = {

@@ -678,31 +678,20 @@ export async function createContent(
     return newItem;
   }
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-      body: JSON.stringify({
-        action: 'createContent',
-        item: newItem,
-      }),
-    });
-    
-    const result = await response.json();
-    if (result && result.success) {
-      return newItem;
-    }
-    throw new Error(result.error || 'Server failed to create content');
-  } catch (error) {
-    console.error('Failed to create content via script URL, using mock save:', error);
-    const { content, team, channels, comments } = getLocalData();
-    const updated = [newItem, ...content];
-    saveLocalData(updated, team, channels, comments);
-    return newItem;
-  }
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+    body: JSON.stringify({
+      action: 'createContent',
+      item: newItem,
+    }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to create content');
+  return result.item || newItem;
 }
 
 export async function updateContent(item: ContentItem): Promise<ContentItem> {
@@ -719,31 +708,20 @@ export async function updateContent(item: ContentItem): Promise<ContentItem> {
     return updatedItem;
   }
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-      body: JSON.stringify({
-        action: 'updateContent',
-        item: updatedItem,
-      }),
-    });
-    
-    const result = await response.json();
-    if (result && result.success) {
-      return updatedItem;
-    }
-    throw new Error(result.error || 'Server failed to update content');
-  } catch (error) {
-    console.error('Failed to update content via script URL, using mock save:', error);
-    const { content, team, channels, comments } = getLocalData();
-    const updated = content.map((c) => (c.id === item.id ? updatedItem : c));
-    saveLocalData(updated, team, channels, comments);
-    return updatedItem;
-  }
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+    body: JSON.stringify({
+      action: 'updateContent',
+      item: updatedItem,
+    }),
+  });
+  const result = await response.json();
+  if (!result?.success) throw new Error(result?.error || 'Server failed to update content');
+  return result.item || updatedItem;
 }
 
 export async function deleteContent(id: string): Promise<boolean> {
