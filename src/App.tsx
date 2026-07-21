@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppShell } from './components/AppShell';
 import { DashboardView } from './components/DashboardView';
+import { ClientPortal } from './components/ClientPortal';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ListView } from './components/ListView';
 import { SettingsView } from './components/SettingsView';
@@ -155,6 +156,7 @@ function App() {
     if (activeTab === 'settings' && currentUser?.role !== 'super') {
       setActiveTab('dashboard');
     }
+    if (currentUser?.role === 'client' && activeTab !== 'dashboard') setActiveTab('dashboard');
   }, [activeTab, currentUser?.role]);
 
   useEffect(() => {
@@ -347,6 +349,17 @@ function App() {
     } catch (e) {
       console.error(e);
       addToast('Failed to save comment.', 'error');
+    } finally {
+      endWrite();
+    }
+  };
+
+  const handleClientUpdateItem = async (item: ContentItem) => {
+    beginWrite();
+    try {
+      const updated = await updateContent(item);
+      setItems((prev) => prev.map((entry) => entry.id === updated.id ? updated : entry));
+      addToast('Review status saved.', 'success');
     } finally {
       endWrite();
     }
@@ -561,10 +574,11 @@ function App() {
   const selectedClient = scopeKey.startsWith('client:') ? scopeKey.slice(7) : '';
 
   const scopedItems = useMemo(() => items.filter((item) => {
+    if (currentUser?.role === 'client') return item.client === currentUser.client;
     if (selectedBrand) return item.client === selectedBrand.client && item.brand === selectedBrand.brand;
     if (selectedClient) return item.client === selectedClient;
     return true;
-  }), [items, selectedBrand, selectedClient]);
+  }), [items, selectedBrand, selectedClient, currentUser]);
 
   const filteredItems = useMemo(() => scopedItems.filter((item) => {
     if (taskView === 'content') return item.taskType === 'Content';
@@ -669,13 +683,7 @@ function App() {
           </div>
         )}
         {activeTab === 'dashboard' && (
-          <DashboardView
-            items={scopedItems}
-            onEditItem={handleOpenEditModal}
-            channels={channels}
-            variablesConfig={variablesConfig}
-            currentUser={currentUser}
-          />
+          currentUser.role === 'client' ? <ClientPortal items={scopedItems} comments={comments} currentUser={currentUser} onUpdateItem={handleClientUpdateItem} onAddComment={handleAddComment} /> : <DashboardView items={scopedItems} onEditItem={handleOpenEditModal} channels={channels} variablesConfig={variablesConfig} currentUser={currentUser} />
         )}
         
         {activeTab === 'board' && (

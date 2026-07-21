@@ -87,7 +87,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       )}
 
       {/* Sidebar - Collapsible & Slide-over Drawer */}
-      <aside className={`app-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'open' : ''}`}>
+      <aside className={`app-sidebar role-${currentUser?.role || 'team'} ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo-container">
             <div className="sidebar-logo">
@@ -286,13 +286,13 @@ export const AppShell: React.FC<AppShellProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', textAlign: 'left' }}>
                   <span style={{ fontWeight: 650, color: 'var(--text-primary)', lineHeight: 1.2 }}>{currentUser.name}</span>
                   <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                    {currentUser.role === 'super' ? 'Super Admin' : 'Team Member'}
+                    {currentUser.role === 'super' ? 'Super Admin' : currentUser.role === 'client' ? 'Client' : 'Team Member'}
                   </span>
                 </div>
               </div>
             )}
 
-            {activeTab !== 'documents' && (
+            {activeTab !== 'documents' && currentUser?.role !== 'client' && (
               <button className="btn btn-primary" onClick={onOpenCreateModal}>
                 <Plus size={16} />
                 <span>Create Task</span>

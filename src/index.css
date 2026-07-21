@@ -463,6 +463,42 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-columns: 2fr 1fr;
   gap: 24px;
 }
+.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(2),
+.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(3),
+.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(4),
+.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(5),
+.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(6),
+.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(7) { display: none; }
+.client-portal { overflow-y: auto; gap: 18px; }
+.client-portal-heading, .client-review-detail-head, .client-section-title, .client-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.client-portal-heading h2 { font-size: 26px; }
+.client-portal-heading p { margin-top: 4px; color: var(--text-secondary); font-size: 12px; }
+.client-portal-scope, .client-review-status { padding: 6px 10px; border-radius: 999px; background: var(--primary-glow); color: var(--primary); font-size: 11px; font-weight: 700; }
+.client-portal-layout { display: grid; grid-template-columns: minmax(240px, .35fr) minmax(0, 1fr); gap: 18px; min-height: 520px; }
+.client-review-list, .client-review-detail { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
+.client-section-title { padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+.client-section-title span { color: var(--text-muted); font-size: 11px; }
+.client-review-item { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 13px 10px; margin-top: 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: var(--bg-app); text-align: left; cursor: pointer; }
+.client-review-item:hover, .client-review-item.active { border-color: rgba(37,99,235,.35); background: var(--primary-glow); }
+.client-review-item strong { color: var(--text-primary); font-size: 12px; }
+.client-review-item span, .client-review-item small { color: var(--text-muted); font-size: 10px; }
+.client-review-detail { display: flex; flex-direction: column; gap: 18px; }
+.client-review-detail-head { padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle); }
+.client-review-detail-head > div > span, .client-review-copy h4, .client-comments h4 { color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.client-review-detail h3 { margin-top: 4px; font-size: 20px; }
+.client-review-copy p { margin: 8px 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.client-review-copy a { color: var(--primary); font-size: 12px; font-weight: 650; }
+.client-comments { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.client-comments h4 { display: flex; align-items: center; gap: 6px; color: var(--text-primary); font-size: 13px; letter-spacing: 0; text-transform: none; }
+.client-comment { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-app); font-size: 12px; }
+.client-comment span { color: var(--text-secondary); white-space: pre-wrap; }
+.client-muted, .client-portal-empty { color: var(--text-muted); font-size: 12px; }
+.client-comments form { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-top: auto; }
+.client-comments textarea { width: 100%; resize: vertical; padding: 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: 12px var(--font-body); }
+.client-review-actions { justify-content: flex-end; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+.client-portal-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); }
+.client-portal-empty strong { color: var(--text-primary); font-size: 14px; }
+@media (max-width: 720px) { .client-portal-layout { grid-template-columns: 1fr; } .client-review-list { max-height: 260px; overflow-y: auto; } .client-review-detail-head { align-items: flex-start; flex-direction: column; } }
 
 .dashboard-page { gap: 0; }
 .dashboard-tabs { margin-bottom: 18px !important; padding-bottom: 12px !important; }

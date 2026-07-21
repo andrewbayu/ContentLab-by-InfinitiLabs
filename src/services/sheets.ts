@@ -1,5 +1,5 @@
 export type TaskType = 'Content' | 'General';
-export type UserRole = 'super' | 'team';
+export type UserRole = 'super' | 'team' | 'client';
 export type KpiDirection = 'increase' | 'decrease';
 export type KpiCadence = 'Weekly' | 'Monthly' | 'Quarterly';
 export type TaskMemberRole = 'creator' | 'owner' | 'collaborator' | 'reviewer';
@@ -67,6 +67,7 @@ export interface TeamMember {
   avatar: string;
   password?: string; // New field for multi-user authentication
   role: UserRole;
+  client?: string;
 }
 
 export interface TaskMember {
@@ -479,7 +480,8 @@ export async function fetchData(): Promise<WorkspaceData> {
       email: String(item.email || ''),
       avatar: String(item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'),
       password: item.password ? String(item.password) : '',
-      role: String(item.role || 'team').toLowerCase() === 'super' ? 'super' : 'team',
+      role: String(item.role || 'team').toLowerCase() === 'super' ? 'super' : String(item.role || 'team').toLowerCase() === 'client' ? 'client' : 'team',
+      client: item.client ? String(item.client) : '',
     })) as TeamMember[];
 
     const taskMembers = (data.taskMembers || []).map((item: any) => ({
@@ -651,7 +653,9 @@ export async function loginUser(
     });
     const result = await response.json();
     if (result?.success && result.user) {
-      result.user.role = String(result.user.role || 'team').toLowerCase() === 'super' ? 'super' : 'team';
+      const role = String(result.user.role || 'team').toLowerCase();
+      result.user.role = role === 'super' ? 'super' : role === 'client' ? 'client' : 'team';
+      result.user.client = result.user.client ? String(result.user.client) : '';
     }
     return result;
   } catch (e) {

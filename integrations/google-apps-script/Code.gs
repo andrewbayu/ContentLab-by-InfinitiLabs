@@ -15,7 +15,8 @@ function doGet(e) {
       name: member.name,
       email: member.email,
       avatar: member.avatar,
-      role: String(member.role || "team").toLowerCase() === "super" ? "super" : "team"
+      role: String(member.role || "team").toLowerCase() === "super" ? "super" : String(member.role || "team").toLowerCase() === "client" ? "client" : "team",
+      client: member.client || ""
     };
   });
   
@@ -314,7 +315,8 @@ function doPost(e) {
             name: member.name,
             email: member.email,
             avatar: member.avatar,
-            role: String(member.role || "team").toLowerCase() === "super" ? "super" : "team"
+            role: String(member.role || "team").toLowerCase() === "super" ? "super" : String(member.role || "team").toLowerCase() === "client" ? "client" : "team",
+            client: member.client || ""
           };
           break;
         }
