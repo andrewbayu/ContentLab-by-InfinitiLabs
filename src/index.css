@@ -464,6 +464,16 @@ h1, h2, h3, h4, h5, h6 {
   gap: 24px;
 }
 
+.dashboard-page { gap: 0; }
+.dashboard-tabs { margin-bottom: 18px !important; padding-bottom: 12px !important; }
+.dashboard-greeting { padding: 14px 18px !important; margin-bottom: 18px !important; }
+.dashboard-greeting img { width: 40px !important; height: 40px !important; }
+.dashboard-greeting h2 { font-size: 17px !important; }
+.dashboard-action-panel, .dashboard-upcoming-panel { min-height: 0; }
+.dashboard-action-panel .insight-header, .dashboard-upcoming-panel .insight-header { margin-bottom: -4px; }
+.dashboard-page .metric-card { transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast); }
+.dashboard-page .metric-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+
 @media (max-width: 1024px) {
   .dashboard-insights {
     grid-template-columns: 1fr;

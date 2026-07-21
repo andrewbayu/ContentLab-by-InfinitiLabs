@@ -39,9 +39,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Time-based greeting helper
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Selamat Pagi';
-    if (hour < 17) return 'Selamat Siang';
-    return 'Selamat Sore / Malam';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   };
 
   // --- GENERAL CALCULATIONS (STUDIO OVERVIEW) ---
@@ -247,10 +247,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="page-container" style={{ overflowY: 'auto' }}>
+    <div className="page-container dashboard-page" style={{ overflowY: 'auto' }}>
       
       {/* 🧭 NAVIGATION SUB-TABS */}
-      <div style={{
+      <div className="dashboard-tabs" style={{
         display: 'flex',
         gap: '12px',
         borderBottom: '1px solid var(--border-subtle)',
@@ -308,7 +308,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {dashboardTab === 'personal' && (
         <div style={{ animation: 'fadeIn var(--transition-fast)' }}>
           {/* Greeting Box banner */}
-          <div style={{
+          <div className="dashboard-greeting" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '16px',
@@ -328,7 +328,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {getGreeting()}, {currentUser.name}! <Sparkles size={16} style={{ color: 'var(--primary)' }} />
               </h2>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                Selamat datang kembali. Mari cek progres tugas dan revisi konten Anda hari ini.
+                You have {myActiveTasks} active task{myActiveTasks === 1 ? '' : 's'} and {myPendingSubtaskCount} pending checklist item{myPendingSubtaskCount === 1 ? '' : 's'}.
               </p>
             </div>
           </div>
@@ -337,29 +337,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="metrics-grid" style={{ marginBottom: '28px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-title">Tugas Aktif Saya</span>
+              <span className="metric-title">Active tasks</span>
                 <Clock size={18} style={{ color: '#2563eb' }} />
               </div>
               <span className="metric-value">{myActiveTasks}</span>
-              <span className="metric-trend text-secondary">Konten dalam tahap produksi</span>
+              <span className="metric-trend text-secondary">Tasks assigned to you</span>
             </div>
 
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-title">Checklist Pending</span>
+              <span className="metric-title">Pending checklist</span>
                 <CheckSquare size={18} style={{ color: '#db2777' }} />
               </div>
               <span className="metric-value" style={myPendingSubtaskCount > 0 ? { color: '#db2777' } : {}}>{myPendingSubtaskCount}</span>
-              <span className="metric-trend text-secondary">Aset draf yang harus ditautkan</span>
+              <span className="metric-trend text-secondary">Assets waiting for updates</span>
             </div>
 
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-title">Views Konten Saya</span>
+              <span className="metric-title">My content views</span>
                 <Eye size={18} style={{ color: '#10b981' }} />
               </div>
               <span className="metric-value" style={{ color: '#10b981' }}>{formatNumber(myPublishedViews)}</span>
-              <span className="metric-trend text-secondary">Dari konten Anda yang rilis</span>
+              <span className="metric-trend text-secondary">From published content</span>
             </div>
           </div>
 
@@ -367,13 +367,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="dashboard-insights">
             
             {/* My Pending Checklists Tasks */}
-            <div className="insight-panel">
+            <div className="insight-panel dashboard-action-panel">
               <div className="insight-header">
                 <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <CheckSquare size={16} className="text-secondary" />
-                  Action Items (Checklist Aset Pending)
+                  Needs your attention
                 </h3>
-                <span className="text-secondary" style={{ fontSize: '12px' }}>Tautkan draf Anda</span>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>{myPendingSubtaskCount} item{myPendingSubtaskCount === 1 ? '' : 's'} require action</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -429,10 +429,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* My Upcoming Publications */}
-            <div className="insight-panel">
+            <div className="insight-panel dashboard-upcoming-panel">
               <div className="insight-header">
-                <h3 className="insight-title">Target Publikasi Saya</h3>
-                <span className="text-secondary" style={{ fontSize: '12px' }}>Terdekat di kalender</span>
+                <h3 className="insight-title">Upcoming publishing</h3>
+                <span className="text-secondary" style={{ fontSize: '12px' }}>Next in your calendar</span>
               </div>
 
               <div className="recent-activity-list">
