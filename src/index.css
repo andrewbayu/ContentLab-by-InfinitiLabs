@@ -1979,6 +1979,11 @@ input:disabled + .switch-slider {
 .analytics-summary-card span { font-size: 11px; color: var(--text-secondary); }
 .analytics-summary-card strong { font: 700 22px var(--font-headings); color: var(--text-primary); line-height: 1.1; }
 .analytics-summary-card small { color: var(--text-muted); font-size: 10px; }
+.analytics-summary-card.summary-positive > svg { color: #15803d; background: #f0fdf4; }
+.analytics-summary-card.summary-warning > svg { color: #b45309; background: #fffbeb; }
+.analytics-summary-card.summary-neutral > svg { color: var(--primary); background: var(--primary-glow); }
+.analytics-summary-card i { display: block; width: 100%; height: 4px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: var(--border-subtle); }
+.analytics-summary-card i b { display: block; height: 100%; border-radius: inherit; background: #22c55e; }
 
 .analytics-form-card,
 .analytics-section {
@@ -2018,7 +2023,8 @@ input:disabled + .switch-slider {
 
 .analytics-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 160px; color: var(--text-muted); text-align: center; }
 .analytics-empty-state strong { color: var(--text-primary); font-size: 13px; }
-.analytics-empty-state span { font-size: 11px; }
+.analytics-empty-state span { max-width: 340px; font-size: 11px; }
+.analytics-empty-state .btn { margin-top: 9px; }
 .analytics-table-wrap { overflow-x: auto; }
 .analytics-table { width: 100%; border-collapse: collapse; }
 .analytics-table th,
@@ -2027,6 +2033,12 @@ input:disabled + .switch-slider {
 .analytics-table td:first-child { display: flex; align-items: center; gap: 7px; }
 .analytics-table td small { color: var(--text-muted); }
 .brand-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.comparison-metric { min-width: 105px; }
+.comparison-metric span { display: block; margin-bottom: 5px; }
+.comparison-metric i { display: block; height: 5px; overflow: hidden; border-radius: 999px; background: var(--border-subtle); }
+.comparison-metric i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #60a5fa); }
+.comparison-alert { color: #b91c1c; font-weight: 700; }
+.comparison-ok { color: #15803d; font-weight: 700; }
 
 @media (max-width: 1000px) {
   .analytics-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -117,6 +117,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const published = items.filter((item) => item.taskType === 'Content' && item.status === 'Published').length;
   const completionRate = items.length ? Math.round((completed / items.length) * 100) : 0;
   const onTrack = scopedDefinitions.filter((definition) => getProgress(definition, latestByKpi.get(definition.id)?.actual) >= 80).length;
+  const trackedKpis = scopedDefinitions.filter((definition) => latestByKpi.has(definition.id));
+  const averageKpiProgress = trackedKpis.length
+    ? Math.round(trackedKpis.reduce((sum, definition) => sum + getProgress(definition, latestByKpi.get(definition.id)?.actual), 0) / trackedKpis.length)
+    : 0;
 
   const comparisons = activeClients.filter((clientBrand) => !selectedClient || clientBrand.client === selectedClient).map((clientBrand) => {
     const brandItems = items.filter((item) => item.client === clientBrand.client && item.brand === clientBrand.brand);
@@ -201,10 +205,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </div>
 
       <div className="analytics-summary-grid">
-        <div className="analytics-summary-card"><CheckCircle2 /><div><span>Task completion</span><strong>{completionRate}%</strong><small>{completed} of {items.length} tasks</small></div></div>
-        <div className="analytics-summary-card"><Clock3 /><div><span>Overdue</span><strong>{overdue}</strong><small>Needs follow-up</small></div></div>
+        <div className="analytics-summary-card summary-positive"><CheckCircle2 /><div><span>Task completion</span><strong>{completionRate}%</strong><small>{completed} of {items.length} tasks</small><i><b style={{ width: `${completionRate}%` }} /></i></div></div>
+        <div className={`analytics-summary-card ${overdue ? 'summary-warning' : 'summary-positive'}`}><Clock3 /><div><span>Overdue</span><strong>{overdue}</strong><small>{overdue ? 'Needs follow-up' : 'All clear'}</small></div></div>
         <div className="analytics-summary-card"><BarChart3 /><div><span>Published content</span><strong>{published}</strong><small>In current scope</small></div></div>
-        <div className="analytics-summary-card"><Target /><div><span>KPI on track</span><strong>{onTrack}/{scopedDefinitions.length}</strong><small>At least 80% progress</small></div></div>
+        <div className={`analytics-summary-card ${averageKpiProgress >= 80 ? 'summary-positive' : 'summary-neutral'}`}><Target /><div><span>KPI health</span><strong>{trackedKpis.length ? `${averageKpiProgress}%` : '—'}</strong><small>{trackedKpis.length ? `${onTrack}/${scopedDefinitions.length} on track` : 'No updates yet'}</small></div></div>
       </div>
 
       {showAddKpi && (
@@ -230,7 +234,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       <section className="analytics-section">
         <div className="analytics-section-heading"><div><h3>Brand KPI progress</h3><p>Manual metric updates remain historical so the team can see movement over time.</p></div><Activity size={20} /></div>
         {scopedDefinitions.length === 0 ? (
-          <div className="analytics-empty-state"><Target size={30} /><strong>No KPI defined for this scope</strong><span>{currentUser.role === 'super' ? 'Use Define KPI to add the first measurable target.' : 'Ask a super admin to define KPI targets.'}</span></div>
+          <div className="analytics-empty-state"><Target size={30} /><strong>No KPI defined for this scope</strong><span>{currentUser.role === 'super' ? 'Start with one measurable target for this client or brand.' : 'Ask a super admin to define KPI targets.'}</span>{currentUser.role === 'super' && <button className="btn btn-primary" type="button" onClick={() => setShowAddKpi(true)}><Plus size={14} /> Define first KPI</button>}</div>
         ) : (
           <div className="kpi-grid">
             {scopedDefinitions.map((definition) => {
@@ -265,7 +269,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           <div className="analytics-section-heading"><div><h3>Brand comparison</h3><p>Portfolio-level delivery and KPI health across active brands.</p></div></div>
           <div className="analytics-table-wrap">
             <table className="analytics-table"><thead><tr><th>Client / Brand</th><th>Tasks</th><th>Completion</th><th>Overdue</th><th>KPI on track</th></tr></thead><tbody>
-              {comparisons.map((row) => <tr key={row.clientBrand.id}><td><span className="brand-color-dot" style={{ backgroundColor: row.clientBrand.color }} /> <strong>{row.clientBrand.client}</strong><small>{row.clientBrand.brand}</small></td><td>{row.tasks}</td><td>{row.completion}%</td><td>{row.overdue}</td><td>{row.onTrack}/{row.kpis}</td></tr>)}
+              {comparisons.sort((a, b) => b.completion - a.completion || b.onTrack - a.onTrack).map((row) => <tr key={row.clientBrand.id}><td><span className="brand-color-dot" style={{ backgroundColor: row.clientBrand.color }} /> <strong>{row.clientBrand.client}</strong><small>{row.clientBrand.brand}</small></td><td>{row.tasks}</td><td><div className="comparison-metric"><span>{row.completion}%</span><i><b style={{ width: `${row.completion}%` }} /></i></div></td><td><span className={row.overdue ? 'comparison-alert' : 'comparison-ok'}>{row.overdue}</span></td><td><div className="comparison-metric"><span>{row.onTrack}/{row.kpis}</span><i><b style={{ width: `${row.kpis ? Math.round((row.onTrack / row.kpis) * 100) : 0}%` }} /></i></div></td></tr>)}
             </tbody></table>
           </div>
         </section>
