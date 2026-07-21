@@ -56,8 +56,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
   // Drag and Drop handlers
@@ -126,7 +126,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-secondary" onClick={handleGoToToday} style={{ padding: '8px 14px' }}>
-            Hari Ini
+            Today
           </button>
           <button className="btn btn-secondary btn-icon-only" onClick={handlePrevMonth} title="Previous Month">
             <ChevronLeft size={16} />
@@ -148,13 +148,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         paddingBottom: '8px',
         borderBottom: '1px solid var(--border-subtle)'
       }}>
-        <div>MENG (SUN)</div>
-        <div>SEN (MON)</div>
-        <div>SEL (TUE)</div>
-        <div>RAB (WED)</div>
-        <div>KAM (THU)</div>
-        <div>JUM (FRI)</div>
-        <div>SAB (SAT)</div>
+        <div>SUN</div>
+        <div>MON</div>
+        <div>TUE</div>
+        <div>WED</div>
+        <div>THU</div>
+        <div>FRI</div>
+        <div>SAT</div>
       </div>
 
       {/* Calendar Grid cells */}
