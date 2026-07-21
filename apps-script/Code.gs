@@ -347,6 +347,7 @@ function getSheetData(sheet) {
   const data = [];
   
   for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0] || "").trim() === "") continue;
     const row = {};
     for (let j = 0; j < headers.length; j++) {
       row[headers[j]] = values[i][j];
