@@ -232,7 +232,8 @@ function App() {
       }
     } catch (e) {
       console.error(e);
-      addToast('Failed to save task. Sync failed.', 'error');
+      const message = e instanceof Error ? e.message : 'Unknown sync error';
+      addToast(`Failed to save task. ${message}`, 'error');
       loadData(false);
     } finally {
       endWrite();

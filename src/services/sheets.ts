@@ -719,7 +719,8 @@ export async function updateContent(item: ContentItem): Promise<ContentItem> {
       item: updatedItem,
     }),
   });
-  const result = await response.json();
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`Sync request failed (${response.status})`);
   if (!result?.success) throw new Error(result?.error || 'Server failed to update content');
   return result.item || updatedItem;
 }
