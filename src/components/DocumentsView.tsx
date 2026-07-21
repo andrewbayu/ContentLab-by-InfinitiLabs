@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ExternalLink, FileText, Link2, Lock, Plus, Search, Star, Trash2, Users, X } from 'lucide-react';
+import { ExternalLink, FileText, Link2, Lock, Maximize2, Minimize2, Plus, Search, Star, Trash2, Users, X } from 'lucide-react';
 import type { ClientBrand, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
 import '../styles/documents.css';
 
@@ -35,6 +35,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [editing, setEditing] = useState<DocumentItem | null>(null);
   const [draft, setDraft] = useState<DocumentDraft>(() => blankDraft(currentUser.id));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const clientNames = useMemo(
@@ -64,6 +65,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const openCreate = () => {
     setEditing(null);
     setDraft(blankDraft(currentUser.id));
+    setEditorFullscreen(false);
     setDrawerOpen(true);
   };
 
@@ -74,6 +76,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       ownerId: document.ownerId, visibility: document.visibility, client: document.client,
       brand: document.brand, taskId: document.taskId, tags: document.tags, pinned: document.pinned,
     });
+    setEditorFullscreen(false);
     setDrawerOpen(true);
   };
 
@@ -178,10 +181,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
       {drawerOpen && (
         <div className="documents-drawer-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
-          <aside className="documents-drawer" role="dialog" aria-modal="true" aria-labelledby="document-drawer-title">
+          <aside className={`documents-drawer${editorFullscreen ? ' is-fullscreen' : ''}`} role="dialog" aria-modal="true" aria-labelledby="document-drawer-title">
             <header>
               <div><span>{editing ? 'Edit document' : 'New document'}</span><h3 id="document-drawer-title">{editing?.title || 'Untitled'}</h3></div>
-              <button className="btn btn-secondary btn-icon-only" type="button" onClick={closeDrawer} aria-label="Close"><X size={17} /></button>
+              <div className="documents-editor-actions">
+                <button className="btn btn-secondary btn-icon-only" type="button" onClick={() => setEditorFullscreen((value) => !value)} aria-label={editorFullscreen ? 'Exit full screen' : 'Full screen'} title={editorFullscreen ? 'Exit full screen' : 'Full screen'}>
+                  {editorFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                </button>
+                <button className="btn btn-secondary btn-icon-only" type="button" onClick={closeDrawer} aria-label="Close"><X size={17} /></button>
+              </div>
             </header>
             <form onSubmit={handleSave}>
               <div className="documents-drawer-body">

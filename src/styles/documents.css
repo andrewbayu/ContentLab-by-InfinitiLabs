@@ -32,8 +32,10 @@
 .documents-empty strong { margin-top: 3px; color: var(--text-primary); font-size: 14px; }
 .documents-empty span { margin-bottom: 8px; font-size: 11px; }
 .documents-drawer-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; justify-content: flex-end; background: rgba(15, 23, 42, .34); animation: fadeIn var(--transition-fast); }
-.documents-drawer { width: min(560px, 100%); height: 100%; display: flex; flex-direction: column; background: #fff; border-left: 1px solid var(--border-subtle); box-shadow: var(--shadow-lg); animation: slideIn var(--transition-normal); }
+.documents-drawer { width: min(760px, 68vw); height: 100%; display: flex; flex-direction: column; background: #fff; border-left: 1px solid var(--border-subtle); box-shadow: var(--shadow-lg); animation: slideIn var(--transition-normal); }
+.documents-drawer.is-fullscreen { width: 100%; border-left: 0; }
 .documents-drawer > header { padding: 18px 22px; border-bottom: 1px solid var(--border-subtle); }
+.documents-editor-actions { display: flex; gap: 8px; }
 .documents-drawer > header > div { min-width: 0; }
 .documents-drawer > header span { color: var(--text-muted); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
 .documents-drawer > header h3 { max-width: 420px; overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
@@ -57,5 +59,6 @@
   .documents-search { width: 100%; }
   .documents-tabs button { flex: 1; justify-content: center; }
   .documents-grid { grid-template-columns: 1fr; }
+  .documents-drawer { width: 100%; border-left: 0; }
   .documents-drawer .form-row { grid-template-columns: 1fr; }
 }
