@@ -758,7 +758,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  max-height: clamp(220px, 42vh, 560px);
+  max-height: clamp(360px, 58vh, 640px);
   min-height: 72px;
 }
 
