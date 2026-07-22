@@ -34,6 +34,8 @@ export interface ContentItem {
   actorId?: string;
   publishDate: string; // YYYY-MM-DD
   assetsLink: string;
+  coverImageUrl?: string;
+  coverImageId?: string;
   // Optional variables
   tags?: string;
   budget?: string;
@@ -330,6 +332,28 @@ export function isMockMode(): boolean {
   return !getScriptUrl();
 }
 
+export interface CoverImageUpload {
+  url: string;
+  id: string;
+}
+
+export async function uploadCoverImage(file: File): Promise<CoverImageUpload> {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Gunakan file JPG, PNG, atau WebP.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Ukuran gambar maksimal 5 MB.');
+  const url = getScriptUrl();
+  if (!url) throw new Error('Workspace belum terhubung ke Google Sheets.');
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  });
+  const response = await fetch(url, { method: 'POST', mode: 'cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'uploadCoverImage', fileName: file.name, mimeType: file.type, dataUrl }) });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result?.success || !result.coverImage?.url) throw new Error(result?.error || 'Upload gambar gagal.');
+  return result.coverImage as CoverImageUpload;
+}
+
 // Variables Config Getters & Setters
 export function getVariablesConfig(): VariablesConfig {
   const saved = localStorage.getItem(VARIABLES_CONFIG_KEY);
@@ -532,6 +556,8 @@ export async function fetchData(): Promise<WorkspaceData> {
       reviewerId,
       publishDate: String(item.publishDate ? item.publishDate.split('T')[0] : ''),
       assetsLink: String(item.assetsLink || ''),
+      coverImageUrl: String(item.coverImageUrl || ''),
+      coverImageId: String(item.coverImageId || ''),
       tags: item.tags ? String(item.tags) : '',
       budget: item.budget ? String(item.budget) : '',
       platformNotes: item.platformNotes ? String(item.platformNotes) : '',
