@@ -157,7 +157,7 @@ function App() {
     if (activeTab === 'settings' && currentUser?.role !== 'super') {
       setActiveTab('dashboard');
     }
-    if (currentUser?.role === 'client' && !['dashboard', 'reports'].includes(activeTab)) setActiveTab('dashboard');
+    if (currentUser?.role === 'client' && !['dashboard', 'review', 'reports'].includes(activeTab)) setActiveTab('dashboard');
   }, [activeTab, currentUser?.role]);
 
   useEffect(() => {
@@ -685,9 +685,33 @@ function App() {
           </div>
         )}
         {activeTab === 'dashboard' && (
-          currentUser.role === 'client' ? <ClientPortal items={scopedItems} comments={comments} currentUser={currentUser} onUpdateItem={handleClientUpdateItem} onAddComment={handleAddComment} /> : <DashboardView items={scopedItems} onEditItem={handleOpenEditModal} channels={channels} variablesConfig={variablesConfig} currentUser={currentUser} />
+          currentUser.role === 'client'
+            ? <ClientPortal
+                items={scopedItems}
+                comments={comments}
+                currentUser={currentUser}
+                mode="overview"
+                reportsCount={documents.filter((document) => document.visibility === 'client').length}
+                onNavigateToReview={() => setActiveTab('review')}
+                onUpdateItem={handleClientUpdateItem}
+                onAddComment={handleAddComment}
+              />
+            : <DashboardView items={scopedItems} onEditItem={handleOpenEditModal} channels={channels} variablesConfig={variablesConfig} currentUser={currentUser} />
         )}
         
+        {activeTab === 'review' && currentUser.role === 'client' && (
+          <ClientPortal
+            items={scopedItems}
+            comments={comments}
+            currentUser={currentUser}
+            mode="review"
+            reportsCount={documents.filter((document) => document.visibility === 'client').length}
+            onNavigateToReview={() => setActiveTab('review')}
+            onUpdateItem={handleClientUpdateItem}
+            onAddComment={handleAddComment}
+          />
+        )}
+
         {activeTab === 'board' && (
           <KanbanBoard
             items={filteredItems}
