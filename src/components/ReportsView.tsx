@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Download, ExternalLink, FileText, List, LayoutGrid, Search } from 'lucide-react';
-import type { DocumentItem, TeamMember } from '../services/sheets';
+import type { DocumentItem } from '../services/sheets';
 import '../styles/reports.css';
 
 interface ReportsViewProps {
   documents: DocumentItem[];
-  currentUser: TeamMember;
 }
 
 const formatDate = (value: string) => {
@@ -15,7 +14,7 @@ const formatDate = (value: string) => {
   }).format(date);
 };
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ documents, currentUser }) => {
+export const ReportsView: React.FC<ReportsViewProps> = ({ documents }) => {
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'cards' | 'list'>('cards');
 
@@ -23,11 +22,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ documents, currentUser
     const normalized = query.trim().toLowerCase();
     return documents
       .filter((document) => document.visibility === 'client')
-      .filter((document) => currentUser.role !== 'client' || !document.client || document.client === currentUser.client)
       .filter((document) => !normalized || [document.title, document.body, document.client, document.brand, document.tags]
         .some((value) => String(value || '').toLowerCase().includes(normalized)))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
-  }, [currentUser.client, currentUser.role, documents, query]);
+  }, [documents, query]);
 
   const download = (document: DocumentItem) => {
     if (document.url) {
