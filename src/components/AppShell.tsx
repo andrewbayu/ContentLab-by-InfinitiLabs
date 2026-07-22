@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   RefreshCw,
   FileText,
-  Files
+  Files,
+  ClipboardCheck
 } from 'lucide-react';
 import { getGeneratedAvatar } from '../utils/avatar';
 
@@ -130,93 +131,26 @@ export const AppShell: React.FC<AppShellProps> = ({
         </div>}
 
         <nav className="sidebar-nav">
-          <button
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => handleNavClick('dashboard')}
-          >
-            <LayoutDashboard className="nav-item-icon" />
-            Overview
-          </button>
-          
-          <button
-            className={`nav-item ${activeTab === 'board' ? 'active' : ''}`}
-            onClick={() => handleNavClick('board')}
-          >
-            <Kanban className="nav-item-icon" />
-            Kanban Board
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
-            onClick={() => handleNavClick('calendar')}
-          >
-            <Calendar className="nav-item-icon" />
-            Task Calendar
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'list' ? 'active' : ''}`}
-            onClick={() => handleNavClick('list')}
-          >
-            <ListTodo className="nav-item-icon" />
-            Task List
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`}
-            onClick={() => handleNavClick('documents')}
-          >
-            <FileText className="nav-item-icon" />
-            Documents &amp; Notes
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
-            onClick={() => handleNavClick('reports')}
-          >
-            <Files className="nav-item-icon" />
-            Reports
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => handleNavClick('analytics')}
-          >
-            <BarChart3 className="nav-item-icon" />
-            Analytics & KPI
-          </button>
-
-          {currentUser?.role === 'super' && (
-            <button
-              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => handleNavClick('settings')}
-            >
-              <Settings className="nav-item-icon" />
-              Settings Manager
-            </button>
+          {currentUser?.role === 'client' ? (
+            <>
+              <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
+              <button className={`nav-item ${activeTab === 'review' ? 'active' : ''}`} onClick={() => handleNavClick('review')}><ClipboardCheck className="nav-item-icon" />Content Review</button>
+              <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
+            </>
+          ) : (
+            <>
+              <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
+              <button className={`nav-item ${activeTab === 'board' ? 'active' : ''}`} onClick={() => handleNavClick('board')}><Kanban className="nav-item-icon" />Kanban Board</button>
+              <button className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => handleNavClick('calendar')}><Calendar className="nav-item-icon" />Task Calendar</button>
+              <button className={`nav-item ${activeTab === 'list' ? 'active' : ''}`} onClick={() => handleNavClick('list')}><ListTodo className="nav-item-icon" />Task List</button>
+              <button className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => handleNavClick('documents')}><FileText className="nav-item-icon" />Documents &amp; Notes</button>
+              <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
+              <button className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => handleNavClick('analytics')}><BarChart3 className="nav-item-icon" />Analytics &amp; KPI</button>
+              {currentUser?.role === 'super' && <button className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleNavClick('settings')}><Settings className="nav-item-icon" />Settings Manager</button>}
+            </>
           )}
-
-          {/* Spacer to push logout to bottom */}
           <div style={{ flexGrow: 1 }} />
-
-          {/* Sign Out Button */}
-          <button
-            className="nav-item"
-            onClick={() => {
-              onLogout();
-              setIsMobileOpen(false);
-            }}
-            style={{ 
-              color: '#dc2626', 
-              borderTop: '1px solid var(--border-subtle)', 
-              borderRadius: '0', 
-              paddingTop: '16px', 
-              marginTop: '16px' 
-            }}
-          >
-            <LogOut className="nav-item-icon" />
-            Sign Out
-          </button>
+          <button className="nav-item" onClick={() => { onLogout(); setIsMobileOpen(false); }} style={{ color: '#dc2626', borderTop: '1px solid var(--border-subtle)', borderRadius: '0', paddingTop: '16px', marginTop: '16px' }}><LogOut className="nav-item-icon" />Sign Out</button>
         </nav>
 
         {isMock && (
@@ -253,7 +187,8 @@ export const AppShell: React.FC<AppShellProps> = ({
             </button>
 
             <h2 className="header-title">
-              {activeTab === 'dashboard' && 'Workspace Overview'}
+              {activeTab === 'dashboard' && (currentUser?.role === 'client' ? 'Client Workspace' : 'Workspace Overview')}
+              {activeTab === 'review' && 'Content Review'}
               {activeTab === 'board' && 'Task Kanban Board'}
               {activeTab === 'calendar' && 'Task Calendar Planner'}
               {activeTab === 'list' && 'Task List'}
