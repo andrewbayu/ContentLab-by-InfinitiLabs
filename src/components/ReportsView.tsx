@@ -31,7 +31,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ documents, currentUser
 
   const download = (document: DocumentItem) => {
     if (document.url) {
-      window.open(document.url, '_blank', 'noopener,noreferrer');
+      const anchor = window.document.createElement('a');
+      anchor.href = document.url;
+      anchor.target = '_blank';
+      anchor.rel = 'noreferrer';
+      anchor.download = document.title || 'report';
+      anchor.click();
       return;
     }
     const blob = new Blob([document.body || document.title], { type: 'text/plain;charset=utf-8' });
