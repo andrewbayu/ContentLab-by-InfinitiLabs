@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { isUserInvolved } from '../services/sheets';
+import { getGeneratedAvatar } from '../utils/avatar';
 import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
 import { 
   Layers, 
@@ -319,7 +320,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             marginBottom: '24px'
           }}>
             <img 
-              src={currentUser.avatar} 
+              src={getGeneratedAvatar(currentUser.name)} 
               alt={currentUser.name} 
               style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2.5px solid white', boxShadow: 'var(--shadow-sm)' }}
             />

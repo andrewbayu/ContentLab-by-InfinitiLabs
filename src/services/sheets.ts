@@ -1,3 +1,5 @@
+import { getGeneratedAvatar } from '../utils/avatar';
+
 export type TaskType = 'Content' | 'General';
 export type UserRole = 'super' | 'team' | 'client';
 export type KpiDirection = 'increase' | 'decrease';
@@ -479,7 +481,7 @@ export async function fetchData(): Promise<WorkspaceData> {
       id: String(item.id || ''),
       name: String(item.name || ''),
       email: String(item.email || ''),
-      avatar: String(item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'),
+      avatar: getGeneratedAvatar(String(item.name || 'User')),
       password: item.password ? String(item.password) : '',
       role: String(item.role || 'team').toLowerCase() === 'super' ? 'super' : String(item.role || 'team').toLowerCase() === 'client' ? 'client' : 'team',
       client: item.client ? String(item.client) : '',
@@ -815,7 +817,7 @@ export async function createTeamMember(
   const newMember: TeamMember = {
     ...member,
     id: Math.random().toString(36).substring(2, 9),
-    avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&w=150&h=150&q=80`,
+    avatar: getGeneratedAvatar(member.name),
     password: '',
     role: member.role || 'team',
   };

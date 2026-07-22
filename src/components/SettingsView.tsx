@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getGlobalScriptUrl, getScriptUrl, hasLocalScriptUrlOverride, saveScriptUrl, validateScriptUrl } from '../services/sheets';
+import { getGeneratedAvatar } from '../utils/avatar';
 import type { TeamMember, Channel, VariablesConfig, ClientBrand } from '../services/sheets';
 import {
   Link,
@@ -750,7 +751,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                 {team.map((member) => (
                   <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid var(--border-subtle)', borderRadius: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <img src={member.avatar} alt={member.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <img src={getGeneratedAvatar(member.name)} alt={member.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div>
                         <div style={{ fontWeight: 600, fontSize: '14px' }}>{member.name}</div>
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{member.email}</div>

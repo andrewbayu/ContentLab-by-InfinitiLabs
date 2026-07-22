@@ -16,6 +16,7 @@ import {
   RefreshCw,
   FileText
 } from 'lucide-react';
+import { getGeneratedAvatar } from '../utils/avatar';
 
 type SyncStatus = 'saved' | 'saving' | 'syncing';
 
@@ -272,7 +273,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             {currentUser && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '16px' }}>
                 <img 
-                  src={currentUser.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80"}
+                  src={getGeneratedAvatar(currentUser.name)}
                   alt={currentUser.name} 
                   style={{ 
                     width: '32px', 
