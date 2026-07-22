@@ -685,7 +685,7 @@ function App() {
           </div>
         )}
         {activeTab === 'dashboard' && (
-          currentUser.role === 'client' ? <ClientPortal items={scopedItems} documents={documents} comments={comments} currentUser={currentUser} onUpdateItem={handleClientUpdateItem} onAddComment={handleAddComment} /> : <DashboardView items={scopedItems} onEditItem={handleOpenEditModal} channels={channels} variablesConfig={variablesConfig} currentUser={currentUser} />
+          currentUser.role === 'client' ? <ClientPortal items={scopedItems} comments={comments} currentUser={currentUser} onUpdateItem={handleClientUpdateItem} onAddComment={handleAddComment} /> : <DashboardView items={scopedItems} onEditItem={handleOpenEditModal} channels={channels} variablesConfig={variablesConfig} currentUser={currentUser} />
         )}
         
         {activeTab === 'board' && (
