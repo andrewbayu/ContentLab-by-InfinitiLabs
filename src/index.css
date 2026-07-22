@@ -476,6 +476,15 @@ h1, h2, h3, h4, h5, h6 {
 .client-portal-scope, .client-review-status { padding: 6px 10px; border-radius: 999px; background: var(--primary-glow); color: var(--primary); font-size: 11px; font-weight: 700; }
 .client-portal-layout { display: grid; grid-template-columns: minmax(240px, .35fr) minmax(0, 1fr); gap: 18px; min-height: 520px; }
 .client-review-list, .client-review-detail { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
+.client-shared-documents { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
+.client-section-title strong { display: inline-flex; align-items: center; gap: 7px; }
+.client-shared-document-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 14px; }
+.client-shared-document { display: flex; gap: 10px; padding: 13px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-app); }
+.client-shared-document-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; background: var(--primary-glow); color: var(--primary); }
+.client-shared-document strong, .client-shared-document span, .client-shared-document p { display: block; }
+.client-shared-document strong { color: var(--text-primary); font-size: 12px; }
+.client-shared-document span, .client-shared-document p { margin-top: 4px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+.client-shared-document a { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; color: var(--primary); font-size: 11px; font-weight: 650; }
 .client-review-filters { display: grid; gap: 8px; padding: 12px 0 4px; }
 .client-review-filters label { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-muted); }
 .client-review-filters input, .client-review-filters select { width: 100%; border: 0; outline: 0; color: var(--text-primary); background: transparent; font: 12px var(--font-body); }
