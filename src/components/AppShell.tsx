@@ -114,7 +114,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           </button>
         </div>
 
-        <div className="scope-switcher-wrap">
+        {currentUser?.role !== 'client' && <div className="scope-switcher-wrap">
           <label>Workspace scope</label>
           <select value={scopeKey} onChange={(event) => onScopeChange(event.target.value)}>
             <option value="all">InfinitiLabs · All Clients</option>
@@ -125,7 +125,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               </optgroup>
             ))}
           </select>
-        </div>
+        </div>}
 
         <nav className="sidebar-nav">
           <button

@@ -118,7 +118,7 @@ function doPost(e) {
       const member = postData.member;
       teamSheet.appendRow([
         member.id, member.name, member.email, member.avatar,
-        member.password || "", member.role || "team"
+        member.password || "", member.role || "team", member.client || ""
       ]);
       result = { success: true, member: member };
     }
@@ -257,7 +257,7 @@ function doPost(e) {
       comment.createdAt = new Date().toISOString();
       
       commentSheet.appendRow([
-        comment.id, comment.contentId, comment.author, comment.text, comment.createdAt
+        comment.id, comment.contentId, comment.author, comment.text, comment.createdAt, comment.attachmentUrl || ""
       ]);
       
       // EMAIL NOTIFICATION FOR @MENTIONS

@@ -335,14 +335,15 @@ function App() {
   };
 
   // Discussion comment thread action
-  const handleAddComment = async (contentId: string, text: string) => {
+  const handleAddComment = async (contentId: string, text: string, attachmentUrl?: string) => {
     if (!currentUser) return;
     beginWrite();
     try {
       const created = await createComment({
         contentId,
         author: currentUser.name,
-        text
+        text,
+        attachmentUrl
       });
       setComments((prev) => [...prev, created]);
       addToast('Comment posted successfully!', 'success');

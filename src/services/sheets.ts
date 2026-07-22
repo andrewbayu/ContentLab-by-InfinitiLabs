@@ -57,6 +57,7 @@ export interface CommentItem {
   contentId: string;
   author: string;
   text: string;
+  attachmentUrl?: string;
   createdAt: string;
 }
 
