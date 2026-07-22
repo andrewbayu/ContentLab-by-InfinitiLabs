@@ -123,6 +123,7 @@ export function KanbanBoard({
         onDragEnd={resetDragState}
         onClick={() => onEditItem(item)}
       >
+        {item.taskType === 'Content' && item.coverImageUrl && <img className="kanban-card-cover" src={item.coverImageUrl} alt="" loading="lazy" />}
         <div className="card-tags">
           {item.brand && <span className="tag-badge">{item.client ? `${item.client} · ` : ''}{item.brand}</span>}
           {item.taskType === 'Content' ? (

@@ -2228,3 +2228,7 @@ input:disabled + .switch-slider {
 @media (max-width: 540px) {
   .client-latest-row { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Content cover images */
+.kanban-card-cover { display: block; width: calc(100% + 28px); height: 132px; margin: -14px -14px 12px; border-radius: var(--radius-md) var(--radius-md) 0 0; object-fit: cover; background: var(--bg-app); }
