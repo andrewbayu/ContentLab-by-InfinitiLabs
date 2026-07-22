@@ -6,7 +6,7 @@ export type KpiDirection = 'increase' | 'decrease';
 export type KpiCadence = 'Weekly' | 'Monthly' | 'Quarterly';
 export type TaskMemberRole = 'creator' | 'owner' | 'collaborator' | 'reviewer';
 export type DocumentType = 'Note' | 'Link';
-export type DocumentVisibility = 'personal' | 'team';
+export type DocumentVisibility = 'personal' | 'team' | 'client';
 export type TaskStatus =
   | 'Idea'
   | 'Scripting/Writing'
@@ -608,7 +608,7 @@ export async function fetchData(): Promise<WorkspaceData> {
       body: String(item.body || ''),
       url: String(item.url || ''),
       ownerId: String(item.ownerId || ''),
-      visibility: String(item.visibility || 'personal').toLowerCase() === 'team' ? 'team' : 'personal',
+      visibility: String(item.visibility || 'personal').toLowerCase() === 'client' ? 'client' : String(item.visibility || 'personal').toLowerCase() === 'team' ? 'team' : 'personal',
       client: String(item.client || ''),
       brand: String(item.brand || ''),
       taskId: String(item.taskId || ''),
