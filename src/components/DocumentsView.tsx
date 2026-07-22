@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ExternalLink, FileText, Link2, Lock, Maximize2, Minimize2, Plus, Search, Star, Trash2, Users, X } from 'lucide-react';
-import type { ContentItem, DocumentItem, TeamMember } from '../services/sheets';
+import type { ClientBrand, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
 import '../styles/documents.css';
 
 type DocumentDraft = Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>;
@@ -8,6 +8,7 @@ type DocumentDraft = Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>;
 interface DocumentsViewProps {
   documents: DocumentItem[];
   currentUser: TeamMember;
+  clients: ClientBrand[];
   tasks: ContentItem[];
   onCreateDocument: (document: DocumentDraft) => Promise<DocumentItem>;
   onUpdateDocument: (document: DocumentItem) => Promise<DocumentItem>;
@@ -27,7 +28,7 @@ const formatUpdatedAt = (value: string) => {
 };
 
 export const DocumentsView: React.FC<DocumentsViewProps> = ({
-  documents, currentUser, tasks, onCreateDocument, onUpdateDocument, onDeleteDocument,
+  documents, currentUser, clients, tasks, onCreateDocument, onUpdateDocument, onDeleteDocument,
 }) => {
   const [activeTab, setActiveTab] = useState<'mine' | 'team'>('mine');
   const [query, setQuery] = useState('');
@@ -37,9 +38,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const clientNames = useMemo(
+    () => [...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort(),
+    [clients],
+  );
+  const brands = useMemo(
+    () => clients.filter((entry) => entry.active && (!draft.client || entry.client === draft.client)),
+    [clients, draft.client],
+  );
   const linkedTasks = useMemo(
-    () => [...tasks].sort((a, b) => `${a.client || ''} ${a.brand || ''} ${a.title}`.localeCompare(`${b.client || ''} ${b.brand || ''} ${b.title}`)),
-    [tasks],
+    () => tasks.filter((task) => (!draft.client || task.client === draft.client) && (!draft.brand || task.brand === draft.brand)),
+    [tasks, draft.client, draft.brand],
   );
 
   const visibleDocuments = useMemo(() => {
@@ -80,18 +89,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     if (!draft.title.trim() || (draft.type === 'Link' && !draft.url.trim())) return;
     setSaving(true);
     try {
-      const linkedTask = tasks.find((task) => task.id === draft.taskId);
       const payload = {
         ...draft,
         title: draft.title.trim(), body: draft.body.trim(), url: draft.url.trim(), tags: draft.tags.trim(),
-        client: linkedTask?.client || draft.client,
-        brand: linkedTask?.brand || draft.brand,
       };
-      if (payload.visibility === 'client' && !payload.client) {
-        window.alert('Client report harus terhubung ke task yang memiliki client.');
-        setSaving(false);
-        return;
-      }
       if (editing) await onUpdateDocument({ ...editing, ...payload });
       else await onCreateDocument(payload);
       setDrawerOpen(false);
@@ -206,13 +207,12 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 <label className="form-group"><span className="form-label">{draft.type === 'Note' ? 'Note' : 'Description'}</span><textarea className="form-textarea document-body-input" rows={draft.type === 'Note' ? 10 : 5} value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
                 <div className="form-row">
                   <label className="form-group"><span className="form-label">Visibility</span><select className="form-select" value={draft.visibility} onChange={(event) => setDraft({ ...draft, visibility: event.target.value as DocumentItem['visibility'] })}><option value="personal">Personal</option><option value="team">Team</option><option value="client">Client</option></select></label>
-                  <span className="document-visibility-help">Client reports are scoped automatically from the linked task.</span>
+                  <label className="form-group"><span className="form-label">Client / Internal</span><select className="form-select" value={draft.client} onChange={(event) => setDraft({ ...draft, client: event.target.value, brand: '', taskId: '' })}><option value="">Internal</option>{clientNames.map((client) => <option key={client}>{client}</option>)}</select></label>
                 </div>
-                <label className="form-group"><span className="form-label">Linked task {draft.visibility === 'client' && <small>required for client reports</small>}</span><select className="form-select" value={draft.taskId} onChange={(event) => {
-                  const task = tasks.find((entry) => entry.id === event.target.value);
-                  setDraft({ ...draft, taskId: event.target.value, client: task?.client || '', brand: task?.brand || '' });
-                }}><option value="">None</option>{linkedTasks.map((task) => <option key={task.id} value={task.id}>{task.client || 'Internal'} · {task.title}</option>)}</select></label>
-                {draft.visibility === 'client' && draft.client && <span className="document-derived-scope">Visible to: {draft.client}{draft.brand ? ` · ${draft.brand}` : ''}</span>}
+                <div className="form-row">
+                  <label className="form-group"><span className="form-label">Brand</span><select className="form-select" value={draft.brand} disabled={!draft.client} onChange={(event) => setDraft({ ...draft, brand: event.target.value, taskId: '' })}><option value="">None</option>{brands.map((entry) => <option key={entry.id} value={entry.brand}>{entry.brand}</option>)}</select></label>
+                  <label className="form-group"><span className="form-label">Linked task</span><select className="form-select" value={draft.taskId} onChange={(event) => setDraft({ ...draft, taskId: event.target.value })}><option value="">None</option>{linkedTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
+                </div>
                 <label className="form-group"><span className="form-label">Tags <small>comma separated</small></span><input className="form-input" placeholder="Brief, Research" value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} /></label>
                 <label className="document-pin-toggle"><input type="checkbox" checked={draft.pinned} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /><Star size={16} /> Pin to the top</label>
               </div>
