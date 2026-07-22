@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { uploadCoverImage } from '../services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from '../services/sheets';
-import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2 } from 'lucide-react';
+import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus } from 'lucide-react';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -66,6 +67,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [assignmentError, setAssignmentError] = useState('');
   const [publishDate, setPublishDate] = useState('');
   const [assetsLink, setAssetsLink] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [coverImageId, setCoverImageId] = useState('');
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverUploadError, setCoverUploadError] = useState('');
   const [taskType, setTaskType] = useState<TaskType>('Content');
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -123,6 +128,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setReviewerId(item.reviewerId || '');
       setPublishDate(item.publishDate || '');
       setAssetsLink(item.assetsLink || '');
+      setCoverImageUrl(item.coverImageUrl || '');
+      setCoverImageId(item.coverImageId || '');
       setTaskType(item.taskType || 'Content');
       setCategory(item.category || '');
       setDueDate(item.dueDate || '');
@@ -159,6 +166,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setReviewerId('');
       setPublishDate('');
       setAssetsLink('');
+      setCoverImageUrl('');
+      setCoverImageId('');
       const inferredType: TaskType = initialStatus && ['To Do', 'In Progress', 'Done'].includes(initialStatus) ? 'General' : 'Content';
       setTaskType(inferredType);
       setStatus(initialStatus || (inferredType === 'General' ? 'To Do' : 'Idea'));
@@ -187,9 +196,26 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setShowMentionSuggestions(false);
     setNewChecklistItemText('');
     setAssignmentError('');
+    setCoverUploadError('');
+    setIsUploadingCover(false);
   }, [item, initialStatus, isOpen, team, channels, activeUser, activeUserId, defaultClientBrand]);
 
   if (!isOpen) return null;
+
+  const handleCoverUpload = async (file?: File) => {
+    if (!file) return;
+    setCoverUploadError('');
+    setIsUploadingCover(true);
+    try {
+      const uploaded = await uploadCoverImage(file);
+      setCoverImageUrl(uploaded.url);
+      setCoverImageId(uploaded.id);
+    } catch (error) {
+      setCoverUploadError(error instanceof Error ? error.message : 'Upload gambar gagal.');
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,6 +241,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       reviewerId: reviewerId === ownerId ? '' : reviewerId,
       publishDate: taskType === 'Content' && variablesConfig.publishDate ? publishDate : '',
       assetsLink,
+      coverImageUrl: taskType === 'Content' ? coverImageUrl : '',
+      coverImageId: taskType === 'Content' ? coverImageId : '',
       tags: variablesConfig.tags ? selectedTags.join(',') : '',
       budget: variablesConfig.budget ? budget : '',
       platformNotes: variablesConfig.platformNotes ? platformNotes : '',
@@ -1066,6 +1094,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     value={targetAudience}
                     onChange={(e) => setTargetAudience(e.target.value)}
                   />
+                </div>
+              )}
+
+              {taskType === 'Content' && (
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ImagePlus size={14} /> Cover Image</label>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingCover} onChange={(event) => handleCoverUpload(event.target.files?.[0])} />
+                  <small className="form-help">JPG, PNG, atau WebP · maksimal 5 MB. Gambar disimpan ke Google Drive workspace.</small>
+                  {isUploadingCover && <small className="form-help">Mengunggah gambar…</small>}
+                  {coverUploadError && <small className="form-error">{coverUploadError}</small>}
+                  {coverImageUrl && <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}><img src={coverImageUrl} alt="Cover preview" style={{ width: '88px', height: '56px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border-subtle)' }} /><button type="button" className="btn btn-secondary" style={{ padding: '6px 9px', fontSize: '11px' }} onClick={() => { setCoverImageUrl(''); setCoverImageId(''); }}>Remove image</button></div>}
                 </div>
               )}
 
