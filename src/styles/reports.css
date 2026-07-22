@@ -1,0 +1,34 @@
+.reports-page { gap: 18px; }
+.reports-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.reports-eyebrow { color: var(--primary); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.reports-heading h2 { margin-top: 5px; font-size: 22px; }
+.reports-heading p { margin-top: 5px; color: var(--text-secondary); font-size: 12px; }
+.reports-view-toggle { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: #fff; }
+.reports-view-toggle button { display: grid; place-items: center; width: 30px; height: 28px; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.reports-view-toggle button.active { background: var(--primary-glow); color: var(--primary); }
+.reports-search { display: flex; align-items: center; gap: 8px; max-width: 440px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: #fff; color: var(--text-muted); }
+.reports-search input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 12px var(--font-body); }
+.reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.report-card { display: flex; gap: 12px; min-height: 170px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
+.report-card-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 9px; background: var(--primary-glow); color: var(--primary); }
+.report-card-content { min-width: 0; display: flex; flex: 1; flex-direction: column; }
+.report-card-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.report-card-title-row strong { color: var(--text-primary); font-size: 13px; line-height: 1.35; }
+.report-card-meta { margin-top: 6px; color: var(--text-muted); font-size: 10px; }
+.report-card-content p { display: -webkit-box; margin-top: 12px; overflow: hidden; color: var(--text-secondary); font-size: 12px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.report-pinned { padding: 3px 6px; border-radius: var(--radius-full); background: #fef3c7; color: #92400e; font-size: 9px; font-weight: 700; }
+.report-card-actions { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 14px; }
+.btn-small { padding: 7px 10px; font-size: 11px; }
+.report-open-link { display: inline-flex; align-items: center; gap: 4px; color: var(--primary); font-size: 11px; font-weight: 650; }
+.reports-list { overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
+.report-list-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 13px 15px; border-bottom: 1px solid var(--border-subtle); }
+.report-list-row:last-child { border-bottom: 0; }
+.report-list-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.report-list-main strong { overflow: hidden; color: var(--text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.report-list-main span, .report-list-row time { color: var(--text-muted); font-size: 10px; }
+.reports-empty { display: flex; min-height: 260px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); color: var(--text-muted); font-size: 12px; }
+.reports-empty strong { color: var(--text-primary); font-size: 14px; }
+.documents-toolbar-hint, .document-visibility-help, .document-derived-scope { color: var(--text-muted); font-size: 10px; }
+.document-visibility-help { align-self: center; max-width: 180px; line-height: 1.4; }
+.document-derived-scope { display: block; margin-top: -4px; }
+@media (max-width: 640px) { .reports-heading { flex-direction: column; } .report-list-row { grid-template-columns: auto minmax(0, 1fr); } .report-list-row time, .report-list-row button { grid-column: 2; } .documents-toolbar-hint { display: none; } }
