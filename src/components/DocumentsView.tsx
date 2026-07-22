@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ExternalLink, FileText, Link2, Lock, Maximize2, Minimize2, Plus, Search, Star, Trash2, Users, X } from 'lucide-react';
-import type { ClientBrand, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
+import type { ContentItem, DocumentItem, TeamMember } from '../services/sheets';
 import '../styles/documents.css';
 
 type DocumentDraft = Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>;
@@ -8,7 +8,6 @@ type DocumentDraft = Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>;
 interface DocumentsViewProps {
   documents: DocumentItem[];
   currentUser: TeamMember;
-  clients: ClientBrand[];
   tasks: ContentItem[];
   onCreateDocument: (document: DocumentDraft) => Promise<DocumentItem>;
   onUpdateDocument: (document: DocumentItem) => Promise<DocumentItem>;
@@ -28,7 +27,7 @@ const formatUpdatedAt = (value: string) => {
 };
 
 export const DocumentsView: React.FC<DocumentsViewProps> = ({
-  documents, currentUser, clients, tasks, onCreateDocument, onUpdateDocument, onDeleteDocument,
+  documents, currentUser, tasks, onCreateDocument, onUpdateDocument, onDeleteDocument,
 }) => {
   const [activeTab, setActiveTab] = useState<'mine' | 'team'>('mine');
   const [query, setQuery] = useState('');
