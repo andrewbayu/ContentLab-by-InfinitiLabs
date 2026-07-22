@@ -14,7 +14,8 @@ import {
   BarChart3,
   CheckCircle2,
   RefreshCw,
-  FileText
+  FileText,
+  Files
 } from 'lucide-react';
 import { getGeneratedAvatar } from '../utils/avatar';
 
@@ -170,6 +171,14 @@ export const AppShell: React.FC<AppShellProps> = ({
           </button>
 
           <button
+            className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => handleNavClick('reports')}
+          >
+            <Files className="nav-item-icon" />
+            Reports
+          </button>
+
+          <button
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
             onClick={() => handleNavClick('analytics')}
           >
@@ -249,6 +258,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               {activeTab === 'calendar' && 'Task Calendar Planner'}
               {activeTab === 'list' && 'Task List'}
               {activeTab === 'documents' && 'Documents & Notes'}
+              {activeTab === 'reports' && 'Reports'}
               {activeTab === 'analytics' && 'Analytics & KPI'}
               {activeTab === 'settings' && 'Settings Center'}
             </h2>
