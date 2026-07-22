@@ -723,6 +723,7 @@ function App() {
           <DocumentsView
             documents={documents}
             currentUser={currentUser}
+            clients={clients}
             tasks={items}
             onCreateDocument={handleCreateDocument}
             onUpdateDocument={handleUpdateDocument}
@@ -731,7 +732,7 @@ function App() {
         )}
 
         {activeTab === 'reports' && (
-          <ReportsView documents={documents} currentUser={currentUser} />
+          <ReportsView documents={documents} />
         )}
 
         {activeTab === 'analytics' && (
