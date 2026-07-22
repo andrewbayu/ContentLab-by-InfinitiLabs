@@ -1,17 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle2, Filter, Link2, MessageSquare, Search, Send, Undo2 } from 'lucide-react';
-import type { CommentItem, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
+import type { CommentItem, ContentItem, TeamMember } from '../services/sheets';
 
 interface ClientPortalProps {
   items: ContentItem[];
-  documents: DocumentItem[];
   comments: CommentItem[];
   currentUser: TeamMember;
   onUpdateItem: (item: ContentItem) => Promise<void>;
   onAddComment: (contentId: string, text: string, attachmentUrl?: string) => Promise<void>;
 }
 
-export const ClientPortal: React.FC<ClientPortalProps> = ({ items, documents, comments, currentUser, onUpdateItem, onAddComment }) => {
+export const ClientPortal: React.FC<ClientPortalProps> = ({ items, comments, currentUser, onUpdateItem, onAddComment }) => {
   const [selectedId, setSelectedId] = useState(items[0]?.id || '');
   const [comment, setComment] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
