@@ -10,6 +10,7 @@ import { LoginPage } from './components/LoginPage';
 import { CalendarView } from './components/CalendarView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { DocumentsView } from './components/DocumentsView';
+import { ReportsView } from './components/ReportsView';
 import {
   fetchData,
   createContent,
@@ -156,7 +157,7 @@ function App() {
     if (activeTab === 'settings' && currentUser?.role !== 'super') {
       setActiveTab('dashboard');
     }
-    if (currentUser?.role === 'client' && activeTab !== 'dashboard') setActiveTab('dashboard');
+    if (currentUser?.role === 'client' && !['dashboard', 'reports'].includes(activeTab)) setActiveTab('dashboard');
   }, [activeTab, currentUser?.role]);
 
   useEffect(() => {
@@ -728,6 +729,10 @@ function App() {
             onUpdateDocument={handleUpdateDocument}
             onDeleteDocument={handleDeleteDocument}
           />
+        )}
+
+        {activeTab === 'reports' && (
+          <ReportsView documents={documents} currentUser={currentUser} />
         )}
 
         {activeTab === 'analytics' && (
