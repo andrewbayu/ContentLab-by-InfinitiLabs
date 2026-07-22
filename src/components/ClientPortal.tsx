@@ -1,17 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, FileText, Filter, Link2, MessageSquare, Search, Send, Undo2 } from 'lucide-react';
-import type { CommentItem, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
+import { CheckCircle2, Filter, Link2, MessageSquare, Search, Send, Undo2 } from 'lucide-react';
+import type { CommentItem, ContentItem, TeamMember } from '../services/sheets';
 
 interface ClientPortalProps {
   items: ContentItem[];
-  documents: DocumentItem[];
   comments: CommentItem[];
   currentUser: TeamMember;
   onUpdateItem: (item: ContentItem) => Promise<void>;
   onAddComment: (contentId: string, text: string, attachmentUrl?: string) => Promise<void>;
 }
 
-export const ClientPortal: React.FC<ClientPortalProps> = ({ items, documents, comments, currentUser, onUpdateItem, onAddComment }) => {
+export const ClientPortal: React.FC<ClientPortalProps> = ({ items, comments, currentUser, onUpdateItem, onAddComment }) => {
   const [selectedId, setSelectedId] = useState(items[0]?.id || '');
   const [comment, setComment] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
@@ -24,7 +23,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ items, documents, co
   }), [items, search, statusFilter]);
   const selected = filteredItems.find((item) => item.id === selectedId) || filteredItems[0];
   const selectedComments = useMemo(() => comments.filter((entry) => entry.contentId === selected?.id), [comments, selected?.id]);
-  const sharedDocuments = useMemo(() => documents.filter((document) => document.visibility === 'team' && document.client === currentUser.client), [documents, currentUser.client]);
 
   const updateReview = async (approved: boolean) => {
     if (!selected) return;
@@ -44,6 +42,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({ items, documents, co
       <section className="client-review-list"><div className="client-section-title"><strong>Needs your review</strong><span>{filteredItems.length} of {items.length}</span></div><div className="client-review-filters"><label><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search content..." /></label><label><Filter size={14} /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All</option><option>To Do</option><option>Idea</option><option>Review/Editing</option><option>Scheduled</option><option>Published</option></select></label></div>{filteredItems.length === 0 ? <p className="client-muted client-filter-empty">No matching content.</p> : filteredItems.map((item) => <button type="button" key={item.id} className={`client-review-item ${selected?.id === item.id ? 'active' : ''}`} onClick={() => setSelectedId(item.id)}><strong>{item.title}</strong><span>{item.brand || item.client} · {item.channel}</span><small>{item.status}</small></button>)}</section>
       {selected && <section className="client-review-detail"><div className="client-review-detail-head"><div><span>{selected.brand || selected.client} · {selected.channel}</span><h3>{selected.title}</h3></div><span className="client-review-status">{selected.status}</span></div><div className="client-review-copy"><h4>Brief</h4><p>{selected.brief || 'No brief provided.'}</p>{selected.publishDate && <small>Planned publish date: {selected.publishDate}</small>}{selected.assetsLink && <a href={selected.assetsLink} target="_blank" rel="noreferrer">Open shared assets</a>}</div><div className="client-comments"><h4><MessageSquare size={15} /> Feedback & discussion ({selectedComments.length})</h4>{selectedComments.map((entry) => <div className="client-comment" key={entry.id}><strong>{entry.author}</strong><span>{entry.text}</span>{entry.attachmentUrl && <a href={entry.attachmentUrl} target="_blank" rel="noreferrer"><Link2 size={12} /> Open attachment</a>}</div>)}{selectedComments.length === 0 && <p className="client-muted">No feedback yet. Start the conversation below.</p>}<form onSubmit={submitComment}><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Write feedback for the team..." rows={3} /><input className="client-attachment-input" type="url" value={attachmentUrl} onChange={(event) => setAttachmentUrl(event.target.value)} placeholder="Optional Google Drive attachment link" /><button className="btn btn-secondary" disabled={saving || !comment.trim()}><Send size={14} /> Send feedback</button></form></div><div className="client-review-actions"><button className="btn btn-secondary" disabled={saving} onClick={() => updateReview(false)}><Undo2 size={14} /> Request changes</button><button className="btn btn-primary" disabled={saving} onClick={() => updateReview(true)}><CheckCircle2 size={14} /> Approve</button></div></section>}
     </div>}
-    <section className="client-shared-documents"><div className="client-section-title"><strong><FileText size={15} /> Shared reports &amp; documents</strong><span>{sharedDocuments.length} item{sharedDocuments.length === 1 ? '' : 's'}</span></div>{sharedDocuments.length === 0 ? <p className="client-muted">Reports and documents shared by your team will appear here.</p> : <div className="client-shared-document-grid">{sharedDocuments.map((document) => <article className="client-shared-document" key={document.id}><div className="client-shared-document-icon"><FileText size={16} /></div><div><strong>{document.title}</strong><span>{document.type === 'Link' ? 'Shared link' : 'Report / note'}</span>{document.body && <p>{document.body.slice(0, 150)}{document.body.length > 150 ? '…' : ''}</p>}{document.url && <a href={document.url} target="_blank" rel="noreferrer">Open document <ExternalLink size={12} /></a>}</div></article>)}</div>}</section>
+
   </main>;
 };
