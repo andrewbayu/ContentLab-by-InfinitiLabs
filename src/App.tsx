@@ -723,7 +723,6 @@ function App() {
           <DocumentsView
             documents={documents}
             currentUser={currentUser}
-            clients={clients}
             tasks={items}
             onCreateDocument={handleCreateDocument}
             onUpdateDocument={handleUpdateDocument}
