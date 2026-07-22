@@ -467,7 +467,6 @@ h1, h2, h3, h4, h5, h6 {
 .app-sidebar.role-client .sidebar-nav .nav-item:nth-child(3),
 .app-sidebar.role-client .sidebar-nav .nav-item:nth-child(4),
 .app-sidebar.role-client .sidebar-nav .nav-item:nth-child(5),
-.app-sidebar.role-client .sidebar-nav .nav-item:nth-child(6),
 .app-sidebar.role-client .sidebar-nav .nav-item:nth-child(7) { display: none; }
 .client-portal { overflow-y: auto; gap: 18px; }
 .client-portal-heading, .client-review-detail-head, .client-section-title, .client-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
