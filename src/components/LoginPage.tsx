@@ -55,7 +55,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         {/* Error message banner */}
         {error && (
-          <div className="login-error-banner">
+          <div className="login-error-banner" role="alert">
             <AlertCircle size={16} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
@@ -64,8 +64,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         {/* Credentials Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="form-group">
-            <label className="form-label">Username atau Email</label>
+            <label className="form-label" htmlFor="login-username">Username atau Email</label>
             <input
+              id="login-username"
               type="text"
               className="form-input"
               placeholder="Nama atau email akun Anda"
@@ -78,9 +79,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </div>
 
           <div className="form-group" style={{ position: 'relative' }}>
-            <label className="form-label">Password</label>
+            <label className="form-label" htmlFor="login-password">Password</label>
             <div style={{ position: 'relative' }}>
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 className="form-input"
                 placeholder="Masukkan password"
@@ -94,6 +96,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                title={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
                 style={{
                   position: 'absolute',
                   right: '12px',

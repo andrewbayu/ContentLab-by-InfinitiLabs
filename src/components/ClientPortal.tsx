@@ -67,7 +67,12 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   };
 
   const handleInsertMention = (member: TeamMember) => {
-    setComment((prev) => prev + `@${member.name} `);
+    setComment((prev) => {
+      // Replace a trailing partial "@query" (what the user is typing) so we never produce "@@name".
+      const base = prev.replace(/@[^\s@]*$/, '');
+      const needsSpace = base.length > 0 && !/\s$/.test(base);
+      return `${base}${needsSpace ? ' ' : ''}@${member.name} `;
+    });
     setMentionedUserIds((current) => current.includes(member.id) ? current : [...current, member.id]);
   };
 
@@ -100,4 +105,4 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       {selected && <section className="client-review-detail"><div className="client-review-detail-head"><div><span>{selected.brand || selected.client} · {selected.channel}</span><h3>{selected.title}</h3></div><span className="client-review-status">{isReadyForReview(selected) ? 'Ready for review' : selected.status}</span></div><div className="client-review-copy"><h4>Brief</h4><p>{selected.brief || 'No brief provided.'}</p>{selected.publishDate && <small>Planned publish date: {selected.publishDate}</small>}{selected.assetsLink && <a href={selected.assetsLink} target="_blank" rel="noreferrer">Open shared assets</a>}</div><div className="client-comments"><h4><MessageSquare size={15} /> Feedback & discussion ({selectedComments.length})</h4>{selectedComments.map((entry) => <div className="client-comment" key={entry.id}><strong>{entry.author}</strong><span>{entry.text}</span>{entry.attachmentUrl && <a href={entry.attachmentUrl} target="_blank" rel="noreferrer"><Link2 size={12} /> Open attachment</a>}</div>)}{selectedComments.length === 0 && <p className="client-muted">No feedback yet. Start the conversation below.</p>}<form onSubmit={submitComment}>{availableTeamMembers.length > 0 && <div className="task-mention-suggestions" style={{ marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b', marginRight: '6px' }}>Mention team:</span>{availableTeamMembers.map((member) => <button key={member.id} type="button" className="tag-select-pill" onClick={() => handleInsertMention(member)} style={{ padding: '1px 6px', fontSize: '10px', borderStyle: 'dashed' }}>{member.name}</button>)}</div>}<textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Write feedback for the team..." rows={3} /><input className="client-attachment-input" type="url" value={attachmentUrl} onChange={(event) => setAttachmentUrl(event.target.value)} placeholder="Optional Google Drive attachment link" /><button className="btn btn-secondary" disabled={saving || !comment.trim()}><Send size={14} /> Send feedback</button></form></div><div className="client-review-actions"><button className="btn btn-secondary" disabled={saving} onClick={() => updateReview(false)}><Undo2 size={14} /> Request changes</button><button className="btn btn-primary" disabled={saving} onClick={() => updateReview(true)}><CheckCircle2 size={14} /> Approve</button></div></section>}
     </div>}
   </main>;
-};
+};

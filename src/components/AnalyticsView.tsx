@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, BarChart3, CheckCircle2, Clock3, Plus, Target, TrendingUp, X } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CheckCircle2, Clock3, Plus, Target, TrendingUp, X } from 'lucide-react';
 import type { ClientBrand, ContentItem, KpiCadence, KpiDefinition, KpiDirection, KpiUpdate, TeamMember } from '../services/sheets';
 
 interface AnalyticsViewProps {
@@ -28,6 +28,21 @@ const getProgress = (definition: KpiDefinition, actual?: number) => {
   return Math.max(0, Math.min(100, Math.round((moved / distance) * 100)));
 };
 
+type KpiHealthStatus = 'on-track' | 'watch' | 'behind' | 'no-data';
+
+const getHealthStatus = (definition: KpiDefinition, latest?: KpiUpdate): KpiHealthStatus => {
+  if (!latest) return 'no-data';
+  const progress = getProgress(definition, latest.actual);
+  return progress >= 80 ? 'on-track' : progress >= 50 ? 'watch' : 'behind';
+};
+
+const HEALTH_LABELS: Record<KpiHealthStatus, string> = {
+  'on-track': 'On track',
+  'watch': 'Watch',
+  'behind': 'Behind',
+  'no-data': 'No data',
+};
+
 const formatMetric = (value: number, unit: string) => {
   if (unit.toLowerCase().includes('percent') || unit === '%') return `${value.toLocaleString('id-ID')}%`;
   if (unit.toLowerCase().includes('rupiah') || unit.toLowerCase() === 'idr') {
@@ -37,18 +52,22 @@ const formatMetric = (value: number, unit: string) => {
 };
 
 const MiniTrend: React.FC<{ values: number[] }> = ({ values }) => {
-  if (values.length < 2) return <div className="kpi-empty-trend">Need 2 updates for trend</div>;
+  if (values.length < 2) return <div className="kpi-empty-trend">Add one more update to unlock the trend line</div>;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
-  const points = values.map((value, index) => {
+  const coords = values.map((value, index) => {
     const x = (index / (values.length - 1)) * 100;
     const y = 34 - ((value - min) / span) * 28;
-    return `${x},${y}`;
-  }).join(' ');
+    return { x, y };
+  });
+  const points = coords.map(({ x, y }) => `${x},${y}`).join(' ');
+  const areaPoints = `0,38 ${points} 100,38`;
   return (
     <svg className="kpi-mini-trend" viewBox="0 0 100 38" preserveAspectRatio="none" aria-label="KPI trend">
+      <polygon points={areaPoints} fill="currentColor" opacity="0.1" />
       <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+      <circle cx={coords[coords.length - 1].x} cy={coords[coords.length - 1].y} r="2.5" fill="currentColor" />
     </svg>
   );
 };
@@ -71,6 +90,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const [updatingKpiId, setUpdatingKpiId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [dateRange, setDateRange] = useState<'30d' | 'month' | 'quarter' | 'all'>('month');
+  const [healthFilter, setHealthFilter] = useState<'all' | KpiHealthStatus>('all');
   const [definitionForm, setDefinitionForm] = useState({
     clientBrandId: selectedBrand?.id || '',
     name: '', category: 'Business', unit: 'Number', baseline: '0', target: '',
@@ -233,21 +253,66 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
       <section className="analytics-section">
         <div className="analytics-section-heading"><div><h3>Brand KPI progress</h3><p>Manual metric updates remain historical so the team can see movement over time.</p></div><Activity size={20} /></div>
+
+        {scopedDefinitions.length > 0 && (
+          <div className="kpi-filter-bar" role="group" aria-label="Filter KPIs by health">
+            {(['all', 'on-track', 'watch', 'behind', 'no-data'] as const).map((key) => {
+              const count = key === 'all'
+                ? scopedDefinitions.length
+                : scopedDefinitions.filter((definition) => getHealthStatus(definition, latestByKpi.get(definition.id)) === key).length;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`kpi-filter-chip ${key !== 'all' ? `chip-${key}` : ''} ${healthFilter === key ? 'active' : ''}`}
+                  onClick={() => setHealthFilter(key)}
+                  aria-pressed={healthFilter === key}
+                >
+                  {key === 'all' ? 'All' : HEALTH_LABELS[key]}
+                  <em>{count}</em>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {scopedDefinitions.length === 0 ? (
           <div className="analytics-empty-state"><Target size={30} /><strong>No KPI defined for this scope</strong><span>{currentUser.role === 'super' ? 'Start with one measurable target for this client or brand.' : 'Ask a super admin to define KPI targets.'}</span>{currentUser.role === 'super' && <button className="btn btn-primary" type="button" onClick={() => setShowAddKpi(true)}><Plus size={14} /> Define first KPI</button>}</div>
         ) : (
           <div className="kpi-grid">
-            {scopedDefinitions.map((definition) => {
+            {scopedDefinitions
+              .filter((definition) => healthFilter === 'all' || getHealthStatus(definition, latestByKpi.get(definition.id)) === healthFilter)
+              .map((definition) => {
               const history = scopedUpdates.filter((update) => update.kpiId === definition.id).sort((a, b) => `${a.period}|${a.updatedAt}`.localeCompare(`${b.period}|${b.updatedAt}`));
               const latest = latestByKpi.get(definition.id);
+              const previous = history.length > 1 ? history[history.length - 2] : undefined;
               const progress = getProgress(definition, latest?.actual);
+              const health = getHealthStatus(definition, latest);
+              const delta = latest && previous ? latest.actual - previous.actual : undefined;
+              const deltaIsGood = delta !== undefined && (definition.direction === 'increase' ? delta >= 0 : delta <= 0);
               return (
-                <article className="kpi-card" key={definition.id}>
-                  <div className="kpi-card-head"><div><span className="kpi-brand-label">{definition.client} · {definition.brand}</span><h4>{definition.name}</h4></div><span className={`kpi-health ${progress >= 80 ? 'on-track' : progress >= 50 ? 'watch' : 'behind'}`}>{latest ? `${progress}%` : 'No data'}</span></div>
-                  <div className="kpi-values"><div><span>Actual</span><strong>{latest ? formatMetric(latest.actual, definition.unit) : '—'}</strong></div><div><span>Target</span><strong>{formatMetric(definition.target, definition.unit)}</strong></div></div>
+                <article className={`kpi-card health-${health}`} key={definition.id}>
+                  <div className="kpi-card-head"><div><span className="kpi-brand-label">{definition.client} · {definition.brand}</span><h4>{definition.name}</h4></div><span className={`kpi-health ${health === 'no-data' ? 'no-data' : health}`}>{latest ? `${progress}% · ${HEALTH_LABELS[health]}` : 'No data'}</span></div>
+                  <div className="kpi-values">
+                    <div><span>Actual</span><strong>{latest ? formatMetric(latest.actual, definition.unit) : '—'}</strong>
+                      {delta !== undefined && delta !== 0 && (
+                        <small className={`kpi-delta ${deltaIsGood ? 'delta-good' : 'delta-bad'}`}>
+                          {delta > 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                          {formatMetric(Math.abs(delta), definition.unit)} vs prev
+                        </small>
+                      )}
+                    </div>
+                    <div><span>Target</span><strong>{formatMetric(definition.target, definition.unit)}</strong><small className="kpi-baseline">Baseline: {formatMetric(definition.baseline, definition.unit)}</small></div>
+                  </div>
                   <div className="kpi-progress-track"><div style={{ width: `${progress}%` }} /></div>
                   <MiniTrend values={history.map((update) => update.actual)} />
-                  <div className="kpi-card-foot"><span>{definition.category} · {definition.cadence}</span><button className="btn btn-secondary" onClick={() => setUpdatingKpiId(definition.id)}><TrendingUp size={14} /> Update KPI</button></div>
+                  <div className="kpi-card-foot">
+                    <span>
+                      {definition.category} · {definition.cadence}
+                      {latest && <> · Updated {new Date(latest.period || latest.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}{latest.updatedBy ? ` by ${latest.updatedBy}` : ''}</>}
+                    </span>
+                    <button className="btn btn-secondary" onClick={() => setUpdatingKpiId(updatingKpiId === definition.id ? '' : definition.id)}><TrendingUp size={14} /> Update KPI</button>
+                  </div>
                   {updatingKpiId === definition.id && (
                     <form className="kpi-update-form" onSubmit={handleCreateUpdate}>
                       <input type="date" className="form-input" value={updateForm.period} onChange={(event) => setUpdateForm({ ...updateForm, period: event.target.value })} required />
@@ -260,6 +325,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 </article>
               );
             })}
+            {healthFilter !== 'all' && scopedDefinitions.filter((definition) => getHealthStatus(definition, latestByKpi.get(definition.id)) === healthFilter).length === 0 && (
+              <div className="analytics-empty-state" style={{ gridColumn: '1 / -1' }}><Target size={26} /><strong>No KPI matches this filter</strong><span>Try another health status or reset to All.</span></div>
+            )}
           </div>
         )}
       </section>

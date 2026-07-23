@@ -112,6 +112,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             }}
             style={{ border: 'none', padding: '6px' }}
             title="Collapse Menu"
+            aria-label="Collapse sidebar menu"
           >
             <X size={16} />
           </button>
@@ -130,27 +131,34 @@ export const AppShell: React.FC<AppShellProps> = ({
           </select>
         </div>}
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Main navigation">
           {currentUser?.role === 'client' ? (
             <>
-              <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
-              <button className={`nav-item ${activeTab === 'review' ? 'active' : ''}`} onClick={() => handleNavClick('review')}><ClipboardCheck className="nav-item-icon" />Content Review</button>
-              <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
+              <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} aria-current={activeTab === 'dashboard' ? 'page' : undefined} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
+              <button className={`nav-item ${activeTab === 'review' ? 'active' : ''}`} aria-current={activeTab === 'review' ? 'page' : undefined} onClick={() => handleNavClick('review')}><ClipboardCheck className="nav-item-icon" />Content Review</button>
+              <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} aria-current={activeTab === 'reports' ? 'page' : undefined} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
             </>
           ) : (
             <>
-              <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
-              <button className={`nav-item ${activeTab === 'board' ? 'active' : ''}`} onClick={() => handleNavClick('board')}><Kanban className="nav-item-icon" />Kanban Board</button>
-              <button className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => handleNavClick('calendar')}><Calendar className="nav-item-icon" />Task Calendar</button>
-              <button className={`nav-item ${activeTab === 'list' ? 'active' : ''}`} onClick={() => handleNavClick('list')}><ListTodo className="nav-item-icon" />Task List</button>
-              <button className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => handleNavClick('documents')}><FileText className="nav-item-icon" />Documents &amp; Notes</button>
-              <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
-              <button className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => handleNavClick('analytics')}><BarChart3 className="nav-item-icon" />Analytics &amp; KPI</button>
-              {currentUser?.role === 'super' && <button className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleNavClick('settings')}><Settings className="nav-item-icon" />Settings Manager</button>}
+              <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} aria-current={activeTab === 'dashboard' ? 'page' : undefined} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
+              <span className="nav-section-label">Planning</span>
+              <button className={`nav-item ${activeTab === 'board' ? 'active' : ''}`} aria-current={activeTab === 'board' ? 'page' : undefined} onClick={() => handleNavClick('board')}><Kanban className="nav-item-icon" />Kanban Board</button>
+              <button className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} aria-current={activeTab === 'calendar' ? 'page' : undefined} onClick={() => handleNavClick('calendar')}><Calendar className="nav-item-icon" />Task Calendar</button>
+              <button className={`nav-item ${activeTab === 'list' ? 'active' : ''}`} aria-current={activeTab === 'list' ? 'page' : undefined} onClick={() => handleNavClick('list')}><ListTodo className="nav-item-icon" />Task List</button>
+              <span className="nav-section-label">Knowledge</span>
+              <button className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`} aria-current={activeTab === 'documents' ? 'page' : undefined} onClick={() => handleNavClick('documents')}><FileText className="nav-item-icon" />Documents &amp; Notes</button>
+              <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} aria-current={activeTab === 'reports' ? 'page' : undefined} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
+              <button className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`} aria-current={activeTab === 'analytics' ? 'page' : undefined} onClick={() => handleNavClick('analytics')}><BarChart3 className="nav-item-icon" />Analytics &amp; KPI</button>
+              {currentUser?.role === 'super' && (
+                <>
+                  <span className="nav-section-label">Admin</span>
+                  <button className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} aria-current={activeTab === 'settings' ? 'page' : undefined} onClick={() => handleNavClick('settings')}><Settings className="nav-item-icon" />Settings Manager</button>
+                </>
+              )}
             </>
           )}
           <div style={{ flexGrow: 1 }} />
-          <button className="nav-item" onClick={() => { onLogout(); setIsMobileOpen(false); }} style={{ color: '#dc2626', borderTop: '1px solid var(--border-subtle)', borderRadius: '0', paddingTop: '16px', marginTop: '16px' }}><LogOut className="nav-item-icon" />Sign Out</button>
+          <button className="nav-item nav-signout" onClick={() => { onLogout(); setIsMobileOpen(false); }}><LogOut className="nav-item-icon" />Sign Out</button>
         </nav>
 
         {isMock && (
@@ -182,6 +190,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               onClick={handleDrawerToggle}
               style={{ border: 'none', padding: '8px', marginRight: '12px' }}
               title="Toggle Menu"
+              aria-label="Toggle sidebar menu"
             >
               <Menu size={20} style={{ display: 'block' }} />
             </button>
@@ -216,7 +225,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
             {/* Authenticated User Profile Avatar Info */}
             {currentUser && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '16px' }}>
+              <div className="header-user-chip" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '16px' }}>
                 <img 
                   src={getGeneratedAvatar(currentUser.name)}
                   alt={currentUser.name} 

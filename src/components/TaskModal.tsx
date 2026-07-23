@@ -282,7 +282,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const handleInsertMention = (member: TeamMember) => {
-    setCommentText((prev) => prev + `@${member.name} `);
+    setCommentText((prev) => {
+      // Replace a trailing partial "@query" (what the user is typing) so we never produce "@@name".
+      const base = prev.replace(/@[^\s@]*$/, '');
+      const needsSpace = base.length > 0 && !/\s$/.test(base);
+      return `${base}${needsSpace ? ' ' : ''}@${member.name} `;
+    });
     setMentionedUserIds((current) => current.includes(member.id) ? current : [...current, member.id]);
     setShowMentionSuggestions(false);
   };

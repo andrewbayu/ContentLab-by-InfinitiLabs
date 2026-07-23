@@ -250,53 +250,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="page-container dashboard-page" style={{ overflowY: 'auto' }}>
       
-      {/* 🧭 NAVIGATION SUB-TABS */}
-      <div className="dashboard-tabs" style={{
-        display: 'flex',
-        gap: '12px',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '16px',
-        marginBottom: '24px'
-      }}>
+      {/* Navigation sub-tabs (segmented control) */}
+      <div className="dashboard-tabs" role="tablist" aria-label="Dashboard views">
         <button
+          role="tab"
+          aria-selected={dashboardTab === 'personal'}
+          className={`dashboard-tab ${dashboardTab === 'personal' ? 'active' : ''}`}
           onClick={() => setDashboardTab('personal')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: '1px solid',
-            borderColor: dashboardTab === 'personal' ? 'var(--primary)' : 'var(--border-strong)',
-            backgroundColor: dashboardTab === 'personal' ? 'var(--primary-glow)' : 'white',
-            color: dashboardTab === 'personal' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: 650,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.15s ease'
-          }}
         >
           <User size={14} />
           Workspace Saya
         </button>
-        
+
         <button
+          role="tab"
+          aria-selected={dashboardTab === 'studio'}
+          className={`dashboard-tab ${dashboardTab === 'studio' ? 'active' : ''}`}
           onClick={() => setDashboardTab('studio')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: '1px solid',
-            borderColor: dashboardTab === 'studio' ? 'var(--primary)' : 'var(--border-strong)',
-            backgroundColor: dashboardTab === 'studio' ? 'var(--primary-glow)' : 'white',
-            color: dashboardTab === 'studio' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: 650,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.15s ease'
-          }}
         >
           <BarChart3 size={14} />
           Studio Overview
@@ -422,8 +392,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', border: '1px dashed var(--border-subtle)', borderRadius: '6px', backgroundColor: '#f8fafc' }}>
-                    Semua checklist aset Anda sudah selesai. Kerja yang luar biasa! 🎉
+                  <div style={{ padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', border: '1px dashed var(--border-subtle)', borderRadius: '6px', backgroundColor: '#f8fafc' }}>
+                    <CheckCircle size={22} style={{ color: '#16a34a' }} />
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Semua checklist selesai</span>
+                    <span>Semua checklist aset Anda sudah selesai. Kerja yang luar biasa!</span>
                   </div>
                 )}
               </div>
