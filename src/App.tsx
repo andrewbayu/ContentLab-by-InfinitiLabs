@@ -691,7 +691,7 @@ function App() {
                 comments={comments}
                 currentUser={currentUser}
                 mode="overview"
-                reportsCount={documents.filter((document) => document.visibility === 'client').length}
+                reportsCount={documents.filter((document) => document.visibility === 'client' && document.client === currentUser.client).length}
                 onNavigateToReview={() => setActiveTab('review')}
                 onUpdateItem={handleClientUpdateItem}
                 onAddComment={handleAddComment}
@@ -705,7 +705,7 @@ function App() {
             comments={comments}
             currentUser={currentUser}
             mode="review"
-            reportsCount={documents.filter((document) => document.visibility === 'client').length}
+            reportsCount={documents.filter((document) => document.visibility === 'client' && document.client === currentUser.client).length}
             onNavigateToReview={() => setActiveTab('review')}
             onUpdateItem={handleClientUpdateItem}
             onAddComment={handleAddComment}
@@ -756,7 +756,7 @@ function App() {
         )}
 
         {activeTab === 'reports' && (
-          <ReportsView documents={documents} />
+          <ReportsView documents={documents} currentUser={currentUser} />
         )}
 
         {activeTab === 'analytics' && (

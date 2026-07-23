@@ -56,7 +56,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     return documents
       .filter((document) => activeTab === 'mine'
         ? document.ownerId === currentUser.id
-        : document.visibility === 'team')
+        : document.visibility === 'team' || document.visibility === 'client')
       .filter((document) => !normalized || [document.title, document.body, document.tags, document.client, document.brand]
         .some((value) => String(value || '').toLowerCase().includes(normalized)))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
