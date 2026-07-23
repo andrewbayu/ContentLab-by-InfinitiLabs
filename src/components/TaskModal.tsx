@@ -19,7 +19,7 @@ interface TaskModalProps {
   activeUser: string;
   activeUserId: string;
   comments: CommentItem[];
-  onAddComment: (contentId: string, text: string) => void;
+  onAddComment: (contentId: string, text: string, attachmentUrl?: string, mentionedUserIds?: string[]) => void;
   onAddCreator: (name: string, email: string) => Promise<TeamMember>;
   onAddChannel: (name: string, color: string) => Promise<Channel>;
   onAddClientBrand: (client: string, brand: string, color: string) => Promise<ClientBrand>;
@@ -92,6 +92,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   // Comment Thread state
   const [commentText, setCommentText] = useState('');
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
 
   // Inline creation states
@@ -269,13 +270,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const handleSendComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!item || !commentText.trim()) return;
-    onAddComment(item.id, commentText.trim());
+    const normalizedComment = commentText.trim().toLocaleLowerCase();
+    const activeMentionIds = mentionedUserIds.filter((id) => {
+      const member = team.find((entry) => entry.id === id);
+      return member && normalizedComment.includes(`@${member.name.toLocaleLowerCase()}`);
+    });
+    onAddComment(item.id, commentText.trim(), undefined, activeMentionIds);
     setCommentText('');
+    setMentionedUserIds([]);
     setShowMentionSuggestions(false);
   };
 
-  const handleInsertMention = (name: string) => {
-    setCommentText((prev) => prev + `@${name} `);
+  const handleInsertMention = (member: TeamMember) => {
+    setCommentText((prev) => prev + `@${member.name} `);
+    setMentionedUserIds((current) => current.includes(member.id) ? current : [...current, member.id]);
     setShowMentionSuggestions(false);
   };
 
@@ -1199,10 +1207,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           key={member.id}
                           type="button"
                           className="tag-select-pill"
-                          onClick={() => handleInsertMention(member.name)}
+                          onClick={() => handleInsertMention(member)}
                           style={{ padding: '1px 6px', fontSize: '10px', borderStyle: 'dashed' }}
                         >
-                          {member.name}
+                          {member.name}{team.filter((entry) => entry.name === member.name).length > 1 && member.email ? ` · ${member.email}` : ''}
                         </button>
                       ))}
                     </div>

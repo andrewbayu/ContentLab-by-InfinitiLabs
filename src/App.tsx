@@ -336,18 +336,25 @@ function App() {
   };
 
   // Discussion comment thread action
-  const handleAddComment = async (contentId: string, text: string, attachmentUrl?: string) => {
+  const handleAddComment = async (contentId: string, text: string, attachmentUrl?: string, mentionedUserIds: string[] = []) => {
     if (!currentUser) return;
     beginWrite();
     try {
+      const normalizedText = text.toLocaleLowerCase();
+      const explicitNames = new Set(team.filter((member) => mentionedUserIds.includes(member.id)).map((member) => member.name.toLocaleLowerCase()));
+      const detectedIds = team.filter((member) => !explicitNames.has(member.name.toLocaleLowerCase()) && normalizedText.includes(`@${member.name.toLocaleLowerCase()}`)).map((member) => member.id);
+      const mentionIds = [...new Set([...mentionedUserIds, ...detectedIds])];
       const created = await createComment({
         contentId,
         author: currentUser.name,
         text,
-        attachmentUrl
+        attachmentUrl,
+        mentionedUserIds: mentionIds
       });
       setComments((prev) => [...prev, created]);
-      addToast('Comment posted successfully!', 'success');
+      if (mentionIds.length && created.notification?.failed) addToast(`Comment saved, but ${created.notification.failed} mention notification${created.notification.failed === 1 ? '' : 's'} failed.`, 'error');
+      else if (mentionIds.length) addToast(`Comment posted and ${created.notification?.sent || mentionIds.length} notification${mentionIds.length === 1 ? '' : 's'} sent.`, 'success');
+      else addToast('Comment posted successfully!', 'success');
     } catch (e) {
       console.error(e);
       addToast('Failed to save comment.', 'error');

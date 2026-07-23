@@ -62,6 +62,13 @@ export interface CommentItem {
   author: string;
   text: string;
   attachmentUrl?: string;
+  mentionedUserIds?: string[];
+  notification?: {
+    requested: number;
+    sent: number;
+    failed: number;
+    errors?: string[];
+  };
   createdAt: string;
 }
 
@@ -824,7 +831,7 @@ export async function createComment(
     });
     const result = await response.json();
     if (result && result.success) {
-      return newComment;
+      return { ...newComment, ...(result.comment || {}), notification: result.notification };
     }
     throw new Error(result.error || 'Server failed to save comment');
   } catch (error) {
