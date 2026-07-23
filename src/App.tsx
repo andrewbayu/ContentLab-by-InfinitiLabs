@@ -696,6 +696,7 @@ function App() {
             ? <ClientPortal
                 items={scopedItems}
                 comments={comments}
+                team={team}
                 currentUser={currentUser}
                 mode="overview"
                 reportsCount={documents.filter((document) => document.visibility === 'client' && document.client === currentUser.client).length}
@@ -710,6 +711,7 @@ function App() {
           <ClientPortal
             items={scopedItems}
             comments={comments}
+            team={team}
             currentUser={currentUser}
             mode="review"
             reportsCount={documents.filter((document) => document.visibility === 'client' && document.client === currentUser.client).length}
@@ -722,6 +724,7 @@ function App() {
         {activeTab === 'board' && (
           <KanbanBoard
             items={filteredItems}
+            comments={comments}
             onMoveItem={handleMoveItem}
             onEditItem={handleOpenEditModal}
             onOpenCreateModalWithStatus={handleOpenCreateModalWithStatus}

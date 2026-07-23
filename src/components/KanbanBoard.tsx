@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import type { ContentItem, Channel, VariablesConfig, TaskType } from '../services/sheets';
-import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks } from 'lucide-react';
+import type { ContentItem, Channel, VariablesConfig, TaskType, CommentItem } from '../services/sheets';
+import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare } from 'lucide-react';
 
 interface KanbanBoardProps {
   items: ContentItem[];
+  comments?: CommentItem[];
   channels: Channel[];
   variablesConfig: VariablesConfig;
   onMoveItem: (id: string, newStatus: ContentItem['status']) => void;
@@ -34,6 +35,7 @@ const GENERAL_COLUMNS: KanbanColumn[] = [
 
 export function KanbanBoard({
   items,
+  comments = [],
   channels,
   variablesConfig,
   onMoveItem,
@@ -114,6 +116,7 @@ export function KanbanBoard({
 
   const renderCard = (item: ContentItem) => {
     const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
+    const itemCommentCount = comments.filter((c) => c.contentId === item.id).length;
     return (
       <div
         key={item.id}
@@ -157,6 +160,12 @@ export function KanbanBoard({
             {item.assetsLink && (
               <div className="card-meta-item" title="Draft Assets Link">
                 <Link className="card-meta-icon kanban-asset-icon" />
+              </div>
+            )}
+            {itemCommentCount > 0 && (
+              <div className="card-meta-item" title={`${itemCommentCount} comment(s)`} style={{ color: '#2563eb' }}>
+                <MessageSquare className="card-meta-icon" size={12} />
+                <span style={{ fontSize: '11px', fontWeight: 600 }}>{itemCommentCount}</span>
               </div>
             )}
           </div>

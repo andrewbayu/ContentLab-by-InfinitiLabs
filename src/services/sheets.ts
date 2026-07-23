@@ -595,6 +595,10 @@ export async function fetchData(): Promise<WorkspaceData> {
       contentId: String(item.contentId || ''),
       author: String(item.author || ''),
       text: String(item.text || ''),
+      attachmentUrl: item.attachmentUrl ? String(item.attachmentUrl) : undefined,
+      mentionedUserIds: Array.isArray(item.mentionedUserIds)
+        ? item.mentionedUserIds.map(String)
+        : (typeof item.mentionedUserIds === 'string' && item.mentionedUserIds ? JSON.parse(item.mentionedUserIds) : undefined),
       createdAt: String(item.createdAt || new Date().toISOString()),
     }));
 

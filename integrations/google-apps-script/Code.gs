@@ -314,6 +314,16 @@ function sendMentionNotifications_(spreadsheet, comment) {
   const seenEmails = {};
   const explicitNames = {};
 
+  let targetContent = null;
+  let contentTitle = "Content Plan";
+  for (let i = 0; i < contentData.length; i++) {
+    if (String(contentData[i].id) === String(comment.contentId)) {
+      targetContent = contentData[i];
+      contentTitle = contentData[i].title || contentTitle;
+      break;
+    }
+  }
+
   for (let i = 0; i < teamData.length; i++) {
     if (explicitIds.indexOf(String(teamData[i].id || "")) !== -1) {
       explicitNames[String(teamData[i].name || "").trim().toLowerCase()] = true;
@@ -325,41 +335,49 @@ function sendMentionNotifications_(spreadsheet, comment) {
     const memberId = String(member.id || "");
     const memberName = String(member.name || "").trim();
     const memberEmail = String(member.email || "").trim().toLowerCase();
+    if (!memberEmail) continue;
+
     const explicitlyMentioned = explicitIds.indexOf(memberId) !== -1;
     const normalizedName = memberName.toLowerCase();
     const textMentioned = memberName && !explicitNames[normalizedName] && normalizedText.indexOf("@" + normalizedName) !== -1;
-    if ((explicitlyMentioned || textMentioned) && memberEmail && !seenEmails[memberEmail]) {
-      seenEmails[memberEmail] = true;
-      recipients.push({ name: memberName || memberEmail, email: memberEmail });
-    }
-  }
 
-  let contentTitle = "Content Plan";
-  for (let i = 0; i < contentData.length; i++) {
-    if (String(contentData[i].id) === String(comment.contentId)) {
-      contentTitle = contentData[i].title || contentTitle;
-      break;
+    let isTargetPic = false;
+    if (targetContent) {
+      const assigneeName = String(targetContent.assignee || "").trim().toLowerCase();
+      const ownerId = String(targetContent.ownerId || "");
+      const reviewerId = String(targetContent.reviewerId || "");
+      if ((assigneeName && normalizedName === assigneeName) || (ownerId && memberId === ownerId) || (reviewerId && memberId === reviewerId)) {
+        isTargetPic = true;
+      }
+    }
+
+    if ((explicitlyMentioned || textMentioned || isTargetPic) && !seenEmails[memberEmail]) {
+      seenEmails[memberEmail] = true;
+      recipients.push({ name: memberName || memberEmail, email: memberEmail, isPic: isTargetPic && !explicitlyMentioned && !textMentioned });
     }
   }
 
   const status = { requested: recipients.length, sent: 0, failed: 0, errors: [] };
+  const attachmentNote = comment.attachmentUrl ? ("\n\nLampiran: " + comment.attachmentUrl) : "";
+
   for (let i = 0; i < recipients.length; i++) {
     const recipient = recipients[i];
+    const subject = "[ContentLab] " + comment.author + (recipient.isPic ? " memberi masukan untuk \"" : " menyebut Anda dalam \"") + contentTitle + "\"";
+    const bodyHeader = "Halo " + recipient.name + ",\n\n" +
+      comment.author + (recipient.isPic ? " telah menambahkan masukan/revisi pada konten \"" : " menyebut Anda dalam diskusi revisi untuk \"") + contentTitle + "\":\n\n";
+
     try {
       MailApp.sendEmail({
         to: recipient.email,
-        subject: "[ContentLab] " + comment.author + " mentioned you in \"" + contentTitle + "\"",
-        body: "Halo " + recipient.name + ",\n\n" +
-          comment.author + " menyebut Anda dalam diskusi revisi untuk \"" + contentTitle + "\":\n\n" +
-          "\"" + comment.text + "\"\n\n" +
-          "Silakan buka ContentLab Studio Planner untuk membalas.",
+        subject: subject,
+        body: bodyHeader + "\"" + comment.text + "\"" + attachmentNote + "\n\nSilakan buka ContentLab Studio Planner untuk membalas.",
         name: "ContentLab Notifications"
       });
       status.sent++;
     } catch (error) {
       status.failed++;
       status.errors.push(recipient.email + ": " + String(error));
-      console.error("ContentLab mention email failed for " + recipient.email + ": " + error);
+      console.error("ContentLab notification email failed for " + recipient.email + ": " + error);
     }
   }
   return status;

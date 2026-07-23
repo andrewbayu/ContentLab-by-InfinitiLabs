@@ -5,23 +5,25 @@ import type { CommentItem, ContentItem, TeamMember } from '../services/sheets';
 interface ClientPortalProps {
   items: ContentItem[];
   comments: CommentItem[];
+  team?: TeamMember[];
   currentUser: TeamMember;
   mode: 'overview' | 'review';
   reportsCount: number;
   onNavigateToReview: () => void;
   onUpdateItem: (item: ContentItem) => Promise<void>;
-  onAddComment: (contentId: string, text: string, attachmentUrl?: string) => Promise<void>;
+  onAddComment: (contentId: string, text: string, attachmentUrl?: string, mentionedUserIds?: string[]) => Promise<void>;
 }
 
 const isReadyForReview = (item: ContentItem) => item.status === 'Review/Editing';
 
 export const ClientPortal: React.FC<ClientPortalProps> = ({
-  items, comments, currentUser, mode, reportsCount, onNavigateToReview, onUpdateItem, onAddComment,
+  items, comments, team = [], currentUser, mode, reportsCount, onNavigateToReview, onUpdateItem, onAddComment,
 }) => {
   const contentItems = useMemo(() => items.filter((item) => item.taskType === 'Content'), [items]);
   const [selectedId, setSelectedId] = useState(contentItems[0]?.id || '');
   const [comment, setComment] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [saving, setSaving] = useState(false);
@@ -38,6 +40,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const approved = contentItems.filter((item) => item.status === 'Scheduled' || item.status === 'Published');
   const recent = [...contentItems].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
 
+  const availableTeamMembers = useMemo(() => team.filter((member) => member.role !== 'client'), [team]);
+
   const updateReview = async (approvedItem: boolean) => {
     if (!selected) return;
     setSaving(true);
@@ -50,10 +54,21 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     if (!selected || !comment.trim()) return;
     setSaving(true);
     try {
-      await onAddComment(selected.id, comment.trim(), attachmentUrl.trim() || undefined);
+      const normalizedComment = comment.trim().toLowerCase();
+      const activeMentionIds = mentionedUserIds.filter((id) => {
+        const member = team.find((entry) => entry.id === id);
+        return member && normalizedComment.includes(`@${member.name.toLowerCase()}`);
+      });
+      await onAddComment(selected.id, comment.trim(), attachmentUrl.trim() || undefined, activeMentionIds);
       setComment('');
       setAttachmentUrl('');
+      setMentionedUserIds([]);
     } finally { setSaving(false); }
+  };
+
+  const handleInsertMention = (member: TeamMember) => {
+    setComment((prev) => prev + `@${member.name} `);
+    setMentionedUserIds((current) => current.includes(member.id) ? current : [...current, member.id]);
   };
 
   if (mode === 'overview') {
@@ -82,7 +97,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     <div className="client-portal-heading"><div><span className="analytics-eyebrow">Content Review</span><h2>Review shared content</h2><p>Approve drafts or send clear feedback to the team.</p></div><span className="client-portal-scope">{currentUser.client || 'Your workspace'}</span></div>
     {contentItems.length === 0 ? <div className="client-portal-empty"><CheckCircle2 size={30} /><strong>No content ready for review</strong><span>Your team will share new drafts here.</span></div> : <div className="client-portal-layout">
       <section className="client-review-list"><div className="client-section-title"><strong>Shared content</strong><span>{reviewItems.length} of {contentItems.length}</span></div><div className="client-review-filters"><label><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search content..." /></label><label><Filter size={14} /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All</option><option>Idea</option><option>Review/Editing</option><option>Scheduled</option><option>Published</option></select></label></div>{reviewItems.length === 0 ? <p className="client-muted client-filter-empty">No matching content.</p> : reviewItems.map((item) => <button type="button" key={item.id} className={`client-review-item ${selected?.id === item.id ? 'active' : ''}`} onClick={() => setSelectedId(item.id)}><strong>{item.title}</strong><span>{item.brand || item.client} · {item.channel}</span><small>{isReadyForReview(item) ? 'Ready for review' : item.status}</small></button>)}</section>
-      {selected && <section className="client-review-detail"><div className="client-review-detail-head"><div><span>{selected.brand || selected.client} · {selected.channel}</span><h3>{selected.title}</h3></div><span className="client-review-status">{isReadyForReview(selected) ? 'Ready for review' : selected.status}</span></div><div className="client-review-copy"><h4>Brief</h4><p>{selected.brief || 'No brief provided.'}</p>{selected.publishDate && <small>Planned publish date: {selected.publishDate}</small>}{selected.assetsLink && <a href={selected.assetsLink} target="_blank" rel="noreferrer">Open shared assets</a>}</div><div className="client-comments"><h4><MessageSquare size={15} /> Feedback & discussion ({selectedComments.length})</h4>{selectedComments.map((entry) => <div className="client-comment" key={entry.id}><strong>{entry.author}</strong><span>{entry.text}</span>{entry.attachmentUrl && <a href={entry.attachmentUrl} target="_blank" rel="noreferrer"><Link2 size={12} /> Open attachment</a>}</div>)}{selectedComments.length === 0 && <p className="client-muted">No feedback yet. Start the conversation below.</p>}<form onSubmit={submitComment}><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Write feedback for the team..." rows={3} /><input className="client-attachment-input" type="url" value={attachmentUrl} onChange={(event) => setAttachmentUrl(event.target.value)} placeholder="Optional Google Drive attachment link" /><button className="btn btn-secondary" disabled={saving || !comment.trim()}><Send size={14} /> Send feedback</button></form></div><div className="client-review-actions"><button className="btn btn-secondary" disabled={saving} onClick={() => updateReview(false)}><Undo2 size={14} /> Request changes</button><button className="btn btn-primary" disabled={saving} onClick={() => updateReview(true)}><CheckCircle2 size={14} /> Approve</button></div></section>}
+      {selected && <section className="client-review-detail"><div className="client-review-detail-head"><div><span>{selected.brand || selected.client} · {selected.channel}</span><h3>{selected.title}</h3></div><span className="client-review-status">{isReadyForReview(selected) ? 'Ready for review' : selected.status}</span></div><div className="client-review-copy"><h4>Brief</h4><p>{selected.brief || 'No brief provided.'}</p>{selected.publishDate && <small>Planned publish date: {selected.publishDate}</small>}{selected.assetsLink && <a href={selected.assetsLink} target="_blank" rel="noreferrer">Open shared assets</a>}</div><div className="client-comments"><h4><MessageSquare size={15} /> Feedback & discussion ({selectedComments.length})</h4>{selectedComments.map((entry) => <div className="client-comment" key={entry.id}><strong>{entry.author}</strong><span>{entry.text}</span>{entry.attachmentUrl && <a href={entry.attachmentUrl} target="_blank" rel="noreferrer"><Link2 size={12} /> Open attachment</a>}</div>)}{selectedComments.length === 0 && <p className="client-muted">No feedback yet. Start the conversation below.</p>}<form onSubmit={submitComment}>{availableTeamMembers.length > 0 && <div className="task-mention-suggestions" style={{ marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b', marginRight: '6px' }}>Mention team:</span>{availableTeamMembers.map((member) => <button key={member.id} type="button" className="tag-select-pill" onClick={() => handleInsertMention(member)} style={{ padding: '1px 6px', fontSize: '10px', borderStyle: 'dashed' }}>{member.name}</button>)}</div>}<textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Write feedback for the team..." rows={3} /><input className="client-attachment-input" type="url" value={attachmentUrl} onChange={(event) => setAttachmentUrl(event.target.value)} placeholder="Optional Google Drive attachment link" /><button className="btn btn-secondary" disabled={saving || !comment.trim()}><Send size={14} /> Send feedback</button></form></div><div className="client-review-actions"><button className="btn btn-secondary" disabled={saving} onClick={() => updateReview(false)}><Undo2 size={14} /> Request changes</button><button className="btn btn-primary" disabled={saving} onClick={() => updateReview(true)}><CheckCircle2 size={14} /> Approve</button></div></section>}
     </div>}
   </main>;
-};
+};
