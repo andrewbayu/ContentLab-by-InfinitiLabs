@@ -36,7 +36,7 @@ import {
   isUserInvolved,
   isMockMode
 } from './services/sheets';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem } from './services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, UserRole } from './services/sheets';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -368,13 +368,13 @@ function App() {
   };
 
   // Crew Handlers
-  const handleAddCreator = async (name: string, email: string): Promise<TeamMember> => {
+  const handleAddCreator = async (name: string, email: string, password = '', role: UserRole = 'team', client = ''): Promise<TeamMember> => {
     if (currentUser?.role !== 'super') throw new Error('Super access required');
     beginWrite();
     try {
-      const created = await createTeamMember({ name, email });
+      const created = await createTeamMember({ name, email, password, role, client });
       setTeam((prev) => [...prev, created]);
-      addToast(`Added creator "${name}" to Team!`, 'success');
+      addToast(`Added ${role === 'client' ? 'client user' : role === 'super' ? 'super admin' : 'team member'} "${name}".`, 'success');
       return created;
     } catch (e) {
       console.error(e);

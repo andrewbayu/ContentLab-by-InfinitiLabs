@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { getGlobalScriptUrl, getScriptUrl, hasLocalScriptUrlOverride, saveScriptUrl, validateScriptUrl } from '../services/sheets';
 import { getGeneratedAvatar } from '../utils/avatar';
-import type { TeamMember, Channel, VariablesConfig, ClientBrand } from '../services/sheets';
+import type { TeamMember, Channel, VariablesConfig, ClientBrand, UserRole } from '../services/sheets';
 import {
   Link,
   CheckCircle,
@@ -30,7 +30,7 @@ interface SettingsViewProps {
   onDeleteTag: (tag: string) => void;
   
   team: TeamMember[];
-  onAddCreator: (name: string, email: string) => Promise<TeamMember>;
+  onAddCreator: (name: string, email: string, password: string, role: UserRole, client: string) => Promise<TeamMember>;
   onDeleteCreator: (id: string) => void;
   
   channels: Channel[];
@@ -70,6 +70,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // New Creator form state
   const [creatorName, setCreatorName] = useState('');
   const [creatorEmail, setCreatorEmail] = useState('');
+  const [creatorPassword, setCreatorPassword] = useState('');
+  const [creatorRole, setCreatorRole] = useState<UserRole>('team');
+  const [creatorClient, setCreatorClient] = useState('');
   const [isAddingCreator, setIsAddingCreator] = useState(false);
 
   // New Channel form state
@@ -139,12 +142,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleAddCreatorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!creatorName.trim()) return;
+    if (!creatorName.trim() || !creatorEmail.trim() || !creatorPassword.trim() || (creatorRole === 'client' && !creatorClient)) return;
     setIsAddingCreator(true);
     try {
-      await onAddCreator(creatorName.trim(), creatorEmail.trim());
+      await onAddCreator(creatorName.trim(), creatorEmail.trim(), creatorPassword, creatorRole, creatorRole === 'client' ? creatorClient : '');
       setCreatorName('');
       setCreatorEmail('');
+      setCreatorPassword('');
+      setCreatorRole('team');
+      setCreatorClient('');
       addToast(`Successfully added creator "${creatorName}"`, 'success');
     } catch (e) {
       addToast('Failed to add crew member.', 'error');
@@ -753,8 +759,8 @@ function deleteTaskMembers(spreadsheet, taskId) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <img src={getGeneratedAvatar(member.name)} alt={member.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '14px' }}>{member.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{member.email}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontWeight: 600, fontSize: '14px' }}>{member.name}</span><span className={`team-role-badge role-${member.role}`}>{member.role === 'super' ? 'Super Admin' : member.role === 'client' ? 'Client' : 'Team'}</span></div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{member.email}{member.role === 'client' && member.client ? ` · ${member.client}` : ''}</div>
                       </div>
                     </div>
                     <button className="btn btn-secondary btn-icon-only" style={{ border: 'none', padding: '4px' }} onClick={() => onDeleteCreator(member.id)}>
@@ -764,26 +770,32 @@ function deleteTaskMembers(spreadsheet, taskId) {
                 ))}
               </div>
 
-              <form onSubmit={handleAddCreatorSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px', borderTop: '1px solid var(--border-subtle)', paddingTop: '20px' }}>
+              <form onSubmit={handleAddCreatorSubmit} className="team-member-form">
                 <input
                   type="text"
                   className="form-input"
                   placeholder="Creator Name *"
                   value={creatorName}
                   onChange={(e) => setCreatorName(e.target.value)}
-                  style={{ flex: '1 1 200px' }}
                   required
                 />
                 <input
                   type="email"
                   className="form-input"
-                  placeholder="Email Address"
+                  placeholder="Email Address *"
                   value={creatorEmail}
                   onChange={(e) => setCreatorEmail(e.target.value)}
-                  style={{ flex: '1 1 200px' }}
+                  required
                 />
+                <input type="password" className="form-input" placeholder="Temporary Password *" value={creatorPassword} onChange={(e) => setCreatorPassword(e.target.value)} minLength={8} required />
+                <select className="form-select" value={creatorRole} onChange={(e) => { const role = e.target.value as UserRole; setCreatorRole(role); if (role !== 'client') setCreatorClient(''); }} aria-label="User role">
+                  <option value="team">Team Member</option>
+                  <option value="client">Client</option>
+                  <option value="super">Super Admin</option>
+                </select>
+                {creatorRole === 'client' && <select className="form-select" value={creatorClient} onChange={(e) => setCreatorClient(e.target.value)} aria-label="Assign client" required><option value="">Assign client *</option>{[...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort().map((client) => <option key={client} value={client}>{client}</option>)}</select>}
                 <button type="submit" className="btn btn-primary" disabled={isAddingCreator}>
-                  {isAddingCreator ? 'Saving...' : 'Add Crew'}
+                  {isAddingCreator ? 'Saving...' : 'Add User'}
                 </button>
               </form>
             </div>

@@ -844,7 +844,7 @@ export async function createTeamMember(
     ...member,
     id: Math.random().toString(36).substring(2, 9),
     avatar: getGeneratedAvatar(member.name),
-    password: '',
+    password: member.password || '',
     role: member.role || 'team',
   };
 
