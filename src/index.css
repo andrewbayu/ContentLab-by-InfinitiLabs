@@ -502,12 +502,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .client-portal { overflow-y: auto; gap: 18px; }
 .client-portal-heading, .client-review-detail-head, .client-section-title, .client-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.client-portal-heading h2 { font-size: 26px; }
-.client-portal-heading p { margin-top: 4px; color: var(--text-secondary); font-size: 12px; }
-.client-portal-scope, .client-review-status { padding: 6px 10px; border-radius: 999px; background: var(--primary-glow); color: var(--primary); font-size: 11px; font-weight: 700; }
-.client-portal-layout { display: grid; grid-template-columns: minmax(240px, .35fr) minmax(0, 1fr); gap: 18px; min-height: 520px; }
-.client-review-list, .client-review-detail { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
-.client-shared-documents { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow-sm); }
+.client-portal-heading h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.client-portal-heading p { margin-top: 4px; color: var(--text-secondary); font-size: 13px; }
+.client-portal-scope { padding: 6px 12px; border-radius: 999px; background: var(--primary-glow); color: var(--primary); font-size: 11px; font-weight: 700; border: 1px solid rgba(37,99,235,.15); }
+.client-portal-layout { display: grid; grid-template-columns: minmax(280px, 0.35fr) minmax(0, 1fr); gap: 18px; min-height: 540px; }
+.client-review-list, .client-review-detail { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #ffffff; box-shadow: var(--shadow-sm); }
+.client-shared-documents { padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: #ffffff; box-shadow: var(--shadow-sm); }
 .client-section-title strong { display: inline-flex; align-items: center; gap: 7px; }
 .client-shared-document-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 14px; }
 .client-shared-document { display: flex; gap: 10px; padding: 13px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-app); }
@@ -516,35 +516,69 @@ h1, h2, h3, h4, h5, h6 {
 .client-shared-document strong { color: var(--text-primary); font-size: 12px; }
 .client-shared-document span, .client-shared-document p { margin-top: 4px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
 .client-shared-document a { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; color: var(--primary); font-size: 11px; font-weight: 650; }
-.client-review-filters { display: grid; gap: 8px; padding: 12px 0 4px; }
-.client-review-filters label { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-muted); }
-.client-review-filters input, .client-review-filters select { width: 100%; border: 0; outline: 0; color: var(--text-primary); background: transparent; font: 12px var(--font-body); }
-.client-filter-empty { padding: 18px 4px; text-align: center; }
-.client-attachment-input { width: 100%; padding: 9px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: 12px var(--font-body); }
-.client-comment a { display: inline-flex; align-items: center; gap: 4px; color: var(--primary); font-size: 11px; font-weight: 650; }
-.client-section-title { padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
-.client-section-title span { color: var(--text-muted); font-size: 11px; }
-.client-review-item { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 13px 10px; margin-top: 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: var(--bg-app); text-align: left; cursor: pointer; }
-.client-review-item:hover, .client-review-item.active { border-color: rgba(37,99,235,.35); background: var(--primary-glow); }
-.client-review-item strong { color: var(--text-primary); font-size: 12px; }
-.client-review-item span, .client-review-item small { color: var(--text-muted); font-size: 10px; }
+.client-mobile-back-btn { display: none; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-app); color: var(--text-primary); font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; }
+.client-mobile-back-btn:active { background: var(--border-subtle); }
+.client-review-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 0; }
+.client-search-box, .client-filter-box { display: flex; align-items: center; gap: 8px; padding: 10px 12px; min-height: 44px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-app); color: var(--text-muted); }
+.client-search-box input, .client-filter-box select { width: 100%; border: 0; outline: 0; color: var(--text-primary); background: transparent; font: 13px var(--font-body); }
+.client-review-scroll-list { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; }
+.client-review-item { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; min-height: 64px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: #ffffff; text-align: left; cursor: pointer; transition: border-color var(--transition-fast), background-color var(--transition-fast); }
+.client-review-item:hover, .client-review-item.active { border-color: var(--primary); background: var(--primary-glow); }
+.client-review-item-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.client-review-item-header strong { color: var(--text-primary); font-size: 13px; font-weight: 650; line-height: 1.3; }
+.client-status-pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+.client-status-pill.pending { background: #fef3c7; color: #b45309; }
+.client-status-pill.normal { background: var(--bg-app); color: var(--text-muted); }
+.client-review-item-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: 11px; }
 .client-review-detail { display: flex; flex-direction: column; gap: 18px; }
-.client-review-detail-head { padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle); }
-.client-review-detail-head > div > span, .client-review-copy h4, .client-comments h4 { color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.client-review-detail h3 { margin-top: 4px; font-size: 20px; }
-.client-review-copy p { margin: 8px 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
-.client-review-copy a { color: var(--primary); font-size: 12px; font-weight: 650; }
-.client-comments { display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.client-comments h4 { display: flex; align-items: center; gap: 6px; color: var(--text-primary); font-size: 13px; letter-spacing: 0; text-transform: none; }
-.client-comment { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-app); font-size: 12px; }
-.client-comment span { color: var(--text-secondary); white-space: pre-wrap; }
-.client-muted, .client-portal-empty { color: var(--text-muted); font-size: 12px; }
-.client-comments form { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-top: auto; }
-.client-comments textarea { width: 100%; resize: vertical; padding: 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: 12px var(--font-body); }
-.client-review-actions { justify-content: flex-end; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+.client-meta-chips { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.client-chip { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.client-chip.brand { background: #e0e7ff; color: #3730a3; }
+.client-chip.channel { background: #f1f5f9; color: #475569; }
+.client-status-badge-lg { padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.client-status-badge-lg.ready { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.client-status-badge-lg.standard { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.client-cover-preview { width: 100%; max-height: 240px; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-app); }
+.client-cover-preview img { width: 100%; height: 100%; max-height: 240px; object-fit: cover; display: block; }
+.client-review-copy h4, .client-comments h4 { color: var(--text-primary); font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.client-review-copy p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.client-review-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-subtle); }
+.client-meta-item { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 12px; }
+.client-asset-link-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-sm); background: var(--primary-glow); color: var(--primary); font-size: 12px; font-weight: 650; }
+.client-comments-list { display: flex; flex-direction: column; gap: 10px; }
+.client-comment-card { padding: 12px; border-radius: var(--radius-sm); background: var(--bg-app); border: 1px solid var(--border-subtle); }
+.client-comment-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.client-comment-author { display: flex; align-items: center; gap: 8px; }
+.client-avatar-badge { width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.client-comment-author strong { color: var(--text-primary); font-size: 12px; }
+.client-comment-date { color: var(--text-muted); font-size: 11px; }
+.client-comment-text { color: var(--text-secondary); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.client-comment-attachment { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--primary); font-size: 11px; font-weight: 650; }
+.client-comment-form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.client-mention-bar { display: flex; flex-direction: column; gap: 4px; }
+.client-mention-label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 11px; }
+.client-mention-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.client-tag-pill { padding: 4px 10px; min-height: 32px; border: 1px dashed var(--border-strong); border-radius: 999px; background: #fff; color: var(--text-secondary); font-size: 11px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.client-tag-pill:active { background: var(--primary-glow); border-color: var(--primary); }
+.client-attachment-input { width: 100%; padding: 10px 12px; min-height: 44px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: 12px var(--font-body); }
+.client-submit-btn { align-self: flex-end; min-height: 40px; padding: 0 16px; }
+.client-review-actions { display: flex; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+.client-action-btn { flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 650; }
 .client-portal-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); }
 .client-portal-empty strong { color: var(--text-primary); font-size: 14px; }
-@media (max-width: 720px) { .client-portal-layout { grid-template-columns: 1fr; } .client-review-list { max-height: 260px; overflow-y: auto; } .client-review-detail-head { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 768px) {
+  .client-portal-layout { grid-template-columns: 1fr; }
+  .client-portal-layout.mobile-list-active .client-review-detail { display: none; }
+  .client-portal-layout.mobile-detail-active .client-review-list { display: none; }
+  .client-mobile-back-btn { display: inline-flex; }
+  .client-review-filters { grid-template-columns: 1fr; }
+  .client-review-scroll-list { max-height: none; }
+  .client-summary-grid { grid-template-columns: 1fr; }
+  .client-overview-panel { flex-direction: column; align-items: flex-start; }
+  .client-main-action-btn { width: 100%; min-height: 44px; justify-content: center; }
+  .client-review-actions { flex-direction: column; }
+  .client-action-btn { width: 100%; }
+}
 
 .dashboard-page { gap: 0; }
 
