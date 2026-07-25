@@ -15,7 +15,9 @@ import {
   Radio,
   Trash2,
   Plus,
-  Building2
+  Building2,
+  Pencil,
+  X
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -31,6 +33,7 @@ interface SettingsViewProps {
   
   team: TeamMember[];
   onAddCreator: (name: string, email: string, password: string, role: UserRole, client: string) => Promise<TeamMember>;
+  onUpdateCreator: (member: TeamMember) => Promise<TeamMember>;
   onDeleteCreator: (id: string) => void;
   
   channels: Channel[];
@@ -50,6 +53,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onDeleteTag,
   team,
   onAddCreator,
+  onUpdateCreator,
   onDeleteCreator,
   channels,
   onAddChannel,
@@ -74,6 +78,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [creatorRole, setCreatorRole] = useState<UserRole>('team');
   const [creatorClient, setCreatorClient] = useState('');
   const [isAddingCreator, setIsAddingCreator] = useState(false);
+
+  // Edit member state
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('team');
+  const [editClient, setEditClient] = useState('');
+  const [isSavingMember, setIsSavingMember] = useState(false);
+
+  const handleStartEditMember = (member: TeamMember) => {
+    setEditingMemberId(member.id);
+    setEditName(member.name);
+    setEditEmail(member.email);
+    setEditRole(member.role);
+    setEditClient(member.client || '');
+  };
+
+  const handleCancelEditMember = () => {
+    setEditingMemberId(null);
+  };
+
+  const handleSaveMemberEdit = async (member: TeamMember) => {
+    if (!editName.trim() || !editEmail.trim()) return;
+    setIsSavingMember(true);
+    try {
+      await onUpdateCreator({
+        ...member,
+        name: editName.trim(),
+        email: editEmail.trim(),
+        role: editRole,
+        client: editRole === 'super' ? '' : editClient,
+      });
+      setEditingMemberId(null);
+    } finally {
+      setIsSavingMember(false);
+    }
+  };
 
   // New Channel form state
   const [channelName, setChannelName] = useState('');
@@ -754,20 +795,126 @@ function deleteTaskMembers(spreadsheet, taskId) {
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {team.map((member) => (
-                  <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid var(--border-subtle)', borderRadius: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <img src={getGeneratedAvatar(member.name)} alt={member.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontWeight: 600, fontSize: '14px' }}>{member.name}</span><span className={`team-role-badge role-${member.role}`}>{member.role === 'super' ? 'Super Admin' : member.role === 'client' ? 'Client' : 'Team'}</span></div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{member.email}{member.client ? ` · Access: ${member.client}` : ' · Access: All Clients'}</div>
-                      </div>
+                {team.map((member) => {
+                  const isEditing = editingMemberId === member.id;
+                  return (
+                    <div key={member.id} style={{ padding: '12px 14px', border: '1px solid var(--border-subtle)', borderRadius: '8px', background: isEditing ? '#f8fafc' : '#ffffff' }}>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>Name</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                style={{ width: '100%' }}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>Email</label>
+                              <input
+                                type="email"
+                                className="form-input"
+                                value={editEmail}
+                                onChange={(e) => setEditEmail(e.target.value)}
+                                style={{ width: '100%' }}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>Role</label>
+                              <select
+                                className="form-select"
+                                value={editRole}
+                                onChange={(e) => setEditRole(e.target.value as UserRole)}
+                                style={{ width: '100%' }}
+                              >
+                                <option value="team">Team Member</option>
+                                <option value="client">Client</option>
+                                <option value="super">Super Admin</option>
+                              </select>
+                            </div>
+                            {editRole !== 'super' && (
+                              <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>Client Access</label>
+                                <select
+                                  className="form-select"
+                                  value={editClient}
+                                  onChange={(e) => setEditClient(e.target.value)}
+                                  style={{ width: '100%' }}
+                                  required={editRole === 'client'}
+                                >
+                                  <option value="">{editRole === 'client' ? 'Assign Client *' : 'All Clients (Default)'}</option>
+                                  {[...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort().map((client) => (
+                                    <option key={client} value={client}>{client}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 10px', fontSize: '12px' }}
+                              onClick={handleCancelEditMember}
+                              disabled={isSavingMember}
+                            >
+                              <X size={13} /> Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              style={{ padding: '4px 12px', fontSize: '12px' }}
+                              onClick={() => handleSaveMemberEdit(member)}
+                              disabled={isSavingMember || !editName.trim() || !editEmail.trim()}
+                            >
+                              <Check size={13} /> {isSavingMember ? 'Saving...' : 'Save Access'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <img src={getGeneratedAvatar(member.name)} alt={member.name} style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontWeight: 600, fontSize: '14px' }}>{member.name}</span>
+                                <span className={`team-role-badge role-${member.role}`}>{member.role === 'super' ? 'Super Admin' : member.role === 'client' ? 'Client' : 'Team Member'}</span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {member.email} · <strong style={{ color: '#2563eb' }}>{member.client ? `Access: ${member.client}` : 'Access: All Clients'}</strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              className="btn btn-secondary btn-icon-only"
+                              style={{ padding: '6px' }}
+                              onClick={() => handleStartEditMember(member)}
+                              title="Edit Member & Access Permissions"
+                            >
+                              <Pencil size={14} style={{ color: '#3b82f6' }} />
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-icon-only"
+                              style={{ padding: '6px' }}
+                              onClick={() => onDeleteCreator(member.id)}
+                              title="Delete Member"
+                            >
+                              <Trash2 size={14} style={{ color: '#dc2626' }} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <button className="btn btn-secondary btn-icon-only" style={{ border: 'none', padding: '4px' }} onClick={() => onDeleteCreator(member.id)}>
-                      <Trash2 size={14} style={{ color: '#dc2626' }} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <form onSubmit={handleAddCreatorSubmit} className="team-member-form">

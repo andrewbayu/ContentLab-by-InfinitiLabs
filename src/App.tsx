@@ -20,6 +20,7 @@ import {
   deleteChannel,
   createClientBrand,
   createTeamMember,
+  updateTeamMember,
   deleteTeamMember,
   createComment,
   createKpiDefinition,
@@ -387,6 +388,23 @@ function App() {
     } catch (e) {
       console.error(e);
       addToast('Failed to add creator to Google Sheet.', 'error');
+      throw e;
+    } finally {
+      endWrite();
+    }
+  };
+
+  const handleUpdateCreator = async (member: TeamMember): Promise<TeamMember> => {
+    if (currentUser?.role !== 'super') throw new Error('Super access required');
+    beginWrite();
+    try {
+      const updated = await updateTeamMember(member);
+      setTeam((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      addToast(`Updated permissions for "${updated.name}".`, 'success');
+      return updated;
+    } catch (e) {
+      console.error(e);
+      addToast('Failed to update team member.', 'error');
       throw e;
     } finally {
       endWrite();
@@ -798,6 +816,7 @@ function App() {
             onDeleteTag={handleDeleteTag}
             team={team}
             onAddCreator={handleAddCreator}
+            onUpdateCreator={handleUpdateCreator}
             onDeleteCreator={handleDeleteCreator}
             channels={channels}
             onAddChannel={handleAddChannel}

@@ -907,6 +907,35 @@ export async function createTeamMember(
   }
 }
 
+export async function updateTeamMember(member: TeamMember): Promise<TeamMember> {
+  const url = getScriptUrl();
+  const { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents } = getLocalData();
+  const updatedTeam = team.map((t) => (t.id === member.id ? member : t));
+  saveLocalData(content, updatedTeam, channels, comments, clients, kpiDefinitions, kpiUpdates, documents);
+
+  if (!url) return member;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'updateTeamMember',
+        member,
+      }),
+    });
+    const result = await response.json();
+    if (result && result.success) {
+      return result.member || member;
+    }
+    throw new Error(result.error || 'Server failed to update team member');
+  } catch (error) {
+    console.error('Failed to update team member:', error);
+    throw error;
+  }
+}
+
 export async function deleteTeamMember(id: string): Promise<boolean> {
   const { content, team, channels, comments } = getLocalData();
   const updated = team.filter((t) => t.id !== id);

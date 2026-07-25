@@ -122,6 +122,46 @@ function doPost(e) {
       ]);
       result = { success: true, member: member };
     }
+    else if (action === "updateTeamMember") {
+      const teamSheet = sheet.getSheetByName("Team");
+      const member = postData.member;
+      const teamData = teamSheet.getDataRange().getValues();
+      let rowIndex = -1;
+      for (let i = 1; i < teamData.length; i++) {
+        if (String(teamData[i][0]).trim() === String(member.id).trim()) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+      if (rowIndex !== -1) {
+        const existingPassword = teamData[rowIndex - 1][4];
+        teamSheet.getRange(rowIndex, 1, 1, 7).setValues([[
+          member.id, member.name, member.email, member.avatar || teamData[rowIndex - 1][3] || "",
+          member.password || existingPassword || "", member.role || "team", member.client || ""
+        ]]);
+        result = { success: true, member: member };
+      } else {
+        result = { success: false, error: "Team member not found" };
+      }
+    }
+    else if (action === "deleteTeamMember") {
+      const teamSheet = sheet.getSheetByName("Team");
+      const memberId = postData.id;
+      const teamData = teamSheet.getDataRange().getValues();
+      let rowIndex = -1;
+      for (let i = 1; i < teamData.length; i++) {
+        if (String(teamData[i][0]).trim() === String(memberId).trim()) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+      if (rowIndex !== -1) {
+        teamSheet.deleteRow(rowIndex);
+        result = { success: true };
+      } else {
+        result = { success: false, error: "Team member not found" };
+      }
+    }
     else if (action === "createChannel") {
       const channelSheet = sheet.getSheetByName("Channels");
       const channel = postData.channel;
