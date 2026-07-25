@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ClientBrand, TeamMember } from '../services/sheets';
+import { ScopeDropdown } from './ScopeDropdown';
 import { 
   LayoutDashboard, 
   Kanban, 
@@ -68,11 +69,6 @@ export const AppShell: React.FC<AppShellProps> = ({
     setIsMobileOpen(!isMobileOpen);
   };
 
-  const clientsByName = clients.filter((entry) => entry.active).reduce<Record<string, ClientBrand[]>>((groups, entry) => {
-    groups[entry.client] = [...(groups[entry.client] || []), entry];
-    return groups;
-  }, {});
-
   const syncLabel = syncStatus === 'saving'
     ? 'Saving…'
     : syncStatus === 'syncing'
@@ -118,18 +114,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           </button>
         </div>
 
-        {currentUser?.role !== 'client' && <div className="scope-switcher-wrap">
-          <label>Workspace scope</label>
-          <select value={scopeKey} onChange={(event) => onScopeChange(event.target.value)}>
-            <option value="all">InfinitiLabs · All Clients</option>
-            {Object.entries(clientsByName).map(([client, brands]) => (
-              <optgroup key={client} label={client}>
-                <option value={`client:${client}`}>All {client}</option>
-                {brands.map((entry) => <option key={entry.id} value={`brand:${entry.id}`}>↳ {entry.brand}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>}
+        {currentUser?.role !== 'client' && (
+          <ScopeDropdown
+            clients={clients}
+            scopeKey={scopeKey}
+            onScopeChange={onScopeChange}
+          />
+        )}
 
         <nav className="sidebar-nav" aria-label="Main navigation">
           {currentUser?.role === 'client' ? (
