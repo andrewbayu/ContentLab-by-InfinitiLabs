@@ -98,6 +98,29 @@ export function isUserInvolved(item: ContentItem, user: Pick<TeamMember, 'id' | 
     (!item.ownerId && item.assignee.toLowerCase() === user.name.toLowerCase());
 }
 
+export function getAssignedClients(user?: TeamMember): string[] {
+  if (!user || !user.client || user.client.trim() === '' || user.client === 'All' || user.client === '*') {
+    return [];
+  }
+  return user.client.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+export function hasClientAccess(user: TeamMember, itemClient?: string, itemBrand?: string): boolean {
+  if (!user) return false;
+  if (user.role === 'super') return true;
+  const assigned = getAssignedClients(user);
+  if (assigned.length === 0) return true; // No restriction specified (has access to all)
+
+  const targetClient = (itemClient || '').trim().toLowerCase();
+  const targetBrand = (itemBrand || '').trim().toLowerCase();
+
+  return assigned.some((clientName) => {
+    const norm = clientName.toLowerCase();
+    return (targetClient && targetClient.includes(norm)) || (targetBrand && targetBrand.includes(norm));
+  });
+}
+
+
 export interface Channel {
   id: string;
   name: string;

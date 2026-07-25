@@ -760,7 +760,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                       <img src={getGeneratedAvatar(member.name)} alt={member.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontWeight: 600, fontSize: '14px' }}>{member.name}</span><span className={`team-role-badge role-${member.role}`}>{member.role === 'super' ? 'Super Admin' : member.role === 'client' ? 'Client' : 'Team'}</span></div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{member.email}{member.role === 'client' && member.client ? ` · ${member.client}` : ''}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{member.email}{member.client ? ` · Access: ${member.client}` : ' · Access: All Clients'}</div>
                       </div>
                     </div>
                     <button className="btn btn-secondary btn-icon-only" style={{ border: 'none', padding: '4px' }} onClick={() => onDeleteCreator(member.id)}>
@@ -788,12 +788,19 @@ function deleteTaskMembers(spreadsheet, taskId) {
                   required
                 />
                 <input type="password" className="form-input" placeholder="Temporary Password *" value={creatorPassword} onChange={(e) => setCreatorPassword(e.target.value)} minLength={8} required />
-                <select className="form-select" value={creatorRole} onChange={(e) => { const role = e.target.value as UserRole; setCreatorRole(role); if (role !== 'client') setCreatorClient(''); }} aria-label="User role">
+                <select className="form-select" value={creatorRole} onChange={(e) => { const role = e.target.value as UserRole; setCreatorRole(role); }} aria-label="User role">
                   <option value="team">Team Member</option>
                   <option value="client">Client</option>
                   <option value="super">Super Admin</option>
                 </select>
-                {creatorRole === 'client' && <select className="form-select" value={creatorClient} onChange={(e) => setCreatorClient(e.target.value)} aria-label="Assign client" required><option value="">Assign client *</option>{[...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort().map((client) => <option key={client} value={client}>{client}</option>)}</select>}
+                {creatorRole !== 'super' && (
+                  <select className="form-select" value={creatorClient} onChange={(e) => setCreatorClient(e.target.value)} aria-label="Assign client" required={creatorRole === 'client'}>
+                    <option value="">{creatorRole === 'client' ? 'Assign Client *' : 'Client Access: All Clients (Default)'}</option>
+                    {[...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort().map((client) => (
+                      <option key={client} value={client}>{client}</option>
+                    ))}
+                  </select>
+                )}
                 <button type="submit" className="btn btn-primary" disabled={isAddingCreator}>
                   {isAddingCreator ? 'Saving...' : 'Add User'}
                 </button>

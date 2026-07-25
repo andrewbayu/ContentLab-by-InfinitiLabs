@@ -34,6 +34,7 @@ import {
   getCachedWorkspaceData,
   saveCachedWorkspaceData,
   isUserInvolved,
+  hasClientAccess,
   isMockMode
 } from './services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, UserRole } from './services/sheets';
@@ -584,6 +585,9 @@ function App() {
 
   const scopedItems = useMemo(() => items.filter((item) => {
     if (currentUser?.role === 'client') return item.client === currentUser.client;
+    if (currentUser && currentUser.role === 'team' && !hasClientAccess(currentUser, item.client, item.brand) && !isUserInvolved(item, currentUser)) {
+      return false;
+    }
     if (selectedBrand) return item.client === selectedBrand.client && item.brand === selectedBrand.brand;
     if (selectedClient) return item.client === selectedClient;
     return true;
