@@ -51,8 +51,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   // View mode state: 'table' (default) or 'cards'
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-  // Modal review state: selected item to view in modal
-  const [selectedModalItem, setSelectedModalItem] = useState<ContentItem | null>(null);
+  // Drawer review state: selected item to view in right-side drawer
+  const [selectedDrawerItem, setSelectedDrawerItem] = useState<ContentItem | null>(null);
 
   const [comment, setComment] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
@@ -68,9 +68,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   }), [contentItems, search, statusFilter]);
 
   const activeComments = useMemo(() => {
-    if (!selectedModalItem) return [];
-    return comments.filter((entry) => entry.contentId === selectedModalItem.id);
-  }, [comments, selectedModalItem]);
+    if (!selectedDrawerItem) return [];
+    return comments.filter((entry) => entry.contentId === selectedDrawerItem.id);
+  }, [comments, selectedDrawerItem]);
 
   const awaitingReview = contentItems.filter(isReadyForReview);
   const approved = contentItems.filter((item) => item.status === 'Scheduled' || item.status === 'Published');
@@ -79,16 +79,16 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const availableTeamMembers = useMemo(() => team.filter((member) => member.role !== 'client'), [team]);
 
   const updateReview = async (approvedItem: boolean) => {
-    if (!selectedModalItem) return;
+    if (!selectedDrawerItem) return;
     setSaving(true);
     try {
       const updated = {
-        ...selectedModalItem,
+        ...selectedDrawerItem,
         status: approvedItem ? 'Scheduled' : 'Review/Editing' as ContentItem['status'],
         actorId: currentUser.id,
       };
       await onUpdateItem(updated);
-      setSelectedModalItem(updated);
+      setSelectedDrawerItem(updated);
     } finally {
       setSaving(false);
     }
@@ -96,7 +96,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   const submitComment = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedModalItem || !comment.trim()) return;
+    if (!selectedDrawerItem || !comment.trim()) return;
     setSaving(true);
     try {
       const normalizedComment = comment.trim().toLowerCase();
@@ -104,7 +104,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         const member = team.find((entry) => entry.id === id);
         return member && normalizedComment.includes(`@${member.name.toLowerCase()}`);
       });
-      await onAddComment(selectedModalItem.id, comment.trim(), attachmentUrl.trim() || undefined, activeMentionIds);
+      await onAddComment(selectedDrawerItem.id, comment.trim(), attachmentUrl.trim() || undefined, activeMentionIds);
       setComment('');
       setAttachmentUrl('');
       setMentionedUserIds([]);
@@ -130,62 +130,62 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           <div>
             <span className="analytics-eyebrow">Client Workspace</span>
             <h2>Welcome back, {currentUser.name}</h2>
-            <p>Ringkasan konten dan pekerjaan yang memerlukan perhatian Anda.</p>
+            <p>A clear view of content ready for review and team activity.</p>
           </div>
-          <span className="client-portal-scope">{currentUser.client || 'Workspace Klien'}</span>
+          <span className="client-portal-scope">{currentUser.client || 'Client Workspace'}</span>
         </div>
 
         <section className="client-summary-grid" aria-label="Workspace summary">
           <article className="client-summary-card summary-action" onClick={onNavigateToReview} role="button" tabIndex={0}>
             <ClipboardCheck size={22} />
             <div>
-              <span>Perlu Review Anda</span>
-              <strong>{awaitingReview.length} Konten</strong>
-              <small>{awaitingReview.length ? 'Draft siap disetujui atau direvisi' : 'Belum ada antrean review'}</small>
+              <span>Needs Your Review</span>
+              <strong>{awaitingReview.length} Items</strong>
+              <small>{awaitingReview.length ? 'Content ready for feedback' : 'No items waiting for review'}</small>
             </div>
           </article>
           <article className="client-summary-card">
             <CheckCircle2 size={22} />
             <div>
-              <span>Disetujui / Jadwal</span>
-              <strong>{approved.length} Konten</strong>
-              <small>Konten berjalan sesuai jadwal</small>
+              <span>Approved / Scheduled</span>
+              <strong>{approved.length} Items</strong>
+              <small>Content moving forward on schedule</small>
             </div>
           </article>
           <article className="client-summary-card">
             <FileText size={22} />
             <div>
-              <span>Laporan Berbagi</span>
-              <strong>{reportsCount} Laporan</strong>
-              <small>Dokumen & laporan kinerja</small>
+              <span>Shared Reports</span>
+              <strong>{reportsCount} Files</strong>
+              <small>Documents & performance reports</small>
             </div>
           </article>
         </section>
 
         <section className="client-overview-panel">
           <div className="client-overview-panel-copy">
-            <span className="analytics-eyebrow">Langkah Selanjutnya</span>
+            <span className="analytics-eyebrow">Next Step</span>
             <h3>
               {awaitingReview.length
-                ? `${awaitingReview.length} konten siap untuk di-review`
-                : 'Semua pekerjaan saat ini sudah selesai di-review'}
+                ? `${awaitingReview.length} item${awaitingReview.length === 1 ? '' : 's'} ready for your review`
+                : 'You are all caught up'}
             </h3>
             <p>
               {awaitingReview.length
-                ? 'Buka Review Konten untuk melihat draft, memberikan masukan, atau menyetujui jadwal publikasi.'
-                : 'Draft baru dari tim akan otomatis muncul di sini begitu siap di-review.'}
+                ? 'Open Content Review to approve drafts or request revisions from the team.'
+                : 'New content shared by the team will appear here when ready.'}
             </p>
           </div>
           <button type="button" className="btn btn-primary client-main-action-btn" onClick={onNavigateToReview}>
-            <ClipboardCheck size={16} /> Buka Review Konten
+            <ClipboardCheck size={16} /> Open Content Review
           </button>
         </section>
 
         <section className="client-latest-panel">
           <div className="client-section-title">
-            <strong><Sparkles size={16} /> Perubahan & Draf Terbaru</strong>
+            <strong><Sparkles size={16} /> Latest Shared Work</strong>
             <button type="button" className="client-text-action" onClick={onNavigateToReview}>
-              Lihat semua <ArrowRight size={14} />
+              View All <ArrowRight size={14} />
             </button>
           </div>
           {recent.length ? (
@@ -196,7 +196,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   key={item.id}
                   className="client-latest-row"
                   onClick={() => {
-                    setSelectedModalItem(item);
+                    setSelectedDrawerItem(item);
                     onNavigateToReview();
                   }}
                 >
@@ -205,7 +205,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                     <span>{item.brand || item.client} · {item.channel}</span>
                   </div>
                   <span className={isReadyForReview(item) ? 'client-status-badge ready' : 'client-status-badge neutral'}>
-                    {isReadyForReview(item) ? 'Siap Review' : item.status}
+                    {isReadyForReview(item) ? 'Ready for Review' : item.status}
                   </span>
                 </button>
               ))}
@@ -213,8 +213,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           ) : (
             <div className="client-overview-empty">
               <CheckCircle2 size={28} />
-              <strong>Belum ada konten yang dibagikan</strong>
-              <span>Tim akan menambahkan konten di sini begitu draft awal disiapkan.</span>
+              <strong>No shared content yet</strong>
+              <span>Your team will add content here when initial drafts are ready.</span>
             </div>
           )}
         </section>
@@ -228,10 +228,10 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       <div className="client-portal-heading">
         <div>
           <span className="analytics-eyebrow">Content Review</span>
-          <h2>Review & Feedback Konten</h2>
-          <p>Tinjau draft, berikan masukan ke tim, atau setujui untuk dipublikasikan.</p>
+          <h2>Review & Feedback</h2>
+          <p>Review drafts, provide feedback to the team, or approve content for publishing.</p>
         </div>
-        <span className="client-portal-scope">{currentUser.client || 'Workspace Klien'}</span>
+        <span className="client-portal-scope">{currentUser.client || 'Client Workspace'}</span>
       </div>
 
       {/* Toolbar Controls: Search, Filter, View Mode Toggle */}
@@ -242,37 +242,37 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari judul, brand, atau channel..."
+              placeholder="Search title, brand, or channel..."
             />
           </label>
           <label className="client-filter-box">
             <Filter size={15} />
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="All">Semua Status ({contentItems.length})</option>
-              <option value="Review/Editing">Review/Editing (Perlu Review)</option>
+              <option value="All">All Statuses ({contentItems.length})</option>
+              <option value="Review/Editing">Review/Editing (Needs Action)</option>
               <option value="Idea">Idea</option>
-              <option value="Scheduled">Scheduled (Disetujui)</option>
+              <option value="Scheduled">Scheduled (Approved)</option>
               <option value="Published">Published</option>
             </select>
           </label>
         </div>
 
         <div className="client-toolbar-actions">
-          <span className="client-count-chip">{reviewItems.length} Konten</span>
+          <span className="client-count-chip">{reviewItems.length} Content Items</span>
           <div className="client-view-toggle-group">
             <button
               type="button"
               className={`client-view-btn ${viewMode === 'table' ? 'active' : ''}`}
               onClick={() => setViewMode('table')}
-              title="Tampilan Tabel List"
+              title="Table View"
             >
-              <List size={16} /> Tabel List
+              <List size={16} /> Table View
             </button>
             <button
               type="button"
               className={`client-view-btn ${viewMode === 'cards' ? 'active' : ''}`}
               onClick={() => setViewMode('cards')}
-              title="Tampilan Cards 3 Kolom"
+              title="Cards Grid View"
             >
               <LayoutGrid size={16} /> Cards Grid
             </button>
@@ -284,8 +284,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       {reviewItems.length === 0 ? (
         <div className="client-portal-empty">
           <CheckCircle2 size={32} />
-          <strong>Tidak ada konten yang sesuai</strong>
-          <span>Coba ubah kata kunci pencarian atau filter status.</span>
+          <strong>No matching content found</strong>
+          <span>Try adjusting your search query or status filter.</span>
         </div>
       ) : viewMode === 'table' ? (
         /* TABLE VIEW (DEFAULT) */
@@ -293,11 +293,11 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           <table className="client-table">
             <thead>
               <tr>
-                <th style={{ width: '40%' }}>Judul Konten & Brand</th>
+                <th style={{ width: '40%' }}>Title & Brand</th>
                 <th style={{ width: '15%' }}>Channel</th>
                 <th style={{ width: '18%' }}>Status</th>
-                <th style={{ width: '17%' }}>Rencana Publikasi</th>
-                <th style={{ width: '10%', textAlign: 'right' }}>Aksi</th>
+                <th style={{ width: '17%' }}>Publish Date</th>
+                <th style={{ width: '10%', textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -307,7 +307,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   <tr
                     key={item.id}
                     className="client-table-row"
-                    onClick={() => setSelectedModalItem(item)}
+                    onClick={() => setSelectedDrawerItem(item)}
                   >
                     <td>
                       <div className="client-table-title-cell">
@@ -320,7 +320,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                     </td>
                     <td>
                       <span className={`client-status-pill ${isPending ? 'pending' : 'normal'}`}>
-                        {isPending ? 'Perlu Review' : item.status}
+                        {isPending ? 'Needs Review' : item.status}
                       </span>
                     </td>
                     <td>
@@ -338,10 +338,10 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                         className="btn btn-secondary btn-sm client-table-action-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedModalItem(item);
+                          setSelectedDrawerItem(item);
                         }}
                       >
-                        Tinjau
+                        Review
                       </button>
                     </td>
                   </tr>
@@ -359,7 +359,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               <article
                 key={item.id}
                 className="client-grid-card"
-                onClick={() => setSelectedModalItem(item)}
+                onClick={() => setSelectedDrawerItem(item)}
               >
                 {item.coverImageUrl && (
                   <div className="client-card-cover-box">
@@ -373,15 +373,15 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   </div>
                   <h4 className="client-card-title">{item.title}</h4>
                   <p className="client-card-brief">
-                    {item.brief ? item.brief : 'Belum ada ringkasan brief.'}
+                    {item.brief ? item.brief : 'No brief provided.'}
                   </p>
                 </div>
                 <div className="client-card-footer">
                   <span className={`client-status-pill ${isPending ? 'pending' : 'normal'}`}>
-                    {isPending ? 'Perlu Review' : item.status}
+                    {isPending ? 'Needs Review' : item.status}
                   </span>
                   <button type="button" className="btn btn-secondary btn-sm">
-                    Tinjau
+                    Review
                   </button>
                 </div>
               </article>
@@ -390,55 +390,55 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         </div>
       )}
 
-      {/* DETAIL & REVIEW MODAL OVERLAY */}
-      {selectedModalItem && (
-        <div className="client-modal-backdrop" onClick={() => setSelectedModalItem(null)}>
-          <div className="client-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="client-modal-header">
-              <div className="client-modal-header-info">
+      {/* RIGHT SIDE DRAWER (SLIDE-IN PANEL) */}
+      {selectedDrawerItem && (
+        <div className="client-drawer-backdrop" onClick={() => setSelectedDrawerItem(null)}>
+          <div className="client-drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="client-drawer-header">
+              <div className="client-drawer-header-info">
                 <div className="client-meta-chips">
-                  <span className="client-chip brand">{selectedModalItem.brand || selectedModalItem.client || 'Brand'}</span>
-                  <span className="client-chip channel">{selectedModalItem.channel}</span>
+                  <span className="client-chip brand">{selectedDrawerItem.brand || selectedDrawerItem.client || 'Brand'}</span>
+                  <span className="client-chip channel">{selectedDrawerItem.channel}</span>
                 </div>
-                <h3>{selectedModalItem.title}</h3>
+                <h3>{selectedDrawerItem.title}</h3>
               </div>
-              <div className="client-modal-header-actions">
-                <span className={`client-status-badge-lg ${isReadyForReview(selectedModalItem) ? 'ready' : 'standard'}`}>
-                  {isReadyForReview(selectedModalItem) ? 'Perlu Review Anda' : selectedModalItem.status}
+              <div className="client-drawer-header-actions">
+                <span className={`client-status-badge-lg ${isReadyForReview(selectedDrawerItem) ? 'ready' : 'standard'}`}>
+                  {isReadyForReview(selectedDrawerItem) ? 'Needs Your Review' : selectedDrawerItem.status}
                 </span>
                 <button
                   type="button"
-                  className="client-modal-close-btn"
-                  onClick={() => setSelectedModalItem(null)}
-                  title="Tutup Modal"
+                  className="client-drawer-close-btn"
+                  onClick={() => setSelectedDrawerItem(null)}
+                  title="Close Panel"
                 >
                   <X size={20} />
                 </button>
               </div>
             </div>
 
-            <div className="client-modal-body">
+            <div className="client-drawer-body">
               {/* Cover Image Preview */}
-              {selectedModalItem.coverImageUrl && (
+              {selectedDrawerItem.coverImageUrl && (
                 <div className="client-cover-preview">
-                  <img src={selectedModalItem.coverImageUrl} alt={selectedModalItem.title} loading="lazy" />
+                  <img src={selectedDrawerItem.coverImageUrl} alt={selectedDrawerItem.title} loading="lazy" />
                 </div>
               )}
 
               {/* Brief & Assets */}
               <div className="client-review-copy">
-                <h4>Brief Konten</h4>
-                <p>{selectedModalItem.brief || 'Belum ada ringkasan brief yang diberikan.'}</p>
+                <h4>Content Brief</h4>
+                <p>{selectedDrawerItem.brief || 'No brief provided.'}</p>
 
                 <div className="client-review-meta-row">
-                  {selectedModalItem.publishDate && (
+                  {selectedDrawerItem.publishDate && (
                     <span className="client-meta-item">
-                      <Clock size={14} /> Rencana Publikasi: <strong>{selectedModalItem.publishDate}</strong>
+                      <Clock size={14} /> Planned Publish Date: <strong>{selectedDrawerItem.publishDate}</strong>
                     </span>
                   )}
-                  {selectedModalItem.assetsLink && (
-                    <a href={selectedModalItem.assetsLink} target="_blank" rel="noreferrer" className="client-asset-link-btn">
-                      <ExternalLink size={14} /> Buka Shared Assets (Google Drive)
+                  {selectedDrawerItem.assetsLink && (
+                    <a href={selectedDrawerItem.assetsLink} target="_blank" rel="noreferrer" className="client-asset-link-btn">
+                      <ExternalLink size={14} /> Open Shared Assets (Google Drive)
                     </a>
                   )}
                 </div>
@@ -447,7 +447,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               {/* Discussion & Feedback */}
               <div className="client-comments">
                 <h4>
-                  <MessageSquare size={16} /> Diskusi & Feedback ({activeComments.length})
+                  <MessageSquare size={16} /> Discussion & Feedback ({activeComments.length})
                 </h4>
 
                 <div className="client-comments-list">
@@ -459,19 +459,19 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                           <strong>{entry.author}</strong>
                         </div>
                         <span className="client-comment-date">
-                          {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                          {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
                       <p className="client-comment-text">{entry.text}</p>
                       {entry.attachmentUrl && (
                         <a href={entry.attachmentUrl} target="_blank" rel="noreferrer" className="client-comment-attachment">
-                          <Link2 size={13} /> Buka Lampiran File
+                          <Link2 size={13} /> Open Attachment
                         </a>
                       )}
                     </div>
                   ))}
                   {activeComments.length === 0 && (
-                    <p className="client-muted client-empty-comments">Belum ada feedback. Tuliskan masukan untuk tim di bawah ini.</p>
+                    <p className="client-muted client-empty-comments">No feedback yet. Write a message for the team below.</p>
                   )}
                 </div>
 
@@ -479,7 +479,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 <form onSubmit={submitComment} className="client-comment-form">
                   {availableTeamMembers.length > 0 && (
                     <div className="client-mention-bar">
-                      <span className="client-mention-label"><User size={12} /> Tag anggota tim:</span>
+                      <span className="client-mention-label"><User size={12} /> Tag team members:</span>
                       <div className="client-mention-pills">
                         {availableTeamMembers.map((member) => (
                           <button
@@ -497,7 +497,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   <textarea
                     value={comment}
                     onChange={(event) => setComment(event.target.value)}
-                    placeholder="Tuliskan saran, revisi, atau catatan untuk tim..."
+                    placeholder="Write feedback, revision requests, or notes for the team..."
                     rows={3}
                   />
                   <input
@@ -505,23 +505,23 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                     type="url"
                     value={attachmentUrl}
                     onChange={(event) => setAttachmentUrl(event.target.value)}
-                    placeholder="Tautan lampiran Google Drive (Opsional)"
+                    placeholder="Optional Google Drive attachment link"
                   />
                   <button type="submit" className="btn btn-secondary client-submit-btn" disabled={saving || !comment.trim()}>
-                    <Send size={14} /> {saving ? 'Mengirim...' : 'Kirim Feedback'}
+                    <Send size={14} /> {saving ? 'Sending...' : 'Send Feedback'}
                   </button>
                 </form>
               </div>
             </div>
 
-            <div className="client-modal-footer">
+            <div className="client-drawer-footer">
               <button
                 type="button"
                 className="btn btn-secondary client-action-btn reject"
                 disabled={saving}
                 onClick={() => updateReview(false)}
               >
-                <Undo2 size={16} /> Minta Revisi
+                <Undo2 size={16} /> Request Revision
               </button>
               <button
                 type="button"
@@ -529,7 +529,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 disabled={saving}
                 onClick={() => updateReview(true)}
               >
-                <CheckCircle2 size={16} /> Setujui Konten
+                <CheckCircle2 size={16} /> Approve
               </button>
             </div>
           </div>
