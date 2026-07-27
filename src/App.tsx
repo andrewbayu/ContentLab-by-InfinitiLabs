@@ -159,7 +159,7 @@ function App() {
     if (activeTab === 'settings' && currentUser?.role !== 'super') {
       setActiveTab('dashboard');
     }
-    if (currentUser?.role === 'client' && !['dashboard', 'review', 'reports'].includes(activeTab)) setActiveTab('dashboard');
+    if (currentUser?.role === 'client' && !['dashboard', 'review', 'calendar', 'reports'].includes(activeTab)) setActiveTab('dashboard');
   }, [activeTab, currentUser?.role]);
 
   useEffect(() => {
@@ -705,7 +705,7 @@ function App() {
           </div>
         ) : (
           <>
-        {['board', 'calendar', 'list'].includes(activeTab) && (
+        {['board', 'calendar', 'list'].includes(activeTab) && currentUser.role !== 'client' && (
           <div className="task-view-bar">
             <div className="task-view-tabs">
               {([
