@@ -562,11 +562,19 @@ function App() {
     setVariablesConfig(config);
   };
 
+  const allAvailableTags = useMemo(() => {
+    return getCustomTags(items);
+  }, [items, customTags]);
+
   // Custom tags
   const handleAddTag = (tag: string) => {
-    const updated = [...customTags, tag];
-    saveCustomTags(updated);
-    setCustomTags(updated);
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+    if (!customTags.includes(trimmed)) {
+      const updated = [...customTags, trimmed];
+      saveCustomTags(updated);
+      setCustomTags(updated);
+    }
   };
 
   const handleDeleteTag = (tag: string) => {
@@ -811,7 +819,7 @@ function App() {
             addToast={addToast}
             variablesConfig={variablesConfig}
             onSaveVariablesConfig={handleSaveVariablesConfig}
-            tags={customTags}
+            tags={allAvailableTags}
             onAddTag={handleAddTag}
             onDeleteTag={handleDeleteTag}
             team={team}
@@ -845,7 +853,7 @@ function App() {
         clients={clients}
         defaultClientBrand={selectedBrand}
         variablesConfig={variablesConfig}
-        customTags={customTags}
+        customTags={allAvailableTags}
         activeUser={currentUser.name}
         activeUserId={currentUser.id}
         comments={comments}
@@ -853,6 +861,7 @@ function App() {
         onAddCreator={handleAddCreator}
         onAddChannel={handleAddChannel}
         onAddClientBrand={handleAddClientBrand}
+        onAddTag={handleAddTag}
         canManageRegistries={currentUser.role === 'super'}
       />
 

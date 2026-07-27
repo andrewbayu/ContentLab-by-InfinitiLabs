@@ -23,6 +23,7 @@ interface TaskModalProps {
   onAddCreator: (name: string, email: string) => Promise<TeamMember>;
   onAddChannel: (name: string, color: string) => Promise<Channel>;
   onAddClientBrand: (client: string, brand: string, color: string) => Promise<ClientBrand>;
+  onAddTag?: (tag: string) => void;
   canManageRegistries: boolean;
 }
 
@@ -53,8 +54,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   onAddCreator,
   onAddChannel,
   onAddClientBrand,
+  onAddTag,
   canManageRegistries,
 }) => {
+  const [newTagInput, setNewTagInput] = useState('');
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
   const [status, setStatus] = useState<ContentItem['status']>('Idea');
@@ -385,6 +388,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
+  };
+
+  const handleCreateInlineTag = () => {
+    const trimmed = newTagInput.trim();
+    if (!trimmed) return;
+    if (!selectedTags.includes(trimmed)) {
+      setSelectedTags((prev) => [...prev, trimmed]);
+    }
+    if (onAddTag) {
+      onAddTag(trimmed);
+    }
+    setNewTagInput('');
   };
 
   // Handle adding a creator inline
@@ -942,6 +957,31 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         </span>
                       );
                     })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Add custom tag (e.g. Diskon50)..."
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateInlineTag();
+                        }
+                      }}
+                      style={{ fontSize: '12px', padding: '6px 10px', height: '34px', flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleCreateInlineTag}
+                      disabled={!newTagInput.trim()}
+                      style={{ height: '34px', padding: '0 12px', fontSize: '12px', flexShrink: 0 }}
+                    >
+                      <Plus size={13} /> Add Tag
+                    </button>
                   </div>
                 </div>
               )}
