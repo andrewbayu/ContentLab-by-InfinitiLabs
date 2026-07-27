@@ -262,9 +262,13 @@ function doPost(e) {
       ]);
       
       // EMAIL NOTIFICATION FOR @MENTIONS
+      let notificationStats = { sent: 0, failed: 0 };
       try {
-        const text = comment.text;
-        if (text.includes("@")) {
+        const text = String(comment.text || "");
+        const lowerText = text.toLowerCase();
+        const mentionIds = Array.isArray(comment.mentionedUserIds) ? comment.mentionedUserIds : [];
+
+        if (text.includes("@") || mentionIds.length > 0) {
           const teamSheet = sheet.getSheetByName("Team");
           const teamData = getSheetData(teamSheet);
           const contentSheet = sheet.getSheetByName("Content");
@@ -273,29 +277,53 @@ function doPost(e) {
           let contentTitle = "Content Plan";
           for (let i = 0; i < contentData.length; i++) {
             if (String(contentData[i].id) === String(comment.contentId)) {
-              contentTitle = contentData[i].title;
+              contentTitle = contentData[i].title || "Content Plan";
               break;
             }
           }
-          
+
+          const recipients = [];
+          const notifiedUserIds = {};
+
           for (let i = 0; i < teamData.length; i++) {
             const member = teamData[i];
-            if (text.includes("@" + member.name)) {
-              if (member.email) {
-                const subject = "[ContentLab] Mentions from " + comment.author + " on \"" + contentTitle + "\"";
-                const body = "Halo " + member.name + ",\n\n" +
-                             comment.author + " menyebut Anda dalam diskusi revisi untuk \"" + contentTitle + "\":\n\n" +
-                             "\"" + text + "\"\n\n" +
-                             "Silakan cek ContentLab Studio Planner Anda.";
-                MailApp.sendEmail(member.email, subject, body);
-              }
+            if (!member.email) continue;
+            
+            const memberId = String(member.id || "");
+            const memberName = String(member.name || "").trim().toLowerCase();
+            const firstName = memberName.split(" ")[0];
+
+            const isMentionedById = mentionIds.indexOf(memberId) !== -1;
+            const isMentionedByName = memberName && lowerText.indexOf("@" + memberName) !== -1;
+            const isMentionedByFirstName = firstName && lowerText.indexOf("@" + firstName) !== -1;
+
+            if ((isMentionedById || isMentionedByName || isMentionedByFirstName) && !notifiedUserIds[memberId]) {
+              notifiedUserIds[memberId] = true;
+              recipients.push(member);
+            }
+          }
+
+          for (let i = 0; i < recipients.length; i++) {
+            const member = recipients[i];
+            try {
+              const subject = "[ContentLab] " + comment.author + " mentioned you in \"" + contentTitle + "\"";
+              const body = "Halo " + member.name + ",\n\n" +
+                           comment.author + " menyebut Anda dalam diskusi revisi/konten \"" + contentTitle + "\":\n\n" +
+                           "\"" + text + "\"\n\n" +
+                           "Silakan buka ContentLab Studio Planner Anda untuk membalas.";
+              MailApp.sendEmail(member.email, subject, body);
+              notificationStats.sent++;
+            } catch (sendErr) {
+              console.error("Failed to send email to " + member.email + ": ", sendErr);
+              notificationStats.failed++;
             }
           }
         }
       } catch (mailErr) {
-        console.error("Mail error log:", mailErr);
+        console.error("Mail notification error log: ", mailErr);
       }
       
+      comment.notification = notificationStats;
       result = { success: true, comment: comment };    
     } else if (action === "login") {
       const teamSheet = sheet.getSheetByName("Team");

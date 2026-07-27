@@ -10,13 +10,14 @@ function doGet(e) {
   const taskMembers = getSheetData(sheet.getSheetByName("Task Members"));
   const documents = getSheetData(sheet.getSheetByName("Documents"));
   const publicTeam = team.map(function(member) {
+    var roleStr = String(member.role || "team").toLowerCase();
     return {
       id: member.id,
       name: member.name,
       email: member.email,
       avatar: member.avatar,
-      role: String(member.role || "team").toLowerCase() === "super" ? "super" : String(member.role || "team").toLowerCase() === "client" ? "client" : "team",
-      client: member.client || ""
+      role: roleStr === "super" ? "super" : roleStr === "client" ? "client" : "team",
+      client: member.client ? String(member.client) : ""
     };
   });
   
@@ -118,49 +119,9 @@ function doPost(e) {
       const member = postData.member;
       teamSheet.appendRow([
         member.id, member.name, member.email, member.avatar,
-        member.password || "", member.role || "team", member.client || ""
+        member.password || "", member.role || "team"
       ]);
       result = { success: true, member: member };
-    }
-    else if (action === "updateTeamMember") {
-      const teamSheet = sheet.getSheetByName("Team");
-      const member = postData.member;
-      const teamData = teamSheet.getDataRange().getValues();
-      let rowIndex = -1;
-      for (let i = 1; i < teamData.length; i++) {
-        if (String(teamData[i][0]).trim() === String(member.id).trim()) {
-          rowIndex = i + 1;
-          break;
-        }
-      }
-      if (rowIndex !== -1) {
-        const existingPassword = teamData[rowIndex - 1][4];
-        teamSheet.getRange(rowIndex, 1, 1, 7).setValues([[
-          member.id, member.name, member.email, member.avatar || teamData[rowIndex - 1][3] || "",
-          member.password || existingPassword || "", member.role || "team", member.client || ""
-        ]]);
-        result = { success: true, member: member };
-      } else {
-        result = { success: false, error: "Team member not found" };
-      }
-    }
-    else if (action === "deleteTeamMember") {
-      const teamSheet = sheet.getSheetByName("Team");
-      const memberId = postData.id;
-      const teamData = teamSheet.getDataRange().getValues();
-      let rowIndex = -1;
-      for (let i = 1; i < teamData.length; i++) {
-        if (String(teamData[i][0]).trim() === String(memberId).trim()) {
-          rowIndex = i + 1;
-          break;
-        }
-      }
-      if (rowIndex !== -1) {
-        teamSheet.deleteRow(rowIndex);
-        result = { success: true };
-      } else {
-        result = { success: false, error: "Team member not found" };
-      }
     }
     else if (action === "createChannel") {
       const channelSheet = sheet.getSheetByName("Channels");
@@ -296,13 +257,74 @@ function doPost(e) {
       comment.id = generateUuid();
       comment.createdAt = new Date().toISOString();
       
-      const mentionIds = Array.isArray(comment.mentionedUserIds) ? comment.mentionedUserIds : [];
       commentSheet.appendRow([
-        comment.id, comment.contentId, comment.author, comment.text, comment.createdAt,
-        comment.attachmentUrl || "", JSON.stringify(mentionIds)
+        comment.id, comment.contentId, comment.author, comment.text, comment.createdAt
       ]);
-      const notification = sendMentionNotifications_(sheet, comment);
-      result = { success: true, comment: comment, notification: notification };
+      
+      // EMAIL NOTIFICATION FOR @MENTIONS
+      let notificationStats = { sent: 0, failed: 0 };
+      try {
+        const text = String(comment.text || "");
+        const lowerText = text.toLowerCase();
+        const mentionIds = Array.isArray(comment.mentionedUserIds) ? comment.mentionedUserIds : [];
+
+        if (text.includes("@") || mentionIds.length > 0) {
+          const teamSheet = sheet.getSheetByName("Team");
+          const teamData = getSheetData(teamSheet);
+          const contentSheet = sheet.getSheetByName("Content");
+          const contentData = getSheetData(contentSheet);
+          
+          let contentTitle = "Content Plan";
+          for (let i = 0; i < contentData.length; i++) {
+            if (String(contentData[i].id) === String(comment.contentId)) {
+              contentTitle = contentData[i].title || "Content Plan";
+              break;
+            }
+          }
+
+          const recipients = [];
+          const notifiedUserIds = {};
+
+          for (let i = 0; i < teamData.length; i++) {
+            const member = teamData[i];
+            if (!member.email) continue;
+            
+            const memberId = String(member.id || "");
+            const memberName = String(member.name || "").trim().toLowerCase();
+            const firstName = memberName.split(" ")[0];
+
+            const isMentionedById = mentionIds.indexOf(memberId) !== -1;
+            const isMentionedByName = memberName && lowerText.indexOf("@" + memberName) !== -1;
+            const isMentionedByFirstName = firstName && lowerText.indexOf("@" + firstName) !== -1;
+
+            if ((isMentionedById || isMentionedByName || isMentionedByFirstName) && !notifiedUserIds[memberId]) {
+              notifiedUserIds[memberId] = true;
+              recipients.push(member);
+            }
+          }
+
+          for (let i = 0; i < recipients.length; i++) {
+            const member = recipients[i];
+            try {
+              const subject = "[ContentLab] " + comment.author + " mentioned you in \"" + contentTitle + "\"";
+              const body = "Halo " + member.name + ",\n\n" +
+                           comment.author + " menyebut Anda dalam diskusi revisi/konten \"" + contentTitle + "\":\n\n" +
+                           "\"" + text + "\"\n\n" +
+                           "Silakan buka ContentLab Studio Planner Anda untuk membalas.";
+              MailApp.sendEmail(member.email, subject, body);
+              notificationStats.sent++;
+            } catch (sendErr) {
+              console.error("Failed to send email to " + member.email + ": ", sendErr);
+              notificationStats.failed++;
+            }
+          }
+        }
+      } catch (mailErr) {
+        console.error("Mail notification error log: ", mailErr);
+      }
+      
+      comment.notification = notificationStats;
+      result = { success: true, comment: comment };    
     } else if (action === "login") {
       const teamSheet = sheet.getSheetByName("Team");
       const teamData = getSheetData(teamSheet);
@@ -317,13 +339,14 @@ function doPost(e) {
         const memberPassword = String(member.password || "").trim();
         
         if ((memberName === username || memberEmail === username) && memberPassword === password) {
+          var roleStr = String(member.role || "team").toLowerCase();
           matchedUser = {
             id: member.id,
             name: member.name,
             email: member.email,
             avatar: member.avatar,
-            role: String(member.role || "team").toLowerCase() === "super" ? "super" : String(member.role || "team").toLowerCase() === "client" ? "client" : "team",
-            client: member.client || ""
+            role: roleStr === "super" ? "super" : roleStr === "client" ? "client" : "team",
+            client: member.client ? String(member.client) : ""
           };
           break;
         }
@@ -345,84 +368,6 @@ function doPost(e) {
   }
 }
 
-function sendMentionNotifications_(spreadsheet, comment) {
-  const teamData = getSheetData(spreadsheet.getSheetByName("Team"));
-  const contentData = getSheetData(spreadsheet.getSheetByName("Content"));
-  const explicitIds = Array.isArray(comment.mentionedUserIds) ? comment.mentionedUserIds.map(String) : [];
-  const normalizedText = String(comment.text || "").toLowerCase();
-  const recipients = [];
-  const seenEmails = {};
-  const explicitNames = {};
-
-  let targetContent = null;
-  let contentTitle = "Content Plan";
-  for (let i = 0; i < contentData.length; i++) {
-    if (String(contentData[i].id) === String(comment.contentId)) {
-      targetContent = contentData[i];
-      contentTitle = contentData[i].title || contentTitle;
-      break;
-    }
-  }
-
-  for (let i = 0; i < teamData.length; i++) {
-    if (explicitIds.indexOf(String(teamData[i].id || "")) !== -1) {
-      explicitNames[String(teamData[i].name || "").trim().toLowerCase()] = true;
-    }
-  }
-
-  for (let i = 0; i < teamData.length; i++) {
-    const member = teamData[i];
-    const memberId = String(member.id || "");
-    const memberName = String(member.name || "").trim();
-    const memberEmail = String(member.email || "").trim().toLowerCase();
-    if (!memberEmail) continue;
-
-    const explicitlyMentioned = explicitIds.indexOf(memberId) !== -1;
-    const normalizedName = memberName.toLowerCase();
-    const textMentioned = memberName && !explicitNames[normalizedName] && normalizedText.indexOf("@" + normalizedName) !== -1;
-
-    let isTargetPic = false;
-    if (targetContent) {
-      const assigneeName = String(targetContent.assignee || "").trim().toLowerCase();
-      const ownerId = String(targetContent.ownerId || "");
-      const reviewerId = String(targetContent.reviewerId || "");
-      if ((assigneeName && normalizedName === assigneeName) || (ownerId && memberId === ownerId) || (reviewerId && memberId === reviewerId)) {
-        isTargetPic = true;
-      }
-    }
-
-    if ((explicitlyMentioned || textMentioned || isTargetPic) && !seenEmails[memberEmail]) {
-      seenEmails[memberEmail] = true;
-      recipients.push({ name: memberName || memberEmail, email: memberEmail, isPic: isTargetPic && !explicitlyMentioned && !textMentioned });
-    }
-  }
-
-  const status = { requested: recipients.length, sent: 0, failed: 0, errors: [] };
-  const attachmentNote = comment.attachmentUrl ? ("\n\nLampiran: " + comment.attachmentUrl) : "";
-
-  for (let i = 0; i < recipients.length; i++) {
-    const recipient = recipients[i];
-    const subject = "[ContentLab] " + comment.author + (recipient.isPic ? " memberi masukan untuk \"" : " menyebut Anda dalam \"") + contentTitle + "\"";
-    const bodyHeader = "Halo " + recipient.name + ",\n\n" +
-      comment.author + (recipient.isPic ? " telah menambahkan masukan/revisi pada konten \"" : " menyebut Anda dalam diskusi revisi untuk \"") + contentTitle + "\":\n\n";
-
-    try {
-      MailApp.sendEmail({
-        to: recipient.email,
-        subject: subject,
-        body: bodyHeader + "\"" + comment.text + "\"" + attachmentNote + "\n\nSilakan buka ContentLab Studio Planner untuk membalas.",
-        name: "ContentLab Notifications"
-      });
-      status.sent++;
-    } catch (error) {
-      status.failed++;
-      status.errors.push(recipient.email + ": " + String(error));
-      console.error("ContentLab notification email failed for " + recipient.email + ": " + error);
-    }
-  }
-  return status;
-}
-
 function getSheetData(sheet) {
   if (!sheet) return [];
   const range = sheet.getDataRange();
@@ -437,7 +382,15 @@ function getSheetData(sheet) {
     if (String(values[i][0] || "").trim() === "") continue;
     const row = {};
     for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = values[i][j];
+      const val = values[i][j];
+      if (Object.prototype.toString.call(val) === '[object Date]') {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        row[headers[j]] = y + '-' + m + '-' + d;
+      } else {
+        row[headers[j]] = val;
+      }
     }
     data.push(row);
   }
@@ -445,8 +398,8 @@ function getSheetData(sheet) {
 }
 
 function syncTaskMembers(spreadsheet, item, isCreate) {
-  const memberSheet = ensureTaskMembersSheet(spreadsheet);
-  if (!item || !item.id) return;
+  const memberSheet = spreadsheet.getSheetByName("Task Members");
+  if (!memberSheet) return;
 
   const values = memberSheet.getDataRange().getValues();
   let hasCreator = false;
@@ -482,17 +435,6 @@ function syncTaskMembers(spreadsheet, item, isCreate) {
   }
 }
 
-function ensureTaskMembersSheet(spreadsheet) {
-  let memberSheet = spreadsheet.getSheetByName("Task Members");
-  if (!memberSheet) {
-    memberSheet = spreadsheet.insertSheet("Task Members");
-    memberSheet.appendRow(["id", "taskId", "userId", "role", "addedAt", "addedBy"]);
-  } else if (memberSheet.getLastRow() === 0) {
-    memberSheet.appendRow(["id", "taskId", "userId", "role", "addedAt", "addedBy"]);
-  }
-  return memberSheet;
-}
-
 function appendTaskMember(memberSheet, taskId, userId, role, addedAt, addedBy) {
   memberSheet.appendRow([
     generateUuid(), taskId, userId, role, addedAt, addedBy || ""
@@ -506,4 +448,11 @@ function deleteTaskMembers(spreadsheet, taskId) {
   for (let i = values.length - 1; i >= 1; i--) {
     if (String(values[i][1]) === String(taskId)) memberSheet.deleteRow(i + 1);
   }
+}
+
+function generateUuid() {
+  if (typeof Utilities !== 'undefined' && typeof Utilities.getUuid === 'function') {
+    return Utilities.getUuid();
+  }
+  return 'id_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
 }
