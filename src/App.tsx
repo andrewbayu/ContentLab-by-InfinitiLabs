@@ -201,48 +201,103 @@ function App() {
     itemPayload: Omit<ContentItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
   ) => {
     setIsModalOpen(false);
+    setSelectedItem(null);
     beginWrite();
 
     const isEdit = !!itemPayload.id;
+    const tempId = itemPayload.id || `temp_${Date.now()}`;
+    const previousItems = [...items];
 
-    try {
-      if (isEdit && itemPayload.id) {
-        const existing = items.find((i) => i.id === itemPayload.id);
-        if (!existing) throw new Error('Task not found');
+    if (isEdit && itemPayload.id) {
+      const existing = items.find((i) => i.id === itemPayload.id);
+      if (!existing) {
+        endWrite();
+        addToast('Task not found', 'error');
+        return;
+      }
 
-        const updatedPayload: ContentItem = {
-          ...existing,
-          ...itemPayload,
-          id: itemPayload.id,
-          createdAt: existing.createdAt,
-          creatorId: existing.creatorId,
-          createdBy: existing.createdBy,
-          actorId: currentUser?.id,
-          updatedAt: new Date().toISOString(),
-        };
+      const updatedPayload: ContentItem = {
+        ...existing,
+        ...itemPayload,
+        id: itemPayload.id,
+        createdAt: existing.createdAt,
+        creatorId: existing.creatorId,
+        createdBy: existing.createdBy,
+        actorId: currentUser?.id,
+        updatedAt: new Date().toISOString(),
+      };
 
-        const updated = await updateContent(updatedPayload);
-        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? updated : item)));
-        addToast(`Successfully updated "${itemPayload.title}"`, 'success');
-      } else {
-        const createdPayload = {
+      // 1. INSTANT UI UPDATE (0ms delay!)
+      setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? updatedPayload : item)));
+      addToast(`Updated "${itemPayload.title}"`, 'success');
+
+      // 2. SILENT BACKGROUND SYNC
+      try {
+        const serverUpdated = await updateContent(updatedPayload);
+        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? serverUpdated : item)));
+      } catch (e) {
+        console.error(e);
+        const message = e instanceof Error ? e.message : 'Sync error';
+        addToast(`Failed to sync update with server. Reverting... (${message})`, 'error');
+        setItems(previousItems);
+      } finally {
+        endWrite();
+      }
+    } else {
+      const newTempItem: ContentItem = {
+        id: tempId,
+        title: itemPayload.title || '',
+        brief: itemPayload.brief || '',
+        status: itemPayload.status || 'Idea',
+        channel: itemPayload.channel || 'Instagram',
+        format: itemPayload.format || 'Feed/Reels',
+        priority: itemPayload.priority || 'Medium',
+        assignee: itemPayload.assignee || '',
+        publishDate: itemPayload.publishDate || '',
+        assetsLink: itemPayload.assetsLink || '',
+        coverImageUrl: itemPayload.coverImageUrl || '',
+        coverImageId: itemPayload.coverImageId || '',
+        tags: itemPayload.tags || '',
+        budget: itemPayload.budget || '',
+        platformNotes: itemPayload.platformNotes || '',
+        targetAudience: itemPayload.targetAudience || '',
+        createdBy: currentUser?.name || 'Anonymous',
+        checklist: itemPayload.checklist || '',
+        views: itemPayload.views || '',
+        likes: itemPayload.likes || '',
+        engagement: itemPayload.engagement || '',
+        taskType: itemPayload.taskType || 'Content',
+        category: itemPayload.category || '',
+        dueDate: itemPayload.dueDate || '',
+        client: itemPayload.client || '',
+        brand: itemPayload.brand || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        creatorId: currentUser?.id || '',
+        actorId: currentUser?.id || '',
+      };
+
+      // 1. INSTANT UI UPDATE (0ms delay!)
+      setItems((prev) => [newTempItem, ...prev]);
+      addToast(`Created "${itemPayload.title}"`, 'success');
+
+      // 2. SILENT BACKGROUND SYNC
+      try {
+        const created = await createContent({
           ...itemPayload,
           createdBy: currentUser?.name || 'Anonymous',
           creatorId: currentUser?.id || '',
           actorId: currentUser?.id || '',
-        };
-        const created = await createContent(createdPayload);
-        setItems((prev) => [created, ...prev]);
-        addToast(`Successfully created "${itemPayload.title}"`, 'success');
+        });
+        setItems((prev) => prev.map((item) => (item.id === tempId ? created : item)));
+      } catch (e) {
+        console.error(e);
+        const message = e instanceof Error ? e.message : 'Sync error';
+        addToast(`Failed to save task to server. (${message})`, 'error');
+        setItems(previousItems);
+      } finally {
+        endWrite();
       }
-    } catch (e) {
-      console.error(e);
-      const message = e instanceof Error ? e.message : 'Unknown sync error';
-      addToast(`Failed to save task. ${message}`, 'error');
-      loadData(false);
-    } finally {
-      endWrite();
-      setSelectedItem(null);
     }
   };
 
