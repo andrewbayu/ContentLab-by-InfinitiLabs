@@ -48,7 +48,7 @@ function doPost(e) {
     if (action === "createContent") {
       const contentSheet = sheet.getSheetByName("Content");
       const item = postData.item;
-      item.id = item.id || Utilities.getUUID();
+      item.id = item.id || generateUuid();
       item.createdAt = new Date().toISOString();
       item.updatedAt = new Date().toISOString();
       
@@ -143,7 +143,7 @@ function doPost(e) {
     else if (action === "createKpiDefinition") {
       const kpiSheet = sheet.getSheetByName("KPI Definitions");
       const definition = postData.definition;
-      definition.id = definition.id || Utilities.getUUID();
+      definition.id = definition.id || generateUuid();
       definition.createdAt = definition.createdAt || new Date().toISOString();
       kpiSheet.appendRow([
         definition.id, definition.clientBrandId, definition.client, definition.brand,
@@ -157,7 +157,7 @@ function doPost(e) {
     else if (action === "createKpiUpdate") {
       const updateSheet = sheet.getSheetByName("KPI Updates");
       const update = postData.update;
-      update.id = update.id || Utilities.getUUID();
+      update.id = update.id || generateUuid();
       update.updatedAt = new Date().toISOString();
       updateSheet.appendRow([
         update.id, update.kpiId, update.period, Number(update.actual || 0),
@@ -172,7 +172,7 @@ function doPost(e) {
       } else {
         const document = postData.document || {};
         const now = new Date().toISOString();
-        document.id = document.id || Utilities.getUUID();
+        document.id = document.id || generateUuid();
         document.type = document.type || "Note";
         document.visibility = document.visibility || "personal";
         document.tags = Array.isArray(document.tags) ? document.tags.join(",") : (document.tags || "");
@@ -254,7 +254,7 @@ function doPost(e) {
     else if (action === "createComment") {
       const commentSheet = sheet.getSheetByName("Comments");
       const comment = postData.comment;
-      comment.id = Utilities.getUUID();
+      comment.id = generateUuid();
       comment.createdAt = new Date().toISOString();
       
       commentSheet.appendRow([
@@ -409,7 +409,7 @@ function syncTaskMembers(spreadsheet, item, isCreate) {
 
 function appendTaskMember(memberSheet, taskId, userId, role, addedAt, addedBy) {
   memberSheet.appendRow([
-    Utilities.getUUID(), taskId, userId, role, addedAt, addedBy || ""
+    generateUuid(), taskId, userId, role, addedAt, addedBy || ""
   ]);
 }
 
@@ -420,4 +420,11 @@ function deleteTaskMembers(spreadsheet, taskId) {
   for (let i = values.length - 1; i >= 1; i--) {
     if (String(values[i][1]) === String(taskId)) memberSheet.deleteRow(i + 1);
   }
+}
+
+function generateUuid() {
+  if (typeof Utilities !== 'undefined' && typeof Utilities.getUuid === 'function') {
+    return Utilities.getUuid();
+  }
+  return 'id_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
 }
