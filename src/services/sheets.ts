@@ -420,11 +420,11 @@ export function saveVariablesConfig(config: VariablesConfig): void {
 // Custom Tags Getters & Setters
 export function getCustomTags(items?: ContentItem[]): string[] {
   const saved = localStorage.getItem(CUSTOM_TAGS_KEY);
-  let tags: string[] = saved ? JSON.parse(saved) : DEFAULT_TAGS;
-  if (!Array.isArray(tags) || tags.length === 0) {
-    tags = DEFAULT_TAGS;
+  let tags: string[] = saved ? JSON.parse(saved) : [];
+  if (!Array.isArray(tags)) {
+    tags = [];
   }
-  const tagSet = new Set<string>(tags);
+  const tagSet = new Set<string>([...DEFAULT_TAGS, ...tags]);
 
   if (Array.isArray(items)) {
     items.forEach((item) => {
@@ -437,7 +437,11 @@ export function getCustomTags(items?: ContentItem[]): string[] {
     });
   }
 
-  return Array.from(tagSet).sort();
+  const result = Array.from(tagSet).sort();
+  try {
+    localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(result));
+  } catch (e) {}
+  return result;
 }
 
 export function saveCustomTags(tags: string[]): void {
