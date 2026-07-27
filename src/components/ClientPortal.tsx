@@ -77,25 +77,35 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const calendarDays = useMemo(() => {
     const days: Array<{ dateStr: string; dayNum: number; isCurrentMonth: boolean }> = [];
     const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const prevYear = month === 0 ? year - 1 : year;
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    const nextMonth = month === 11 ? 0 : month + 1;
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    // Previous month padding cells
     for (let i = startOffset - 1; i >= 0; i--) {
       const d = prevMonthDays - i;
-      const prevDate = new Date(year, month - 1, d);
-      const dateStr = prevDate.toISOString().slice(0, 10);
+      const dateStr = `${prevYear}-${pad(prevMonth + 1)}-${pad(d)}`;
       days.push({ dateStr, dayNum: d, isCurrentMonth: false });
     }
+
+    // Current month cells
     for (let d = 1; d <= daysInMonth; d++) {
-      const monthStr = String(month + 1).padStart(2, '0');
-      const dayStr = String(d).padStart(2, '0');
-      const dateStr = `${year}-${monthStr}-${dayStr}`;
+      const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
       days.push({ dateStr, dayNum: d, isCurrentMonth: true });
     }
+
+    // Next month padding cells
     const totalCells = days.length > 35 ? 42 : 35;
     const remaining = totalCells - days.length;
     for (let d = 1; d <= remaining; d++) {
-      const nextDate = new Date(year, month + 1, d);
-      const dateStr = nextDate.toISOString().slice(0, 10);
+      const dateStr = `${nextYear}-${pad(nextMonth + 1)}-${pad(d)}`;
       days.push({ dateStr, dayNum: d, isCurrentMonth: false });
     }
+
     return days;
   }, [year, month, startOffset, daysInMonth]);
 
@@ -466,7 +476,33 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   // CALENDAR MODE
   if (mode === 'calendar') {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const getChannelClass = (ch: string) => {
+      const norm = ch.toLowerCase();
+      if (norm.includes('instagram')) return 'channel-badge-ig';
+      if (norm.includes('tiktok')) return 'channel-badge-tiktok';
+      if (norm.includes('youtube')) return 'channel-badge-yt';
+      if (norm.includes('linkedin')) return 'channel-badge-linkedin';
+      return 'channel-badge-default';
+    };
+
+    const getStatusClass = (st: string) => {
+      if (st === 'Review/Editing') return 'cal-status-review';
+      if (st === 'Scheduled') return 'cal-status-scheduled';
+      if (st === 'Published') return 'cal-status-published';
+      if (st === 'Production/Design') return 'cal-status-production';
+      return 'cal-status-draft';
+    };
+
+    const getStatusText = (st: string) => {
+      if (st === 'Review/Editing') return 'Needs Review';
+      if (st === 'Scheduled') return 'Approved';
+      if (st === 'Published') return 'Published';
+      if (st === 'Production/Design') return 'In Production';
+      return st;
+    };
 
     return (
       <main className="client-portal page-container">
@@ -530,12 +566,12 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                           key={item.id}
                           className={`client-calendar-item-card ${isPending ? 'pending' : ''}`}
                           onClick={() => setSelectedDrawerItem(item)}
-                          title={`${item.title} (${item.channel})`}
+                          title={`${item.title} (${item.channel}) - ${item.status}`}
                         >
                           <div className="client-cal-item-header">
-                            <span className="client-cal-channel">{item.channel}</span>
-                            <span className={`client-status-pill-xs ${isPending ? 'pending' : 'normal'}`}>
-                              {isPending ? 'Needs Review' : item.status}
+                            <span className={`client-cal-channel ${getChannelClass(item.channel)}`}>{item.channel}</span>
+                            <span className={`client-cal-status-pill ${getStatusClass(item.status)}`}>
+                              {getStatusText(item.status)}
                             </span>
                           </div>
                           <div className="client-cal-item-title">{item.title}</div>
