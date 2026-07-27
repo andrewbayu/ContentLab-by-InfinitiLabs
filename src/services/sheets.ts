@@ -91,6 +91,26 @@ export interface TaskMember {
   addedBy: string;
 }
 
+export function parseDateCell(raw: unknown): string {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return str.split('T')[0];
+}
+
 export function isUserInvolved(item: ContentItem, user: Pick<TeamMember, 'id' | 'name'>): boolean {
   return item.ownerId === user.id ||
     item.reviewerId === user.id ||
@@ -597,7 +617,7 @@ export async function fetchData(): Promise<WorkspaceData> {
       creatorId,
       collaboratorIds,
       reviewerId,
-      publishDate: String(item.publishDate ? item.publishDate.split('T')[0] : ''),
+      publishDate: parseDateCell(item.publishDate),
       assetsLink: String(item.assetsLink || ''),
       coverImageUrl: String(item.coverImageUrl || ''),
       coverImageId: String(item.coverImageId || ''),
@@ -612,7 +632,7 @@ export async function fetchData(): Promise<WorkspaceData> {
       engagement: item.engagement ? String(item.engagement) : '',
       taskType: String(item.taskType || 'Content') as ContentItem['taskType'],
       category: item.category ? String(item.category) : '',
-      dueDate: String(item.dueDate ? item.dueDate.split('T')[0] : ''),
+      dueDate: parseDateCell(item.dueDate),
       client: item.client ? String(item.client) : '',
       brand: item.brand ? String(item.brand) : '',
       createdAt: String(item.createdAt || new Date().toISOString()),

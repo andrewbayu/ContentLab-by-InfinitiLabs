@@ -354,7 +354,15 @@ function getSheetData(sheet) {
     if (String(values[i][0] || "").trim() === "") continue;
     const row = {};
     for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = values[i][j];
+      const val = values[i][j];
+      if (Object.prototype.toString.call(val) === '[object Date]') {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        row[headers[j]] = y + '-' + m + '-' + d;
+      } else {
+        row[headers[j]] = val;
+      }
     }
     data.push(row);
   }
