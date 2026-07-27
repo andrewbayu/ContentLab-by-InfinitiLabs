@@ -61,6 +61,43 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [statusFilter, setStatusFilter] = useState('All');
   const [saving, setSaving] = useState(false);
 
+  // Dynamically extract all available statuses present in contentItems + counts
+  const statusOptions = useMemo(() => {
+    const counts: Record<string, number> = {};
+    contentItems.forEach((item) => {
+      if (item.status) {
+        counts[item.status] = (counts[item.status] || 0) + 1;
+      }
+    });
+
+    const standardOrder: ContentItem['status'][] = [
+      'Idea',
+      'Scripting/Writing',
+      'Production/Design',
+      'Review/Editing',
+      'Scheduled',
+      'Published',
+      'To Do',
+      'In Progress',
+      'Done',
+    ];
+
+    const allStatuses = new Set<string>([
+      ...standardOrder.filter((s) => counts[s]),
+      ...Object.keys(counts),
+    ]);
+
+    return Array.from(allStatuses).map((status) => ({
+      status,
+      count: counts[status] || 0,
+      label: status === 'Review/Editing'
+        ? 'Review/Editing (Needs Action)'
+        : status === 'Scheduled'
+        ? 'Scheduled (Approved)'
+        : status,
+    }));
+  }, [contentItems]);
+
   const reviewItems = useMemo(() => contentItems.filter((item) => {
     const query = search.toLowerCase();
     return (!query || `${item.title} ${item.brand || ''} ${item.channel}`.toLowerCase().includes(query))
@@ -249,10 +286,11 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             <Filter size={15} />
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="All">All Statuses ({contentItems.length})</option>
-              <option value="Review/Editing">Review/Editing (Needs Action)</option>
-              <option value="Idea">Idea</option>
-              <option value="Scheduled">Scheduled (Approved)</option>
-              <option value="Published">Published</option>
+              {statusOptions.map((opt) => (
+                <option key={opt.status} value={opt.status}>
+                  {opt.label} ({opt.count})
+                </option>
+              ))}
             </select>
           </label>
         </div>
