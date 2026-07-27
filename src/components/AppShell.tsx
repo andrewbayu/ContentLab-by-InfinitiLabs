@@ -127,6 +127,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             <>
               <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} aria-current={activeTab === 'dashboard' ? 'page' : undefined} onClick={() => handleNavClick('dashboard')}><LayoutDashboard className="nav-item-icon" />Overview</button>
               <button className={`nav-item ${activeTab === 'review' ? 'active' : ''}`} aria-current={activeTab === 'review' ? 'page' : undefined} onClick={() => handleNavClick('review')}><ClipboardCheck className="nav-item-icon" />Content Review</button>
+              <button className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} aria-current={activeTab === 'calendar' ? 'page' : undefined} onClick={() => handleNavClick('calendar')}><Calendar className="nav-item-icon" />Content Calendar</button>
               <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} aria-current={activeTab === 'reports' ? 'page' : undefined} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
             </>
           ) : (

@@ -3,6 +3,8 @@ import {
   ArrowRight,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Clock,
   ExternalLink,
@@ -26,7 +28,7 @@ interface ClientPortalProps {
   comments: CommentItem[];
   team?: TeamMember[];
   currentUser: TeamMember;
-  mode: 'overview' | 'review';
+  mode: 'overview' | 'review' | 'calendar';
   reportsCount: number;
   onNavigateToReview: () => void;
   onUpdateItem: (item: ContentItem) => Promise<void>;
@@ -60,6 +62,58 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [saving, setSaving] = useState(false);
+
+  // Calendar month state
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
+
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+  const monthName = calendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const startOffset = (firstDayOfWeek + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const calendarDays = useMemo(() => {
+    const days: Array<{ dateStr: string; dayNum: number; isCurrentMonth: boolean }> = [];
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    for (let i = startOffset - 1; i >= 0; i--) {
+      const d = prevMonthDays - i;
+      const prevDate = new Date(year, month - 1, d);
+      const dateStr = prevDate.toISOString().slice(0, 10);
+      days.push({ dateStr, dayNum: d, isCurrentMonth: false });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const monthStr = String(month + 1).padStart(2, '0');
+      const dayStr = String(d).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+      days.push({ dateStr, dayNum: d, isCurrentMonth: true });
+    }
+    const totalCells = days.length > 35 ? 42 : 35;
+    const remaining = totalCells - days.length;
+    for (let d = 1; d <= remaining; d++) {
+      const nextDate = new Date(year, month + 1, d);
+      const dateStr = nextDate.toISOString().slice(0, 10);
+      days.push({ dateStr, dayNum: d, isCurrentMonth: false });
+    }
+    return days;
+  }, [year, month, startOffset, daysInMonth]);
+
+  const itemsByDate = useMemo(() => {
+    const map: Record<string, ContentItem[]> = {};
+    contentItems.forEach((item) => {
+      const targetDate = item.publishDate || item.dueDate;
+      if (targetDate) {
+        if (!map[targetDate]) map[targetDate] = [];
+        map[targetDate].push(item);
+      }
+    });
+    return map;
+  }, [contentItems]);
+
+  const handlePrevMonth = () => setCalendarDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCalendarDate(new Date(year, month + 1, 1));
+  const handleToday = () => setCalendarDate(new Date());
 
   // Dynamically extract all available statuses present in contentItems + counts
   const statusOptions = useMemo(() => {
@@ -159,6 +213,156 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     setMentionedUserIds((current) => (current.includes(member.id) ? current : [...current, member.id]));
   };
 
+  // Reusable Right Side Drawer Panel Render Function
+  const renderRightDrawer = () => {
+    if (!selectedDrawerItem) return null;
+
+    return (
+      <div className="client-drawer-backdrop" onClick={() => setSelectedDrawerItem(null)}>
+        <div className="client-drawer-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="client-drawer-header">
+            <div className="client-drawer-header-info">
+              <div className="client-meta-chips">
+                <span className="client-chip brand">{selectedDrawerItem.brand || selectedDrawerItem.client || 'Brand'}</span>
+                <span className="client-chip channel">{selectedDrawerItem.channel}</span>
+              </div>
+              <h3>{selectedDrawerItem.title}</h3>
+            </div>
+            <div className="client-drawer-header-actions">
+              <span className={`client-status-badge-lg ${isReadyForReview(selectedDrawerItem) ? 'ready' : 'standard'}`}>
+                {isReadyForReview(selectedDrawerItem) ? 'Needs Your Review' : selectedDrawerItem.status}
+              </span>
+              <button
+                type="button"
+                className="client-drawer-close-btn"
+                onClick={() => setSelectedDrawerItem(null)}
+                title="Close Panel"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="client-drawer-body">
+            {/* Cover Image Preview */}
+            {selectedDrawerItem.coverImageUrl && (
+              <div className="client-cover-preview">
+                <img src={selectedDrawerItem.coverImageUrl} alt={selectedDrawerItem.title} loading="lazy" />
+              </div>
+            )}
+
+            {/* Brief & Assets */}
+            <div className="client-review-copy">
+              <h4>Content Brief</h4>
+              <p>{selectedDrawerItem.brief || 'No brief provided.'}</p>
+
+              <div className="client-review-meta-row">
+                {selectedDrawerItem.publishDate && (
+                  <span className="client-meta-item">
+                    <Clock size={14} /> Planned Publish Date: <strong>{selectedDrawerItem.publishDate}</strong>
+                  </span>
+                )}
+                {selectedDrawerItem.assetsLink && (
+                  <a href={selectedDrawerItem.assetsLink} target="_blank" rel="noreferrer" className="client-asset-link-btn">
+                    <ExternalLink size={14} /> Open Shared Assets (Google Drive)
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Discussion & Feedback */}
+            <div className="client-comments">
+              <h4>
+                <MessageSquare size={16} /> Discussion &amp; Feedback ({activeComments.length})
+              </h4>
+
+              <div className="client-comments-list">
+                {activeComments.map((entry) => (
+                  <div className="client-comment-card" key={entry.id}>
+                    <div className="client-comment-header">
+                      <div className="client-comment-author">
+                        <div className="client-avatar-badge">{entry.author.charAt(0).toUpperCase()}</div>
+                        <strong>{entry.author}</strong>
+                      </div>
+                      <span className="client-comment-date">
+                        {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                    <p className="client-comment-text">{entry.text}</p>
+                    {entry.attachmentUrl && (
+                      <a href={entry.attachmentUrl} target="_blank" rel="noreferrer" className="client-comment-attachment">
+                        <Link2 size={13} /> Open Attachment
+                      </a>
+                    )}
+                  </div>
+                ))}
+                {activeComments.length === 0 && (
+                  <p className="client-muted client-empty-comments">No feedback yet. Write a message for the team below.</p>
+                )}
+              </div>
+
+              {/* Comment Form */}
+              <form onSubmit={submitComment} className="client-comment-form">
+                {availableTeamMembers.length > 0 && (
+                  <div className="client-mention-bar">
+                    <span className="client-mention-label"><User size={12} /> Tag team members:</span>
+                    <div className="client-mention-pills">
+                      {availableTeamMembers.map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          className="client-tag-pill"
+                          onClick={() => handleInsertMention(member)}
+                        >
+                          @{member.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <textarea
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  placeholder="Write feedback, revision requests, or notes for the team..."
+                  rows={3}
+                />
+                <input
+                  className="client-attachment-input"
+                  type="url"
+                  value={attachmentUrl}
+                  onChange={(event) => setAttachmentUrl(event.target.value)}
+                  placeholder="Optional Google Drive attachment link"
+                />
+                <button type="submit" className="btn btn-secondary client-submit-btn" disabled={saving || !comment.trim()}>
+                  <Send size={14} /> {saving ? 'Sending...' : 'Send Feedback'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div className="client-drawer-footer">
+            <button
+              type="button"
+              className="btn btn-secondary client-action-btn reject"
+              disabled={saving}
+              onClick={() => updateReview(false)}
+            >
+              <Undo2 size={16} /> Request Revision
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary client-action-btn approve"
+              disabled={saving}
+              onClick={() => updateReview(true)}
+            >
+              <CheckCircle2 size={16} /> Approve
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // OVERVIEW MODE
   if (mode === 'overview') {
     return (
@@ -194,7 +398,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             <div>
               <span>Shared Reports</span>
               <strong>{reportsCount} Files</strong>
-              <small>Documents & performance reports</small>
+              <small>Documents &amp; performance reports</small>
             </div>
           </article>
         </section>
@@ -255,6 +459,98 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             </div>
           )}
         </section>
+        {renderRightDrawer()}
+      </main>
+    );
+  }
+
+  // CALENDAR MODE
+  if (mode === 'calendar') {
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    return (
+      <main className="client-portal page-container">
+        <div className="client-portal-heading">
+          <div>
+            <span className="analytics-eyebrow">Content Schedule</span>
+            <h2>Content Calendar</h2>
+            <p>Visual monthly schedule of all planned, review-ready, scheduled, and published content.</p>
+          </div>
+          <span className="client-portal-scope">{currentUser.client || 'Client Workspace'}</span>
+        </div>
+
+        {/* CALENDAR TOOLBAR & GRID */}
+        <div className="client-calendar-wrapper">
+          <div className="client-calendar-toolbar">
+            <div className="client-calendar-nav">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrevMonth}>
+                <ChevronLeft size={16} /> Prev
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleToday}>
+                Today
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleNextMonth}>
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+            <h3 className="client-calendar-month-title">{monthName}</h3>
+            <span className="client-count-chip">{contentItems.length} Content Items</span>
+          </div>
+
+          <div className="client-calendar-grid-header">
+            <div>Mon</div>
+            <div>Tue</div>
+            <div>Wed</div>
+            <div>Thu</div>
+            <div>Fri</div>
+            <div>Sat</div>
+            <div>Sun</div>
+          </div>
+
+          <div className="client-calendar-grid">
+            {calendarDays.map(({ dateStr, dayNum, isCurrentMonth }) => {
+              const dayItems = itemsByDate[dateStr] || [];
+              const isToday = dateStr === todayStr;
+
+              return (
+                <div
+                  key={dateStr}
+                  className={`client-calendar-day-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'is-today' : ''}`}
+                >
+                  <div className="client-calendar-day-number">
+                    <span>{dayNum}</span>
+                    {dayItems.length > 0 && <span className="client-day-count-badge">{dayItems.length}</span>}
+                  </div>
+
+                  <div className="client-calendar-day-items">
+                    {dayItems.map((item) => {
+                      const isPending = isReadyForReview(item);
+                      return (
+                        <div
+                          key={item.id}
+                          className={`client-calendar-item-card ${isPending ? 'pending' : ''}`}
+                          onClick={() => setSelectedDrawerItem(item)}
+                          title={`${item.title} (${item.channel})`}
+                        >
+                          <div className="client-cal-item-header">
+                            <span className="client-cal-channel">{item.channel}</span>
+                            <span className={`client-status-pill-xs ${isPending ? 'pending' : 'normal'}`}>
+                              {isPending ? 'Needs Review' : item.status}
+                            </span>
+                          </div>
+                          <div className="client-cal-item-title">{item.title}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* RIGHT SIDE DRAWER PANEL */}
+        {renderRightDrawer()}
       </main>
     );
   }
@@ -265,7 +561,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       <div className="client-portal-heading">
         <div>
           <span className="analytics-eyebrow">Content Review</span>
-          <h2>Review & Feedback</h2>
+          <h2>Review &amp; Feedback</h2>
           <p>Review drafts, provide feedback to the team, or approve content for publishing.</p>
         </div>
         <span className="client-portal-scope">{currentUser.client || 'Client Workspace'}</span>
@@ -318,24 +614,17 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         </div>
       </div>
 
-      {/* Empty State */}
-      {reviewItems.length === 0 ? (
-        <div className="client-portal-empty">
-          <CheckCircle2 size={32} />
-          <strong>No matching content found</strong>
-          <span>Try adjusting your search query or status filter.</span>
-        </div>
-      ) : viewMode === 'table' ? (
-        /* TABLE VIEW (DEFAULT) */
+      {/* TABLE LIST VIEW (DEFAULT) */}
+      {viewMode === 'table' ? (
         <div className="client-table-wrapper">
           <table className="client-table">
             <thead>
               <tr>
-                <th style={{ width: '40%' }}>Title & Brand</th>
-                <th style={{ width: '15%' }}>Channel</th>
-                <th style={{ width: '18%' }}>Status</th>
-                <th style={{ width: '17%' }}>Publish Date</th>
-                <th style={{ width: '10%', textAlign: 'right' }}>Action</th>
+                <th>Title &amp; Brand</th>
+                <th>Channel</th>
+                <th>Status</th>
+                <th>Publish Date</th>
+                <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -349,12 +638,12 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   >
                     <td>
                       <div className="client-table-title-cell">
-                        <strong className="client-table-title" title={item.title}>{item.title}</strong>
-                        <span className="client-table-sub">{item.brand || item.client || 'General'}</span>
+                        <strong>{item.title}</strong>
+                        <span>{item.brand || item.client || 'Brand'}</span>
                       </div>
                     </td>
                     <td>
-                      <span className="client-channel-badge">{item.channel}</span>
+                      <span className="client-chip channel">{item.channel}</span>
                     </td>
                     <td>
                       <span className={`client-status-pill ${isPending ? 'pending' : 'normal'}`}>
@@ -428,152 +717,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         </div>
       )}
 
-      {/* RIGHT SIDE DRAWER (SLIDE-IN PANEL) */}
-      {selectedDrawerItem && (
-        <div className="client-drawer-backdrop" onClick={() => setSelectedDrawerItem(null)}>
-          <div className="client-drawer-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="client-drawer-header">
-              <div className="client-drawer-header-info">
-                <div className="client-meta-chips">
-                  <span className="client-chip brand">{selectedDrawerItem.brand || selectedDrawerItem.client || 'Brand'}</span>
-                  <span className="client-chip channel">{selectedDrawerItem.channel}</span>
-                </div>
-                <h3>{selectedDrawerItem.title}</h3>
-              </div>
-              <div className="client-drawer-header-actions">
-                <span className={`client-status-badge-lg ${isReadyForReview(selectedDrawerItem) ? 'ready' : 'standard'}`}>
-                  {isReadyForReview(selectedDrawerItem) ? 'Needs Your Review' : selectedDrawerItem.status}
-                </span>
-                <button
-                  type="button"
-                  className="client-drawer-close-btn"
-                  onClick={() => setSelectedDrawerItem(null)}
-                  title="Close Panel"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            <div className="client-drawer-body">
-              {/* Cover Image Preview */}
-              {selectedDrawerItem.coverImageUrl && (
-                <div className="client-cover-preview">
-                  <img src={selectedDrawerItem.coverImageUrl} alt={selectedDrawerItem.title} loading="lazy" />
-                </div>
-              )}
-
-              {/* Brief & Assets */}
-              <div className="client-review-copy">
-                <h4>Content Brief</h4>
-                <p>{selectedDrawerItem.brief || 'No brief provided.'}</p>
-
-                <div className="client-review-meta-row">
-                  {selectedDrawerItem.publishDate && (
-                    <span className="client-meta-item">
-                      <Clock size={14} /> Planned Publish Date: <strong>{selectedDrawerItem.publishDate}</strong>
-                    </span>
-                  )}
-                  {selectedDrawerItem.assetsLink && (
-                    <a href={selectedDrawerItem.assetsLink} target="_blank" rel="noreferrer" className="client-asset-link-btn">
-                      <ExternalLink size={14} /> Open Shared Assets (Google Drive)
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              {/* Discussion & Feedback */}
-              <div className="client-comments">
-                <h4>
-                  <MessageSquare size={16} /> Discussion & Feedback ({activeComments.length})
-                </h4>
-
-                <div className="client-comments-list">
-                  {activeComments.map((entry) => (
-                    <div className="client-comment-card" key={entry.id}>
-                      <div className="client-comment-header">
-                        <div className="client-comment-author">
-                          <div className="client-avatar-badge">{entry.author.charAt(0).toUpperCase()}</div>
-                          <strong>{entry.author}</strong>
-                        </div>
-                        <span className="client-comment-date">
-                          {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-                        </span>
-                      </div>
-                      <p className="client-comment-text">{entry.text}</p>
-                      {entry.attachmentUrl && (
-                        <a href={entry.attachmentUrl} target="_blank" rel="noreferrer" className="client-comment-attachment">
-                          <Link2 size={13} /> Open Attachment
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                  {activeComments.length === 0 && (
-                    <p className="client-muted client-empty-comments">No feedback yet. Write a message for the team below.</p>
-                  )}
-                </div>
-
-                {/* Comment Form */}
-                <form onSubmit={submitComment} className="client-comment-form">
-                  {availableTeamMembers.length > 0 && (
-                    <div className="client-mention-bar">
-                      <span className="client-mention-label"><User size={12} /> Tag team members:</span>
-                      <div className="client-mention-pills">
-                        {availableTeamMembers.map((member) => (
-                          <button
-                            key={member.id}
-                            type="button"
-                            className="client-tag-pill"
-                            onClick={() => handleInsertMention(member)}
-                          >
-                            @{member.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <textarea
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    placeholder="Write feedback, revision requests, or notes for the team..."
-                    rows={3}
-                  />
-                  <input
-                    className="client-attachment-input"
-                    type="url"
-                    value={attachmentUrl}
-                    onChange={(event) => setAttachmentUrl(event.target.value)}
-                    placeholder="Optional Google Drive attachment link"
-                  />
-                  <button type="submit" className="btn btn-secondary client-submit-btn" disabled={saving || !comment.trim()}>
-                    <Send size={14} /> {saving ? 'Sending...' : 'Send Feedback'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="client-drawer-footer">
-              <button
-                type="button"
-                className="btn btn-secondary client-action-btn reject"
-                disabled={saving}
-                onClick={() => updateReview(false)}
-              >
-                <Undo2 size={16} /> Request Revision
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary client-action-btn approve"
-                disabled={saving}
-                onClick={() => updateReview(true)}
-              >
-                <CheckCircle2 size={16} /> Approve
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* RIGHT SIDE DRAWER PANEL */}
+      {renderRightDrawer()}
     </main>
   );
 };
-

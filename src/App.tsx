@@ -765,12 +765,24 @@ function App() {
         )}
 
         {activeTab === 'calendar' && (
-          <CalendarView
-            items={filteredItems}
-            channels={channels}
-            onEditItem={handleOpenEditModal}
-            onMoveDate={handleMoveDate}
-          />
+          currentUser.role === 'client'
+            ? <ClientPortal
+                items={scopedItems}
+                comments={comments}
+                team={team}
+                currentUser={currentUser}
+                mode="calendar"
+                reportsCount={documents.filter((document) => document.visibility === 'client' && document.client === currentUser.client).length}
+                onNavigateToReview={() => setActiveTab('review')}
+                onUpdateItem={handleClientUpdateItem}
+                onAddComment={handleAddComment}
+              />
+            : <CalendarView
+                items={filteredItems}
+                channels={channels}
+                onEditItem={handleOpenEditModal}
+                onMoveDate={handleMoveDate}
+              />
         )}
 
         {activeTab === 'list' && (
