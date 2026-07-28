@@ -224,13 +224,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-    const ownerRequired = !['Idea', 'To Do'].includes(status);
-    if (ownerRequired && !ownerId) {
-      setAssignmentError('Pilih satu PIC sebelum task masuk tahap aktif.');
+    if (!title.trim()) {
+      alert('Judul task/konten tidak boleh kosong.');
       return;
     }
-    const owner = team.find((member) => member.id === ownerId);
+    const ownerRequired = !['Idea', 'To Do'].includes(status);
+    let finalOwnerId = ownerId;
+    if (ownerRequired && !finalOwnerId) {
+      if (activeUserId) {
+        finalOwnerId = activeUserId;
+      } else if (team.length > 0) {
+        finalOwnerId = team[0].id;
+      } else {
+        setAssignmentError('Pilih satu PIC sebelum task masuk tahap aktif.');
+        return;
+      }
+    }
+    const owner = team.find((member) => member.id === finalOwnerId);
 
     onSave({
       id: item?.id,
@@ -241,8 +251,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       format: taskType === 'Content' ? format : 'Article',
       priority,
       assignee: owner?.name || '',
-      ownerId,
-      collaboratorIds: collaboratorIds.filter((id) => id !== ownerId && id !== reviewerId),
+      ownerId: finalOwnerId,
+      collaboratorIds: collaboratorIds.filter((id) => id !== finalOwnerId && id !== reviewerId),
       reviewerId: reviewerId === ownerId ? '' : reviewerId,
       publishDate: taskType === 'Content' && variablesConfig.publishDate ? publishDate : '',
       assetsLink: normalizeUrl(assetsLink),

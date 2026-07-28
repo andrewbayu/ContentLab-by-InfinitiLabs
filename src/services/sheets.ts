@@ -771,63 +771,108 @@ export async function createContent(
   const url = getScriptUrl();
   const newItem: ContentItem = {
     ...item,
-    id: Math.random().toString(36).substring(2, 9),
+    id: (item as any).id || `c_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  if (!url) {
+  // Always persist to local cache immediately!
+  try {
     const { content, team, channels, comments } = getLocalData();
-    const updated = [newItem, ...content];
-    saveLocalData(updated, team, channels, comments);
+    const updatedLocal = [newItem, ...content.filter((c) => c.id !== newItem.id)];
+    saveLocalData(updatedLocal, team, channels, comments);
+  } catch (err) {
+    console.error('Failed to update local cache:', err);
+  }
+
+  if (!url) {
     return newItem;
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    mode: 'cors',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body: JSON.stringify({
-      action: 'createContent',
-      item: newItem,
-    }),
-  });
-  const result = await response.json();
-  if (!result?.success) throw new Error(result?.error || 'Server failed to create content');
-  return result.item || newItem;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'createContent',
+        item: newItem,
+      }),
+    });
+    const text = await response.text();
+    let result: any = null;
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      console.warn('Apps Script returned non-JSON response on createContent:', text.slice(0, 150));
+    }
+
+    if (result?.success && result?.item) {
+      const { content, team, channels, comments } = getLocalData();
+      const synced = content.map((c) => (c.id === newItem.id ? result.item : c));
+      saveLocalData(synced, team, channels, comments);
+      return result.item;
+    }
+    return newItem;
+  } catch (e) {
+    console.warn('Background server sync failed for createContent, preserved local copy:', e);
+    return newItem;
+  }
 }
 
 export async function updateContent(item: ContentItem): Promise<ContentItem> {
   const url = getScriptUrl();
-  const updatedItem = {
+  const updatedItem: ContentItem = {
     ...item,
     updatedAt: new Date().toISOString(),
   };
 
-  if (!url) {
+  // Always persist to local cache immediately!
+  try {
     const { content, team, channels, comments } = getLocalData();
-    const updated = content.map((c) => (c.id === item.id ? updatedItem : c));
-    saveLocalData(updated, team, channels, comments);
+    const updatedLocal = content.map((c) => (c.id === item.id ? updatedItem : c));
+    saveLocalData(updatedLocal, team, channels, comments);
+  } catch (err) {
+    console.error('Failed to update local cache:', err);
+  }
+
+  if (!url) {
     return updatedItem;
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    mode: 'cors',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body: JSON.stringify({
-      action: 'updateContent',
-      item: updatedItem,
-    }),
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Sync request failed (${response.status})`);
-  if (!result?.success) throw new Error(result?.error || 'Server failed to update content');
-  return result.item || updatedItem;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'updateContent',
+        item: updatedItem,
+      }),
+    });
+    const text = await response.text();
+    let result: any = null;
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      console.warn('Apps Script returned non-JSON response on updateContent:', text.slice(0, 150));
+    }
+
+    if (result?.success && result?.item) {
+      const { content, team, channels, comments } = getLocalData();
+      const synced = content.map((c) => (c.id === updatedItem.id ? result.item : c));
+      saveLocalData(synced, team, channels, comments);
+      return result.item;
+    }
+    return updatedItem;
+  } catch (e) {
+    console.warn('Background server sync failed for updateContent, preserved local copy:', e);
+    return updatedItem;
+  }
 }
 
 export async function deleteContent(id: string): Promise<boolean> {
