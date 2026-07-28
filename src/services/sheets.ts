@@ -1,4 +1,5 @@
 import { getGeneratedAvatar } from '../utils/avatar';
+import { normalizeUrl } from '../utils/url';
 
 export type TaskType = 'Content' | 'General';
 export type UserRole = 'super' | 'team' | 'client';
@@ -622,7 +623,7 @@ export async function fetchData(): Promise<WorkspaceData> {
       collaboratorIds,
       reviewerId,
       publishDate: parseDateCell(item.publishDate),
-      assetsLink: String(item.assetsLink || ''),
+      assetsLink: normalizeUrl(String(item.assetsLink || '')),
       coverImageUrl: String(item.coverImageUrl || ''),
       coverImageId: String(item.coverImageId || ''),
       tags: item.tags ? String(item.tags) : '',

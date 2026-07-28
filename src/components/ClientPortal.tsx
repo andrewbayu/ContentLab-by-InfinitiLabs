@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import type { CommentItem, ContentItem, TeamMember } from '../services/sheets';
+import { normalizeUrl } from '../utils/url';
 
 interface ClientPortalProps {
   items: ContentItem[];
@@ -205,7 +206,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         const member = team.find((entry) => entry.id === id);
         return member && normalizedComment.includes(`@${member.name.toLowerCase()}`);
       });
-      await onAddComment(selectedDrawerItem.id, comment.trim(), attachmentUrl.trim() || undefined, activeMentionIds);
+      await onAddComment(selectedDrawerItem.id, comment.trim(), normalizeUrl(attachmentUrl) || undefined, activeMentionIds);
       setComment('');
       setAttachmentUrl('');
       setMentionedUserIds([]);
@@ -338,9 +339,11 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 />
                 <input
                   className="client-attachment-input"
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={attachmentUrl}
                   onChange={(event) => setAttachmentUrl(event.target.value)}
+                  onBlur={() => setAttachmentUrl((prev) => normalizeUrl(prev))}
                   placeholder="Optional Google Drive attachment link"
                 />
                 <button type="submit" className="btn btn-secondary client-submit-btn" disabled={saving || !comment.trim()}>

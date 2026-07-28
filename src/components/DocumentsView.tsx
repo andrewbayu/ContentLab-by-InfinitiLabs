@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ExternalLink, FileText, Link2, Lock, Maximize2, Minimize2, Plus, Search, Star, Trash2, Users, X } from 'lucide-react';
 import type { ClientBrand, ContentItem, DocumentItem, TeamMember } from '../services/sheets';
+import { normalizeUrl } from '../utils/url';
 import '../styles/documents.css';
 
 type DocumentDraft = Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>;
@@ -91,7 +92,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     try {
       const payload = {
         ...draft,
-        title: draft.title.trim(), body: draft.body.trim(), url: draft.url.trim(), tags: draft.tags.trim(),
+        title: draft.title.trim(), body: draft.body.trim(), url: normalizeUrl(draft.url), tags: draft.tags.trim(),
       };
       if (editing) await onUpdateDocument({ ...editing, ...payload });
       else await onCreateDocument(payload);
@@ -203,7 +204,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   ))}
                 </fieldset>
                 <label className="form-group"><span className="form-label">Title</span><input className="form-input" autoFocus required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-                {draft.type === 'Link' && <label className="form-group"><span className="form-label">Document URL</span><input className="form-input" type="url" placeholder="https://" required value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} /></label>}
+                {draft.type === 'Link' && <label className="form-group"><span className="form-label">Document URL</span><input className="form-input" type="text" inputMode="url" placeholder="https://" required value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} onBlur={(event) => setDraft({ ...draft, url: normalizeUrl(event.target.value) })} /></label>}
                 <label className="form-group"><span className="form-label">{draft.type === 'Note' ? 'Note' : 'Description'}</span><textarea className="form-textarea document-body-input" rows={draft.type === 'Note' ? 10 : 5} value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
                 <div className="form-row">
                   <label className="form-group"><span className="form-label">Visibility</span><select className="form-select" value={draft.visibility} onChange={(event) => setDraft({ ...draft, visibility: event.target.value as DocumentItem['visibility'] })}><option value="personal">Personal</option><option value="team">Team</option><option value="client">Client</option></select></label>

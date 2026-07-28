@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { uploadCoverImage } from '../services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from '../services/sheets';
 import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus } from 'lucide-react';
+import { normalizeUrl } from '../utils/url';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -244,7 +245,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       collaboratorIds: collaboratorIds.filter((id) => id !== ownerId && id !== reviewerId),
       reviewerId: reviewerId === ownerId ? '' : reviewerId,
       publishDate: taskType === 'Content' && variablesConfig.publishDate ? publishDate : '',
-      assetsLink,
+      assetsLink: normalizeUrl(assetsLink),
       coverImageUrl: taskType === 'Content' ? coverImageUrl : '',
       coverImageId: taskType === 'Content' ? coverImageId : '',
       tags: variablesConfig.tags ? selectedTags.join(',') : '',
@@ -1053,10 +1054,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '24px' }}>
                         <Link size={11} className="text-secondary" />
                         <input
-                          type="url"
+                          type="text"
+                          inputMode="url"
                           placeholder="Link specific asset (e.g. Canva, Doc)"
                           value={itm.link || ''}
                           onChange={(e) => handleUpdateChecklistItemLink(itm.id, e.target.value)}
+                          onBlur={(e) => handleUpdateChecklistItemLink(itm.id, normalizeUrl(e.target.value))}
                           style={{
                             fontSize: '11px',
                             padding: '4px 6px',
@@ -1068,7 +1071,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         />
                         {itm.link && (
                           <a 
-                            href={itm.link} 
+                            href={normalizeUrl(itm.link)} 
                             target="_blank" 
                             rel="noopener noreferrer" 
                             style={{ 
@@ -1168,11 +1171,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   General Folders / Assets Link (Drive / Dropbox)
                 </label>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   className="form-input"
                   placeholder="https://drive.google.com/..."
                   value={assetsLink}
                   onChange={(e) => setAssetsLink(e.target.value)}
+                  onBlur={() => setAssetsLink((prev) => normalizeUrl(prev))}
                 />
               </div>
             </div>

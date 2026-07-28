@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CheckCircle2, Clock3, Plus, Target, TrendingUp, X } from 'lucide-react';
 import type { ClientBrand, ContentItem, KpiCadence, KpiDefinition, KpiDirection, KpiUpdate, TeamMember } from '../services/sheets';
+import { normalizeUrl } from '../utils/url';
 
 interface AnalyticsViewProps {
   items: ContentItem[];
@@ -191,7 +192,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         period: updateForm.period,
         actual: Number(updateForm.actual),
         notes: updateForm.notes.trim(),
-        sourceLink: updateForm.sourceLink.trim(),
+        sourceLink: normalizeUrl(updateForm.sourceLink),
         updatedBy: currentUser.name,
       });
       setUpdatingKpiId('');
@@ -318,7 +319,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                       <input type="date" className="form-input" value={updateForm.period} onChange={(event) => setUpdateForm({ ...updateForm, period: event.target.value })} required />
                       <input type="number" step="any" className="form-input" placeholder={`Actual (${definition.unit})`} value={updateForm.actual} onChange={(event) => setUpdateForm({ ...updateForm, actual: event.target.value })} required />
                       <input className="form-input" placeholder="Notes (optional)" value={updateForm.notes} onChange={(event) => setUpdateForm({ ...updateForm, notes: event.target.value })} />
-                      <input type="url" className="form-input" placeholder="Source link (optional)" value={updateForm.sourceLink} onChange={(event) => setUpdateForm({ ...updateForm, sourceLink: event.target.value })} />
+                      <input type="text" inputMode="url" className="form-input" placeholder="Source link (optional)" value={updateForm.sourceLink} onChange={(event) => setUpdateForm({ ...updateForm, sourceLink: event.target.value })} onBlur={(event) => setUpdateForm({ ...updateForm, sourceLink: normalizeUrl(event.target.value) })} />
                       <div><button className="btn btn-primary" type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save update'}</button><button className="btn btn-secondary" type="button" onClick={() => setUpdatingKpiId('')}>Cancel</button></div>
                     </form>
                   )}
