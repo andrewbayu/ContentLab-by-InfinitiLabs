@@ -206,7 +206,6 @@ function App() {
 
     const isEdit = !!itemPayload.id;
     const tempId = itemPayload.id || `temp_${Date.now()}`;
-    const previousItems = [...items];
 
     if (isEdit && itemPayload.id) {
       const existing = items.find((i) => i.id === itemPayload.id);
@@ -236,10 +235,9 @@ function App() {
         const serverUpdated = await updateContent(updatedPayload);
         setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? serverUpdated : item)));
       } catch (e) {
-        console.error(e);
+        console.error('Background sync failed for task update:', e);
         const message = e instanceof Error ? e.message : 'Sync error';
-        addToast(`Failed to sync update with server. Reverting... (${message})`, 'error');
-        setItems(previousItems);
+        addToast(`Card updated locally (${message})`, 'info');
       } finally {
         endWrite();
       }
@@ -291,10 +289,9 @@ function App() {
         });
         setItems((prev) => prev.map((item) => (item.id === tempId ? created : item)));
       } catch (e) {
-        console.error(e);
+        console.error('Background sync failed for task creation:', e);
         const message = e instanceof Error ? e.message : 'Sync error';
-        addToast(`Failed to save task to server. (${message})`, 'error');
-        setItems(previousItems);
+        addToast(`Card created locally (${message})`, 'info');
       } finally {
         endWrite();
       }

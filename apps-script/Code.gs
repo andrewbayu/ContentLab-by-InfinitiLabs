@@ -71,7 +71,7 @@ function doPost(e) {
       const data = contentSheet.getDataRange().getValues();
       let rowIndex = -1;
       for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === item.id) {
+        if (String(data[i][0] || "").trim() === String(item.id || "").trim()) {
           rowIndex = i + 1;
           break;
         }
@@ -92,7 +92,20 @@ function doPost(e) {
         syncTaskMembers(sheet, item, false);
         result = { success: true, item: item };
       } else {
-        result = { success: false, error: "Content item not found" };
+        // Upsert fallback: append as a new row if ID not found in sheet
+        item.createdAt = item.createdAt || new Date().toISOString();
+        item.updatedAt = new Date().toISOString();
+        contentSheet.appendRow([
+          item.id, item.title, item.brief, item.status, 
+          item.channel, item.format, item.priority, item.assignee, item.publishDate,
+          item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
+          item.targetAudience || "", item.createdBy || "", item.checklist || "",
+          item.views || "", item.likes || "", item.engagement || "",
+          item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
+          item.dueDate || "", item.client || "", item.brand || ""
+        ]);
+        syncTaskMembers(sheet, item, true);
+        result = { success: true, item: item };
       }
     }
     else if (action === "deleteContent") {
@@ -101,7 +114,7 @@ function doPost(e) {
       const data = contentSheet.getDataRange().getValues();
       let rowIndex = -1;
       for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === itemId) {
+        if (String(data[i][0] || "").trim() === String(itemId || "").trim()) {
           rowIndex = i + 1;
           break;
         }
