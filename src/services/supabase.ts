@@ -29,40 +29,25 @@ export async function uploadCoverImageToSupabase(file: File): Promise<SupabaseUp
 
   const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const filePath = `covers/${Date.now()}_${safeFileName}`;
-  const bucketName = 'contentlab-covers';
 
-  // Direct upload to Supabase Storage
-  const { data, error } = await supabase.storage
-    .from(bucketName)
-    .upload(filePath, file, {
+  // Try candidate buckets: user's "contentLab-storage", "contentlab-covers", "covers"
+  const candidateBuckets = ['contentLab-storage', 'contentlab-covers', 'covers'];
+
+  for (const bucket of candidateBuckets) {
+    const { data, error } = await supabase.storage.from(bucket).upload(filePath, file, {
       cacheControl: '3600',
       upsert: true,
       contentType: file.type,
     });
 
-  if (error) {
-    console.warn(`Supabase Storage bucket "${bucketName}" error:`, error.message);
-
-    // Fallback attempt with "covers" bucket if "contentlab-covers" fails
-    const fallbackPath = `covers/${Date.now()}_${safeFileName}`;
-    const { data: fbData, error: fbError } = await supabase.storage
-      .from('covers')
-      .upload(fallbackPath, file, { cacheControl: '3600', upsert: true, contentType: file.type });
-
-    if (fbError) {
-      throw new Error(`Gagal mengunggah gambar ke Supabase Storage: ${error.message}`);
+    if (!error && data?.path) {
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+      return {
+        id: data.path,
+        url: publicUrlData.publicUrl,
+      };
     }
-
-    const { data: fbPublicUrl } = supabase.storage.from('covers').getPublicUrl(fbData.path);
-    return {
-      id: fbData.path,
-      url: fbPublicUrl.publicUrl,
-    };
   }
 
-  const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(data.path);
-  return {
-    id: data.path,
-    url: publicUrlData.publicUrl,
-  };
+  throw new Error('Gagal mengunggah gambar ke Supabase Storage (bucket contentLab-storage).');
 }
