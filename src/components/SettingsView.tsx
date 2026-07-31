@@ -17,8 +17,12 @@ import {
   Plus,
   Building2,
   Pencil,
-  X
+  X,
+  Database,
+  RefreshCw
 } from 'lucide-react';
+import { importGoogleSheetsToSupabase, isSupabaseDbConfigured } from '../services/supabaseDb';
+import type { CommentItem, ContentItem, KpiDefinition, KpiUpdate, DocumentItem } from '../services/sheets';
 
 interface SettingsViewProps {
   onConnectionChange: () => void;
@@ -41,6 +45,12 @@ interface SettingsViewProps {
   onDeleteChannel: (id: string) => void;
   clients: ClientBrand[];
   onAddClientBrand: (client: string, brand: string, color: string) => Promise<ClientBrand>;
+  
+  items?: ContentItem[];
+  comments?: CommentItem[];
+  kpiDefinitions?: KpiDefinition[];
+  kpiUpdates?: KpiUpdate[];
+  documents?: DocumentItem[];
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -59,9 +69,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onAddChannel,
   onDeleteChannel,
   clients,
-  onAddClientBrand
+  onAddClientBrand,
+  items = [],
+  comments = [],
+  kpiDefinitions = [],
+  kpiUpdates = [],
+  documents = []
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'variables' | 'tags' | 'team' | 'channels' | 'clients' | 'connection'>('variables');
+  const [isImportingSupabase, setIsImportingSupabase] = useState(false);
+
+  const handleImportToSupabase = async () => {
+    if (!isSupabaseDbConfigured()) {
+      addToast('Supabase Client is not configured. Check VITE_SUPABASE_URL in .env.', 'error');
+      return;
+    }
+    setIsImportingSupabase(true);
+    try {
+      const res = await importGoogleSheetsToSupabase({
+        content: items,
+        team,
+        channels,
+        clients,
+        comments,
+        kpiDefinitions,
+        kpiUpdates,
+        documents,
+      });
+      if (res.success) {
+        addToast(`✅ ${res.message} (${res.count} records processed)`, 'success');
+        localStorage.setItem('contentlab_db_provider', 'supabase');
+        onConnectionChange();
+      } else {
+        addToast('Migration failed.', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      addToast(e instanceof Error ? e.message : 'Import failed', 'error');
+    } finally {
+      setIsImportingSupabase(false);
+    }
+  };
   
   // Connection state
   const [url, setUrl] = useState(getScriptUrl() || '');
@@ -1036,6 +1084,42 @@ function deleteTaskMembers(spreadsheet, taskId) {
           {/* CONNECTION TAB */}
           {activeSubTab === 'connection' && (
             <>
+              {/* SUPABASE DATABASE & MIGRATION PANEL */}
+              <div className="insight-panel" style={{ gap: '16px', border: '1px solid #3b82f6', background: '#f0f9ff' }}>
+                <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1d4ed8' }}>
+                  <Database size={20} style={{ color: '#2563eb' }} />
+                  <span>Supabase Postgres Database Engine (Recommended)</span>
+                </h3>
+
+                <p style={{ fontSize: '13px', color: '#334155' }}>
+                  Gunakan Supabase PostgreSQL sebagai database utama aplikasi untuk performa super cepat (&lt;50ms), real-time collaboration, dan bebas dari kuota request Google Sheets.
+                </p>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '12px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>
+                      Status Database: <span style={{ color: isSupabaseDbConfigured() ? '#16a34a' : '#d97706' }}>{isSupabaseDbConfigured() ? 'Connected & Ready' : 'Configuration Missing'}</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                      Primary Database Mode: <strong>{localStorage.getItem('contentlab_db_provider') === 'supabase' ? 'Supabase Postgres (Active)' : 'Google Sheets Mode'}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 14px' }}
+                      onClick={handleImportToSupabase}
+                      disabled={isImportingSupabase || !isSupabaseDbConfigured()}
+                    >
+                      <RefreshCw size={14} className={isImportingSupabase ? 'spin' : ''} />
+                      {isImportingSupabase ? 'Importing Data...' : '1-Click Import Google Sheets -> Supabase'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="insight-panel" style={{ gap: '16px' }}>
                 <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Link size={18} className="text-secondary" />

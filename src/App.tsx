@@ -38,6 +38,15 @@ import {
   hasClientAccess,
   isMockMode
 } from './services/sheets';
+import {
+  fetchSupabaseInitialData,
+  createSupabaseContent,
+  updateSupabaseContent,
+  deleteSupabaseContent,
+  createSupabaseComment,
+  subscribeToSupabaseRealtime,
+  isSupabaseDbConfigured
+} from './services/supabaseDb';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, UserRole } from './services/sheets';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
@@ -89,13 +98,14 @@ function App() {
   const [isMock, setIsMock] = useState<boolean>(isMockMode());
   const hasWorkspaceData = useRef<boolean>(!!initialCache);
 
-  // Load spreadsheet database
+  // Load database (Google Sheets or Supabase)
   const loadData = async (showLoading = true) => {
     if (!isAuthenticated) return;
     if (showLoading && !hasWorkspaceData.current) setIsInitialLoading(true);
     setIsSyncing(true);
     try {
-      const data = await fetchData();
+      const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+      const data = useSupabase ? await fetchSupabaseInitialData() : await fetchData();
       setItems(data.content);
       setTeam(data.team);
       setChannels(data.channels);
@@ -114,10 +124,7 @@ function App() {
           setCurrentUser(found);
           localStorage.setItem('contentlab_logged_user', JSON.stringify(found));
         } else {
-          localStorage.removeItem('contentlab_is_authenticated');
-          localStorage.removeItem('contentlab_logged_user');
-          setCurrentUser(null);
-          setIsAuthenticated(false);
+          handleLogout();
         }
       }
     } catch (error) {
@@ -134,6 +141,16 @@ function App() {
       loadData();
     }
   }, [isMock, isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated && localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured()) {
+      const unsubscribe = subscribeToSupabaseRealtime(
+        () => loadData(false),
+        () => loadData(false)
+      );
+      return () => unsubscribe();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated || !hasWorkspaceData.current) return;
@@ -232,7 +249,10 @@ function App() {
 
       // 2. SILENT BACKGROUND SYNC
       try {
-        const serverUpdated = await updateContent(updatedPayload);
+        const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+        const serverUpdated = useSupabase
+          ? await updateSupabaseContent(updatedPayload)
+          : await updateContent(updatedPayload);
         const merged: ContentItem = {
           ...updatedPayload,
           ...serverUpdated,
@@ -287,12 +307,20 @@ function App() {
 
       // 2. SILENT BACKGROUND SYNC
       try {
-        const created = await createContent({
-          ...itemPayload,
-          createdBy: currentUser?.name || 'Anonymous',
-          creatorId: currentUser?.id || '',
-          actorId: currentUser?.id || '',
-        });
+        const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+        const created = useSupabase
+          ? await createSupabaseContent({
+              ...itemPayload,
+              createdBy: currentUser?.name || 'Anonymous',
+              creatorId: currentUser?.id || '',
+              actorId: currentUser?.id || '',
+            })
+          : await createContent({
+              ...itemPayload,
+              createdBy: currentUser?.name || 'Anonymous',
+              creatorId: currentUser?.id || '',
+              actorId: currentUser?.id || '',
+            });
         const merged: ContentItem = {
           ...newTempItem,
           ...created,
@@ -389,11 +417,16 @@ function App() {
     beginWrite();
 
     try {
-      await deleteContent(id);
+      const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+      if (useSupabase) {
+        await deleteSupabaseContent(id);
+      } else {
+        await deleteContent(id);
+      }
       addToast(`Successfully deleted "${itemToDelete?.title || 'Task'}"`, 'success');
     } catch (e) {
       console.error(e);
-      addToast('Failed to delete task in Google Sheet. Reverting...', 'error');
+      addToast('Failed to delete task. Reverting...', 'error');
       setItems(originalItems);
     } finally {
       endWrite();
@@ -410,16 +443,19 @@ function App() {
       const explicitNames = new Set(team.filter((member) => mentionedUserIds.includes(member.id)).map((member) => member.name.toLocaleLowerCase()));
       const detectedIds = team.filter((member) => !explicitNames.has(member.name.toLocaleLowerCase()) && normalizedText.includes(`@${member.name.toLocaleLowerCase()}`)).map((member) => member.id);
       const mentionIds = [...new Set([...mentionedUserIds, ...detectedIds])];
-      const created = await createComment({
-        contentId,
-        author: currentUser.name,
-        text,
-        attachmentUrl,
-        mentionedUserIds: mentionIds
-      });
+      const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+      const created = useSupabase
+        ? await createSupabaseComment(contentId, text, attachmentUrl, mentionIds, currentUser.name, currentUser.id)
+        : await createComment({
+            contentId,
+            author: currentUser.name,
+            text,
+            attachmentUrl,
+            mentionedUserIds: mentionIds
+          });
       setComments((prev) => [...prev, created]);
-      if (mentionIds.length && created.notification?.failed) addToast(`Comment saved, but ${created.notification.failed} mention notification${created.notification.failed === 1 ? '' : 's'} failed.`, 'error');
-      else if (mentionIds.length) addToast(`Comment posted and ${created.notification?.sent || mentionIds.length} notification${mentionIds.length === 1 ? '' : 's'} sent.`, 'success');
+      if (mentionIds.length && (created as any).notification?.failed) addToast(`Comment saved, but ${(created as any).notification.failed} mention notification${(created as any).notification.failed === 1 ? '' : 's'} failed.`, 'error');
+      else if (mentionIds.length) addToast(`Comment posted and ${(created as any).notification?.sent || mentionIds.length} notification${mentionIds.length === 1 ? '' : 's'} sent.`, 'success');
       else addToast('Comment posted successfully!', 'success');
     } catch (e) {
       console.error(e);
@@ -907,6 +943,11 @@ function App() {
             onDeleteChannel={handleDeleteChannel}
             clients={clients}
             onAddClientBrand={handleAddClientBrand}
+            items={items}
+            comments={comments}
+            kpiDefinitions={kpiDefinitions}
+            kpiUpdates={kpiUpdates}
+            documents={documents}
           />
         )}
           </>
