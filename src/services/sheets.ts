@@ -839,10 +839,16 @@ export async function createContent(
     }
 
     if (result?.success && result?.item) {
+      const mergedResult: ContentItem = {
+        ...newItem,
+        ...result.item,
+        coverImageUrl: result.item.coverImageUrl || newItem.coverImageUrl || '',
+        coverImageId: result.item.coverImageId || newItem.coverImageId || '',
+      };
       const { content, team, channels, comments } = getLocalData();
-      const synced = content.map((c) => (c.id === newItem.id ? result.item : c));
+      const synced = content.map((c) => (c.id === newItem.id ? mergedResult : c));
       saveLocalData(synced, team, channels, comments);
-      return result.item;
+      return mergedResult;
     }
     return newItem;
   } catch (e) {
@@ -892,10 +898,16 @@ export async function updateContent(item: ContentItem): Promise<ContentItem> {
     }
 
     if (result?.success && result?.item) {
+      const mergedResult: ContentItem = {
+        ...updatedItem,
+        ...result.item,
+        coverImageUrl: result.item.coverImageUrl || updatedItem.coverImageUrl || '',
+        coverImageId: result.item.coverImageId || updatedItem.coverImageId || '',
+      };
       const { content, team, channels, comments } = getLocalData();
-      const synced = content.map((c) => (c.id === updatedItem.id ? result.item : c));
+      const synced = content.map((c) => (c.id === updatedItem.id ? mergedResult : c));
       saveLocalData(synced, team, channels, comments);
-      return result.item;
+      return mergedResult;
     }
     return updatedItem;
   } catch (e) {

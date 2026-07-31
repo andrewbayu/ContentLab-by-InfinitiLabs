@@ -233,7 +233,13 @@ function App() {
       // 2. SILENT BACKGROUND SYNC
       try {
         const serverUpdated = await updateContent(updatedPayload);
-        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? serverUpdated : item)));
+        const merged: ContentItem = {
+          ...updatedPayload,
+          ...serverUpdated,
+          coverImageUrl: serverUpdated?.coverImageUrl || updatedPayload.coverImageUrl || '',
+          coverImageId: serverUpdated?.coverImageId || updatedPayload.coverImageId || '',
+        };
+        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? merged : item)));
       } catch (e) {
         console.error('Background sync failed for task update:', e);
         const message = e instanceof Error ? e.message : 'Sync error';
@@ -287,7 +293,13 @@ function App() {
           creatorId: currentUser?.id || '',
           actorId: currentUser?.id || '',
         });
-        setItems((prev) => prev.map((item) => (item.id === tempId ? created : item)));
+        const merged: ContentItem = {
+          ...newTempItem,
+          ...created,
+          coverImageUrl: created?.coverImageUrl || newTempItem.coverImageUrl || '',
+          coverImageId: created?.coverImageId || newTempItem.coverImageId || '',
+        };
+        setItems((prev) => prev.map((item) => (item.id === tempId ? merged : item)));
       } catch (e) {
         console.error('Background sync failed for task creation:', e);
         const message = e instanceof Error ? e.message : 'Sync error';

@@ -483,11 +483,10 @@ function uploadCoverImage_(postData) {
 }
 
 function writeContentItem_(contentSheet, rowIndex, item) {
-  const lastCol = Math.max(contentSheet.getLastColumn(), 28);
-  const headers = contentSheet.getRange(1, 1, 1, lastCol).getValues()[0]
-    .map(function(header) { return String(header).trim(); });
+  const lastCol = Math.max(contentSheet.getLastColumn(), 1);
+  const row1Values = contentSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const headers = row1Values.map(function(header) { return String(header).trim(); });
   
-  // Ensure coverImageUrl and coverImageId headers exist if not present in row 1
   let coverUrlIdx = headers.indexOf("coverImageUrl");
   let coverIdIdx = headers.indexOf("coverImageId");
   
@@ -503,7 +502,9 @@ function writeContentItem_(contentSheet, rowIndex, item) {
   }
 
   const headerIndex = {};
-  headers.forEach(function(header, index) { headerIndex[header] = index; });
+  headers.forEach(function(header, index) {
+    if (header) headerIndex[header] = index;
+  });
 
   const values = rowIndex
     ? contentSheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0]
@@ -511,39 +512,44 @@ function writeContentItem_(contentSheet, rowIndex, item) {
 
   // Map known fields explicitly
   const fieldMapping = {
-    id: item.id || "",
-    title: item.title || "",
-    brief: item.brief || "",
-    status: item.status || "Idea",
-    channel: item.channel || "Instagram",
-    format: item.format || "Feed/Reels",
-    priority: item.priority || "Medium",
-    assignee: item.assignee || "",
-    publishDate: item.publishDate || "",
-    assetsLink: item.assetsLink || "",
-    tags: item.tags || "",
-    budget: item.budget || "",
-    platformNotes: item.platformNotes || "",
-    targetAudience: item.targetAudience || "",
-    createdBy: item.createdBy || "",
-    checklist: item.checklist || "",
-    views: item.views || "",
-    likes: item.likes || "",
-    engagement: item.engagement || "",
-    createdAt: item.createdAt || new Date().toISOString(),
+    id: item.id,
+    title: item.title,
+    brief: item.brief,
+    status: item.status,
+    channel: item.channel,
+    format: item.format,
+    priority: item.priority,
+    assignee: item.assignee,
+    publishDate: item.publishDate,
+    assetsLink: item.assetsLink,
+    tags: item.tags,
+    budget: item.budget,
+    platformNotes: item.platformNotes,
+    targetAudience: item.targetAudience,
+    createdBy: item.createdBy,
+    checklist: item.checklist,
+    views: item.views,
+    likes: item.likes,
+    engagement: item.engagement,
+    createdAt: item.createdAt,
     updatedAt: item.updatedAt || new Date().toISOString(),
-    taskType: item.taskType || "Content",
-    category: item.category || "",
-    dueDate: item.dueDate || "",
-    client: item.client || "",
-    brand: item.brand || "",
-    coverImageUrl: item.coverImageUrl || "",
-    coverImageId: item.coverImageId || ""
+    taskType: item.taskType,
+    category: item.category,
+    dueDate: item.dueDate,
+    client: item.client,
+    brand: item.brand,
+    coverImageUrl: item.coverImageUrl,
+    coverImageId: item.coverImageId
   };
 
   Object.keys(fieldMapping).forEach(function(key) {
     if (Object.prototype.hasOwnProperty.call(headerIndex, key)) {
-      values[headerIndex[key]] = fieldMapping[key];
+      var val = fieldMapping[key];
+      // On update: preserve existing coverImageUrl / coverImageId if item payload has empty/undefined coverImageUrl
+      if (rowIndex && (key === "coverImageUrl" || key === "coverImageId") && (!val || String(val).trim() === "")) {
+        return;
+      }
+      values[headerIndex[key]] = (val !== undefined && val !== null) ? val : "";
     }
   });
 
