@@ -52,15 +52,7 @@ function doPost(e) {
       item.createdAt = new Date().toISOString();
       item.updatedAt = new Date().toISOString();
       
-      contentSheet.appendRow([
-        item.id, item.title, item.brief, item.status, 
-        item.channel, item.format, item.priority, item.assignee, item.publishDate,
-        item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
-        item.targetAudience || "", item.createdBy || "", item.checklist || "",
-        item.views || "", item.likes || "", item.engagement || "",
-        item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
-        item.dueDate || "", item.client || "", item.brand || ""
-      ]);
+      writeContentItem_(contentSheet, null, item);
       syncTaskMembers(sheet, item, true);
       result = { success: true, item: item };
     } 
@@ -80,33 +72,20 @@ function doPost(e) {
       if (rowIndex !== -1) {
         item.createdBy = data[rowIndex - 1][14] || item.createdBy || "";
         item.createdAt = data[rowIndex - 1][19] || item.createdAt;
-        contentSheet.getRange(rowIndex, 1, 1, 26).setValues([[
-          item.id, item.title, item.brief, item.status, 
-          item.channel, item.format, item.priority, item.assignee, item.publishDate,
-          item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
-          item.targetAudience || "", item.createdBy || "", item.checklist || "",
-          item.views || "", item.likes || "", item.engagement || "",
-          item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
-          item.dueDate || "", item.client || "", item.brand || ""
-        ]]);
+        writeContentItem_(contentSheet, rowIndex, item);
         syncTaskMembers(sheet, item, false);
         result = { success: true, item: item };
       } else {
         // Upsert fallback: append as a new row if ID not found in sheet
         item.createdAt = item.createdAt || new Date().toISOString();
         item.updatedAt = new Date().toISOString();
-        contentSheet.appendRow([
-          item.id, item.title, item.brief, item.status, 
-          item.channel, item.format, item.priority, item.assignee, item.publishDate,
-          item.assetsLink, item.tags || "", item.budget || "", item.platformNotes || "", 
-          item.targetAudience || "", item.createdBy || "", item.checklist || "",
-          item.views || "", item.likes || "", item.engagement || "",
-          item.createdAt, item.updatedAt, item.taskType || "Content", item.category || "",
-          item.dueDate || "", item.client || "", item.brand || ""
-        ]);
+        writeContentItem_(contentSheet, null, item);
         syncTaskMembers(sheet, item, true);
         result = { success: true, item: item };
       }
+    }
+    else if (action === "uploadCoverImage") {
+      result = { success: true, coverImage: uploadCoverImage_(postData) };
     }
     else if (action === "deleteContent") {
       const contentSheet = sheet.getSheetByName("Content");
@@ -468,4 +447,109 @@ function generateUuid() {
     return Utilities.getUuid();
   }
   return 'id_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
+}
+
+function uploadCoverImage_(postData) {
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  const mimeType = String(postData.mimeType || "");
+  const fileName = String(postData.fileName || "content-cover");
+  const dataUrl = String(postData.dataUrl || "");
+  if (allowedTypes.indexOf(mimeType) === -1) throw new Error("Only JPG, PNG, and WebP are supported.");
+
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) throw new Error("Invalid image payload.");
+  const bytes = Utilities.base64Decode(match[2]);
+  if (bytes.length > 5 * 1024 * 1024) throw new Error("Image must be 5 MB or smaller.");
+
+  const props = PropertiesService.getScriptProperties();
+  let folderId = props.getProperty("CONTENTLAB_MEDIA_FOLDER_ID");
+  let folder;
+  if (folderId) {
+    try { folder = DriveApp.getFolderById(folderId); } catch (error) { folder = null; }
+  }
+  if (!folder) {
+    folder = DriveApp.createFolder("ContentLab Media");
+    props.setProperty("CONTENTLAB_MEDIA_FOLDER_ID", folder.getId());
+  }
+
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const file = folder.createFile(Utilities.newBlob(bytes, mimeType, Date.now() + "-" + safeName));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  return {
+    id: file.getId(),
+    url: "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1200"
+  };
+}
+
+function writeContentItem_(contentSheet, rowIndex, item) {
+  const lastCol = Math.max(contentSheet.getLastColumn(), 28);
+  const headers = contentSheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(header) { return String(header).trim(); });
+  
+  // Ensure coverImageUrl and coverImageId headers exist if not present in row 1
+  let coverUrlIdx = headers.indexOf("coverImageUrl");
+  let coverIdIdx = headers.indexOf("coverImageId");
+  
+  if (coverUrlIdx === -1) {
+    coverUrlIdx = headers.length;
+    headers.push("coverImageUrl");
+    contentSheet.getRange(1, coverUrlIdx + 1).setValue("coverImageUrl");
+  }
+  if (coverIdIdx === -1) {
+    coverIdIdx = headers.length;
+    headers.push("coverImageId");
+    contentSheet.getRange(1, coverIdIdx + 1).setValue("coverImageId");
+  }
+
+  const headerIndex = {};
+  headers.forEach(function(header, index) { headerIndex[header] = index; });
+
+  const values = rowIndex
+    ? contentSheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0]
+    : new Array(headers.length).fill("");
+
+  // Map known fields explicitly
+  const fieldMapping = {
+    id: item.id || "",
+    title: item.title || "",
+    brief: item.brief || "",
+    status: item.status || "Idea",
+    channel: item.channel || "Instagram",
+    format: item.format || "Feed/Reels",
+    priority: item.priority || "Medium",
+    assignee: item.assignee || "",
+    publishDate: item.publishDate || "",
+    assetsLink: item.assetsLink || "",
+    tags: item.tags || "",
+    budget: item.budget || "",
+    platformNotes: item.platformNotes || "",
+    targetAudience: item.targetAudience || "",
+    createdBy: item.createdBy || "",
+    checklist: item.checklist || "",
+    views: item.views || "",
+    likes: item.likes || "",
+    engagement: item.engagement || "",
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
+    taskType: item.taskType || "Content",
+    category: item.category || "",
+    dueDate: item.dueDate || "",
+    client: item.client || "",
+    brand: item.brand || "",
+    coverImageUrl: item.coverImageUrl || "",
+    coverImageId: item.coverImageId || ""
+  };
+
+  Object.keys(fieldMapping).forEach(function(key) {
+    if (Object.prototype.hasOwnProperty.call(headerIndex, key)) {
+      values[headerIndex[key]] = fieldMapping[key];
+    }
+  });
+
+  if (rowIndex) {
+    contentSheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
+  } else {
+    contentSheet.appendRow(values);
+  }
 }
