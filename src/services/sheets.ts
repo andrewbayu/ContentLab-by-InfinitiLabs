@@ -383,14 +383,31 @@ export function isMockMode(): boolean {
   return !getScriptUrl();
 }
 
+import { uploadCoverImageToSupabase } from './supabase';
+
 export interface CoverImageUpload {
   url: string;
   id: string;
 }
 
 export async function uploadCoverImage(file: File): Promise<CoverImageUpload> {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Gunakan file JPG, PNG, atau WebP.');
-  if (file.size > 5 * 1024 * 1024) throw new Error('Ukuran gambar maksimal 5 MB.');
+  // 1. Try Supabase Object Storage first for instant 100ms CDN upload
+  try {
+    const supabaseResult = await uploadCoverImageToSupabase(file);
+    if (supabaseResult?.url) {
+      return supabaseResult;
+    }
+  } catch (sbErr) {
+    console.warn('Supabase storage upload failed, attempting Apps Script fallback:', sbErr);
+  }
+
+  // 2. Fallback to Google Apps Script Drive Storage
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Gunakan file JPG, PNG, atau WebP.');
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Ukuran gambar maksimal 5 MB.');
+  }
   const url = getScriptUrl();
   if (!url) throw new Error('Workspace belum terhubung ke Google Sheets.');
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -399,9 +416,21 @@ export async function uploadCoverImage(file: File): Promise<CoverImageUpload> {
     reader.onload = () => resolve(String(reader.result || ''));
     reader.readAsDataURL(file);
   });
-  const response = await fetch(url, { method: 'POST', mode: 'cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'uploadCoverImage', fileName: file.name, mimeType: file.type, dataUrl }) });
+  const response = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      action: 'uploadCoverImage',
+      fileName: file.name,
+      mimeType: file.type,
+      dataUrl,
+    }),
+  });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result?.success || !result.coverImage?.url) throw new Error(result?.error || 'Upload gambar gagal.');
+  if (!response.ok || !result?.success || !result.coverImage?.url) {
+    throw new Error(result?.error || 'Upload gambar gagal.');
+  }
   return result.coverImage as CoverImageUpload;
 }
 
