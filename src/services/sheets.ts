@@ -735,7 +735,7 @@ export async function fetchData(): Promise<WorkspaceData> {
       body: String(item.body || ''),
       url: String(item.url || ''),
       ownerId: String(item.ownerId || ''),
-      visibility: String(item.visibility || 'personal').toLowerCase() === 'client' ? 'client' : String(item.visibility || 'personal').toLowerCase() === 'team' ? 'team' : 'personal',
+      visibility: String(item.visibility || 'team').toLowerCase() === 'client' ? 'client' : String(item.visibility || 'team').toLowerCase() === 'personal' ? 'personal' : 'team',
       client: String(item.client || ''),
       brand: String(item.brand || ''),
       taskId: String(item.taskId || ''),
