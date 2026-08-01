@@ -79,6 +79,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'variables' | 'tags' | 'team' | 'channels' | 'clients' | 'connection'>('variables');
   const [isImportingSupabase, setIsImportingSupabase] = useState(false);
 
+  const handleSwitchProvider = (provider: 'sheets' | 'supabase') => {
+    localStorage.setItem('contentlab_db_provider', provider);
+    onConnectionChange();
+    addToast(`Primary database switched to ${provider === 'supabase' ? 'Supabase Postgres' : 'Google Sheets'}.`, 'success');
+  };
+
+  const currentProvider = localStorage.getItem('contentlab_db_provider') === 'supabase' ? 'supabase' : 'sheets';
+
   const handleImportToSupabase = async () => {
     if (!isSupabaseDbConfigured()) {
       addToast('Supabase Client is not configured. Check VITE_SUPABASE_URL in .env.', 'error');
@@ -1105,16 +1113,34 @@ function deleteTaskMembers(spreadsheet, taskId) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      className="btn btn-primary"
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 14px' }}
+                      className={`btn ${currentProvider === 'sheets' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '12px', padding: '8px 12px' }}
+                      onClick={() => handleSwitchProvider('sheets')}
+                    >
+                      {currentProvider === 'sheets' ? '✓ Active: Google Sheets' : 'Switch to Google Sheets'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`btn ${currentProvider === 'supabase' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '12px', padding: '8px 12px' }}
+                      onClick={() => handleSwitchProvider('supabase')}
+                    >
+                      {currentProvider === 'supabase' ? '✓ Active: Supabase' : 'Switch to Supabase'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
                       onClick={handleImportToSupabase}
                       disabled={isImportingSupabase || !isSupabaseDbConfigured()}
                     >
                       <RefreshCw size={14} className={isImportingSupabase ? 'spin' : ''} />
-                      {isImportingSupabase ? 'Importing Data...' : '1-Click Import Google Sheets -> Supabase'}
+                      {isImportingSupabase ? 'Importing...' : '1-Click Import -> Supabase'}
                     </button>
                   </div>
                 </div>
