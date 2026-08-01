@@ -434,3 +434,56 @@ export async function importGoogleSheetsToSupabase(sheetsData: {
     message: `Berhasil mengimpor data Google Sheets ke Supabase Database.`,
   };
 }
+
+// ----------------------------------------------------------------------
+// USER AUTHENTICATION (Supabase DB Team Members)
+// ----------------------------------------------------------------------
+
+export async function authenticateSupabaseUser(
+  username: string,
+  password: string
+): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
+  if (!supabase) return { success: false, error: 'Supabase client is not initialized.' };
+
+  const cleanUser = username.trim().toLowerCase();
+  const cleanPass = password.trim();
+
+  try {
+    const { data, error } = await supabase.from('team_members').select('*');
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return { success: false, error: 'Belum ada anggota Team di Supabase. Silakan login atau eksekusi 1-Click Import di Settings.' };
+    }
+
+    const match = data.find((member: any) => {
+      const nameMatch = String(member.name || '').trim().toLowerCase() === cleanUser;
+      const emailMatch = String(member.email || '').trim().toLowerCase() === cleanUser;
+      return nameMatch || emailMatch;
+    });
+
+    if (!match) {
+      return { success: false, error: 'User tidak ditemukan di daftar Team.' };
+    }
+
+    if (match.password && String(match.password).trim() !== cleanPass) {
+      return { success: false, error: 'Password salah.' };
+    }
+
+    const user: TeamMember = {
+      id: String(match.id),
+      name: String(match.name || ''),
+      email: String(match.email || ''),
+      password: String(match.password || ''),
+      role: (String(match.role || 'team').toLowerCase() === 'super' ? 'super' : String(match.role || 'team').toLowerCase() === 'client' ? 'client' : 'team') as TeamMember['role'],
+      client: String(match.client_access || match.client || ''),
+      avatar: match.avatar_url || '',
+    };
+
+    return { success: true, user };
+  } catch (e: any) {
+    console.error('Supabase authentication error:', e);
+    return { success: false, error: e?.message || 'Gagal terhubung ke Supabase DB.' };
+  }
+}
+
