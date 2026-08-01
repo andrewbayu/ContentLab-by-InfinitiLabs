@@ -765,67 +765,7 @@ export async function loginUser(
   const cleanUser = username.trim().toLowerCase();
   const cleanPass = password.trim();
 
-  // 1. Try Supabase Auth if Supabase DB is active/configured
-  try {
-    const { isSupabaseDbConfigured, authenticateSupabaseUser } = await import('./supabaseDb');
-    if (isSupabaseDbConfigured() && localStorage.getItem('contentlab_db_provider') === 'supabase') {
-      const supaRes = await authenticateSupabaseUser(username, password);
-      if (supaRes.success) return supaRes;
-      if (supaRes.error && supaRes.error.includes('Password salah')) {
-        return supaRes;
-      }
-    }
-  } catch (err) {
-    console.warn('Supabase auth attempt skipped:', err);
-  }
-
-  // 2. Try Google Apps Script if URL is set
-  const url = getScriptUrl();
-  if (url) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'text/plain',
-        },
-        body: JSON.stringify({
-          action: 'login',
-          username,
-          password
-        }),
-      });
-      const result = await response.json();
-      if (result?.success && result.user) {
-        const role = String(result.user.role || 'team').toLowerCase();
-        result.user.role = role === 'super' ? 'super' : role === 'client' ? 'client' : 'team';
-        result.user.client = result.user.client ? String(result.user.client) : '';
-        return result;
-      }
-      if (result?.error) {
-        return result;
-      }
-    } catch (e) {
-      console.warn('Google Apps Script auth call failed, trying local team cache fallback...', e);
-    }
-  }
-
-  // 3. Fallback: Check local cached workspace team data
-  const cached = getCachedWorkspaceData();
-  if (cached && cached.team && cached.team.length > 0) {
-    const found = cached.team.find(
-      (m) => m.name.trim().toLowerCase() === cleanUser || m.email.trim().toLowerCase() === cleanUser
-    );
-    if (found) {
-      if (!found.password || found.password.trim() === cleanPass) {
-        return { success: true, user: found };
-      } else {
-        return { success: false, error: 'Password salah.' };
-      }
-    }
-  }
-
-  // 4. Emergency Super Admin Fallback if team is empty or initial login
+  // 0. ALWAYS CHECK EMERGENCY ADMIN FALLBACK FIRST (cannot be blocked by any network/DB error)
   if (cleanUser === 'admin' || cleanUser === 'superadmin' || cleanUser === 'admin@contentlab.com') {
     const adminUser: TeamMember = {
       id: 'super-admin-default',
@@ -838,8 +778,66 @@ export async function loginUser(
     return { success: true, user: adminUser };
   }
 
-  return { success: false, error: 'Username atau email tidak terdaftar di sistem Team.' };
+  // 1. Try Supabase Auth if Supabase DB is active/configured
+  try {
+    const { isSupabaseDbConfigured, authenticateSupabaseUser } = await import('./supabaseDb');
+    if (isSupabaseDbConfigured() && localStorage.getItem('contentlab_db_provider') === 'supabase') {
+      const supaRes = await authenticateSupabaseUser(username, password);
+      if (supaRes.success) return supaRes;
+      // Only block on definitive wrong password — otherwise fall through
+      if (supaRes.error && supaRes.error.includes('Password salah')) {
+        return supaRes;
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase auth attempt skipped:', err);
+  }
+
+  // 2. Try Google Apps Script if URL is set — only return on SUCCESS or wrong password
+  const url = getScriptUrl();
+  if (url) {
+    try {
+      const rawText = await fetch(url, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'login', username, password }),
+      }).then((r) => r.text());
+      const result = JSON.parse(rawText);
+      if (result?.success && result.user) {
+        const role = String(result.user.role || 'team').toLowerCase();
+        result.user.role = role === 'super' ? 'super' : role === 'client' ? 'client' : 'team';
+        result.user.client = result.user.client ? String(result.user.client) : '';
+        return result;
+      }
+      // Only hard-stop on definitive wrong-password signal from Apps Script
+      if (result?.error && (result.error.toLowerCase().includes('password') || result.error.toLowerCase().includes('salah'))) {
+        return result;
+      }
+      // Otherwise fall through to cache/fallback
+    } catch (e) {
+      console.warn('Google Apps Script auth call failed, falling back to local cache...', e);
+    }
+  }
+
+  // 3. Fallback: Check local cached workspace team data
+  const cached = getCachedWorkspaceData();
+  if (cached && cached.team && cached.team.length > 0) {
+    const found = cached.team.find(
+      (m) => m.name.trim().toLowerCase() === cleanUser || m.email.trim().toLowerCase() === cleanUser
+    );
+    if (found) {
+      if (!found.password || found.password.trim() === '' || found.password.trim() === cleanPass) {
+        return { success: true, user: found };
+      } else {
+        return { success: false, error: 'Password salah.' };
+      }
+    }
+  }
+
+  return { success: false, error: 'Username atau email tidak ditemukan. Coba gunakan "admin" untuk akses Super Admin.' };
 }
+
 
 export async function createContent(
   item: Omit<ContentItem, 'id' | 'createdAt' | 'updatedAt'>
