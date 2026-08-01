@@ -22,6 +22,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { importGoogleSheetsToSupabase, isSupabaseDbConfigured } from '../services/supabaseDb';
+import { fetchData } from '../services/sheets';
 import type { CommentItem, ContentItem, KpiDefinition, KpiUpdate, DocumentItem } from '../services/sheets';
 
 interface SettingsViewProps {
@@ -93,8 +94,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return;
     }
     setIsImportingSupabase(true);
+    addToast('Fetching fresh data from Google Sheets...', 'info');
     try {
-      const res = await importGoogleSheetsToSupabase({
+      // ALWAYS fetch fresh data directly from Google Sheets regardless of current DB mode
+      let freshData: any = null;
+      try {
+        // Temporarily clear supabase flag so fetchData() hits Google Sheets
+        const prevProvider = localStorage.getItem('contentlab_db_provider');
+        localStorage.removeItem('contentlab_db_provider');
+        freshData = await fetchData();
+        if (prevProvider) localStorage.setItem('contentlab_db_provider', prevProvider);
+      } catch (fetchErr) {
+        console.warn('Could not fetch from Google Sheets, using in-memory data:', fetchErr);
+      }
+
+      const dataToImport = freshData ?? {
         content: items,
         team,
         channels,
@@ -103,9 +117,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         kpiDefinitions,
         kpiUpdates,
         documents,
+      };
+
+      const totalItems = (dataToImport.content?.length || 0) + (dataToImport.team?.length || 0);
+      if (totalItems === 0) {
+        addToast('Tidak ada data di Google Sheets untuk diimport. Pastikan koneksi Google Sheets sudah terkonfigurasi.', 'error');
+        return;
+      }
+
+      addToast(`Mengimport ${totalItems} records ke Supabase...`, 'info');
+
+      const res = await importGoogleSheetsToSupabase({
+        content: dataToImport.content || [],
+        team: dataToImport.team || [],
+        channels: dataToImport.channels || [],
+        clients: dataToImport.clients || [],
+        comments: dataToImport.comments || [],
+        kpiDefinitions: dataToImport.kpiDefinitions || [],
+        kpiUpdates: dataToImport.kpiUpdates || [],
+        documents: dataToImport.documents || [],
       });
+
       if (res.success) {
-        addToast(`✅ ${res.message} (${res.count} records processed)`, 'success');
+        addToast(`✅ ${res.message} (${res.count} records berhasil diimport!)`, 'success');
         localStorage.setItem('contentlab_db_provider', 'supabase');
         onConnectionChange();
       } else {
