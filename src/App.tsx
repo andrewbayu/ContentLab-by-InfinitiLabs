@@ -118,13 +118,20 @@ function App() {
       setLastSyncedAt(saveCachedWorkspaceData(data));
 
       // Keep only sessions that still exist in the live Team registry.
+      // Exceptions: (1) super-admin virtual user always stays, (2) empty team = DB not yet imported
       if (currentUser) {
-        const found = data.team.find((t) => t.id === currentUser.id || t.email === currentUser.email);
-        if (found) {
-          setCurrentUser(found);
-          localStorage.setItem('contentlab_logged_user', JSON.stringify(found));
+        const isSuperAdminFallback = currentUser.id === 'super-admin-default';
+        const teamIsEmpty = !data.team || data.team.length === 0;
+        if (isSuperAdminFallback || teamIsEmpty) {
+          // Keep the session — don't force logout for emergency admin or empty DB state
         } else {
-          handleLogout();
+          const found = data.team.find((t) => t.id === currentUser.id || t.email === currentUser.email);
+          if (found) {
+            setCurrentUser(found);
+            localStorage.setItem('contentlab_logged_user', JSON.stringify(found));
+          } else {
+            handleLogout();
+          }
         }
       }
     } catch (error) {
