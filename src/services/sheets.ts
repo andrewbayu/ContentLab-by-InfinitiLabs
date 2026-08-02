@@ -61,6 +61,7 @@ export interface CommentItem {
   id: string;
   contentId: string;
   author: string;
+  authorId?: string;
   text: string;
   attachmentUrl?: string;
   mentionedUserIds?: string[];

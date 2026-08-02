@@ -119,13 +119,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         documents,
       };
 
-      const totalItems = (dataToImport.content?.length || 0) + (dataToImport.team?.length || 0);
+      const totalItems =
+        (dataToImport.content?.length || 0) +
+        (dataToImport.team?.length || 0) +
+        (dataToImport.channels?.length || 0) +
+        (dataToImport.clients?.length || 0) +
+        (dataToImport.comments?.length || 0) +
+        (dataToImport.kpiDefinitions?.length || 0) +
+        (dataToImport.kpiUpdates?.length || 0) +
+        (dataToImport.documents?.length || 0);
+
       if (totalItems === 0) {
         addToast('Tidak ada data di Google Sheets untuk diimport. Pastikan koneksi Google Sheets sudah terkonfigurasi.', 'error');
         return;
       }
 
-      addToast(`Mengimport ${totalItems} records ke Supabase...`, 'info');
+      addToast(`Mengimport ${totalItems} records (Tasks, Comments, KPIs, Team, Docs, Channels, Clients) ke Supabase...`, 'info');
 
       const res = await importGoogleSheetsToSupabase({
         content: dataToImport.content || [],
@@ -139,7 +148,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       });
 
       if (res.success) {
-        addToast(`✅ ${res.message} (${res.count} records berhasil diimport!)`, 'success');
+        const b = res.breakdown;
+        const detailMsg = b
+          ? `[Tasks: ${b.tasks}, Comments: ${b.comments}, KPIs: ${b.kpiDefinitions + b.kpiUpdates}, Docs: ${b.documents}, Team: ${b.team}, Channels: ${b.channels}, Clients: ${b.clients}]`
+          : `${res.count} records`;
+
+        addToast(`✅ ${res.message} ${detailMsg}`, 'success');
         localStorage.setItem('contentlab_db_provider', 'supabase');
         onConnectionChange();
       } else {

@@ -452,7 +452,7 @@ function App() {
       const mentionIds = [...new Set([...mentionedUserIds, ...detectedIds])];
       const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
       const created = useSupabase
-        ? await createSupabaseComment(contentId, text, attachmentUrl, mentionIds, currentUser.name, currentUser.id)
+        ? await createSupabaseComment(contentId, currentUser?.name || 'Anonymous', text, attachmentUrl, mentionIds, currentUser?.id)
         : await createComment({
             contentId,
             author: currentUser.name,
