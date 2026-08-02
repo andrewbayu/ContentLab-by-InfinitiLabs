@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ContentItem, Channel, VariablesConfig, TaskType, CommentItem } from '../services/sheets';
+import { isCommentForTask, type ContentItem, type Channel, type VariablesConfig, type TaskType, type CommentItem } from '../services/sheets';
 import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare } from 'lucide-react';
 
 interface KanbanBoardProps {
@@ -116,7 +116,7 @@ export function KanbanBoard({
 
   const renderCard = (item: ContentItem) => {
     const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
-    const itemCommentCount = comments.filter((c) => c.contentId === item.id).length;
+    const itemCommentCount = comments.filter((c) => isCommentForTask(c, item.id)).length;
     return (
       <div
         key={item.id}

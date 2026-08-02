@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { uploadCoverImage } from '../services/sheets';
+import { uploadCoverImage, isCommentForTask } from '../services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from '../services/sheets';
 import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus } from 'lucide-react';
 import { normalizeUrl } from '../utils/url';
@@ -116,7 +116,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [isAddingClient, setIsAddingClient] = useState(false);
 
   // Filter comments for this specific item
-  const itemComments = comments.filter((c) => c.contentId === item?.id);
+  const itemComments = comments.filter((c) => item?.id && isCommentForTask(c, item.id));
 
   // Update form fields when modal opens or item changes
   useEffect(() => {

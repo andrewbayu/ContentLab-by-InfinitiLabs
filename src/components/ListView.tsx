@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { isUserInvolved } from '../services/sheets';
-import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
-import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck } from 'lucide-react';
+import { isUserInvolved, isCommentForTask } from '../services/sheets';
+import type { ContentItem, Channel, VariablesConfig, TeamMember, CommentItem } from '../services/sheets';
+import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck, MessageSquare } from 'lucide-react';
 
 interface ListViewProps {
   items: ContentItem[];
+  comments?: CommentItem[];
   channels: Channel[];
   variablesConfig: VariablesConfig;
   onEditItem: (item: ContentItem) => void;
@@ -16,6 +17,7 @@ type SortOrder = 'asc' | 'desc';
 
 export const ListView: React.FC<ListViewProps> = ({
   items,
+  comments = [],
   channels,
   variablesConfig,
   onEditItem,
@@ -351,6 +353,17 @@ export const ListView: React.FC<ListViewProps> = ({
                             {item.assignee.charAt(0)}
                           </div>
                         )}
+
+                        {(() => {
+                          const taskCommentsCount = comments.filter((c) => isCommentForTask(c, item.id)).length;
+                          if (taskCommentsCount === 0) return null;
+                          return (
+                            <span title={`${taskCommentsCount} comments`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, padding: '2px 6px', backgroundColor: '#f1f5f9', borderRadius: '4px' }}>
+                              <MessageSquare size={12} />
+                              {taskCommentsCount}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

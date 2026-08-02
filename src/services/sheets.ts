@@ -791,6 +791,44 @@ export function deduplicateContentItems(items: ContentItem[]): ContentItem[] {
   return result;
 }
 
+export function toDeterministicUuid(str: string | null | undefined): string | null {
+  if (!str || typeof str !== 'string') return null;
+  const trimmed = str.trim();
+  if (!trimmed) return null;
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
+  let hash1 = 0x811c9dc5;
+  let hash2 = 0x01000193;
+  for (let i = 0; i < trimmed.length; i++) {
+    const code = trimmed.charCodeAt(i);
+    hash1 = Math.imul(hash1 ^ code, 0x01000193);
+    hash2 = Math.imul(hash2 ^ code, 0x811c9dc5);
+  }
+
+  const hex1 = (hash1 >>> 0).toString(16).padStart(8, '0');
+  const hex2 = (hash2 >>> 0).toString(16).padStart(8, '0');
+  const hex3 = ((hash1 ^ hash2) >>> 0).toString(16).padStart(8, '0');
+  const hex4 = (Math.imul(hash1, hash2) >>> 0).toString(16).padStart(8, '0');
+
+  const raw32 = (hex1 + hex2 + hex3 + hex4).slice(0, 32).padEnd(32, '0');
+  const uuid = `${raw32.slice(0, 8)}-${raw32.slice(8, 12)}-4${raw32.slice(13, 16)}-a${raw32.slice(17, 20)}-${raw32.slice(20, 32)}`;
+  return uuid.toLowerCase();
+}
+
+export function isCommentForTask(comment: CommentItem, taskId: string): boolean {
+  if (!comment || !taskId) return false;
+  const cId = String(comment.contentId || '').trim();
+  const tId = String(taskId || '').trim();
+  if (cId === tId) return true;
+  const uuidC = toDeterministicUuid(cId);
+  const uuidT = toDeterministicUuid(tId);
+  return !!uuidC && uuidC === uuidT;
+}
+
 // True multi-user login verify API call (Supports Supabase, Google Apps Script, Cached Team, & Admin Fallback)
 export async function loginUser(
   username: string, 

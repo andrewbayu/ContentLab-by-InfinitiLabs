@@ -21,7 +21,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import type { CommentItem, ContentItem, TeamMember } from '../services/sheets';
+import { isCommentForTask, type CommentItem, type ContentItem, type TeamMember } from '../services/sheets';
 import { normalizeUrl } from '../utils/url';
 
 interface ClientPortalProps {
@@ -171,7 +171,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   const activeComments = useMemo(() => {
     if (!selectedDrawerItem) return [];
-    return comments.filter((entry) => entry.contentId === selectedDrawerItem.id);
+    return comments.filter((entry) => isCommentForTask(entry, selectedDrawerItem.id));
   }, [comments, selectedDrawerItem]);
 
   const awaitingReview = contentItems.filter(isReadyForReview);

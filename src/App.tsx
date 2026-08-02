@@ -895,6 +895,7 @@ function App() {
         {activeTab === 'list' && (
           <ListView
             items={filteredItems}
+            comments={comments}
             onEditItem={handleOpenEditModal}
             channels={channels}
             variablesConfig={variablesConfig}
