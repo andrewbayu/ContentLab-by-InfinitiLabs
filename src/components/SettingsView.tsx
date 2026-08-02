@@ -21,7 +21,7 @@ import {
   Database,
   RefreshCw
 } from 'lucide-react';
-import { importGoogleSheetsToSupabase, isSupabaseDbConfigured } from '../services/supabaseDb';
+import { importGoogleSheetsToSupabase, isSupabaseDbConfigured, purgeSupabaseDuplicateTasks } from '../services/supabaseDb';
 import { fetchData } from '../services/sheets';
 import type { CommentItem, ContentItem, KpiDefinition, KpiUpdate, DocumentItem } from '../services/sheets';
 
@@ -164,6 +164,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       addToast(e instanceof Error ? e.message : 'Import failed', 'error');
     } finally {
       setIsImportingSupabase(false);
+    }
+  };
+
+  const [isPurging, setIsPurging] = useState(false);
+
+  const handlePurgeDuplicates = async () => {
+    setIsPurging(true);
+    try {
+      addToast('Membersihkan data task ganda di database...', 'info');
+      const res = await purgeSupabaseDuplicateTasks();
+      if (res.deleted > 0) {
+        addToast(`✅ Berhasil menghapus ${res.deleted} task ganda dari database!`, 'success');
+      } else {
+        addToast('✅ Tidak ditemukan task ganda di database.', 'info');
+      }
+      onConnectionChange();
+    } catch (e) {
+      addToast('Gagal membersihkan task ganda.', 'error');
+    } finally {
+      setIsPurging(false);
     }
   };
   
@@ -1189,6 +1209,17 @@ function deleteTaskMembers(spreadsheet, taskId) {
                     >
                       <RefreshCw size={14} className={isImportingSupabase ? 'spin' : ''} />
                       {isImportingSupabase ? 'Importing...' : '1-Click Import -> Supabase'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px', color: '#dc2626', borderColor: '#fca5a5', background: '#fff5f5' }}
+                      onClick={handlePurgeDuplicates}
+                      disabled={isPurging}
+                    >
+                      <Trash2 size={14} className={isPurging ? 'spin' : ''} />
+                      {isPurging ? 'Cleaning...' : '🧹 Hapus Task Ganda'}
                     </button>
                   </div>
                 </div>

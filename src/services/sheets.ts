@@ -746,16 +746,49 @@ export async function fetchData(): Promise<WorkspaceData> {
       updatedAt: String(item.updatedAt || new Date().toISOString()),
     })) as DocumentItem[];
 
-    return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents };
+    const uniqueContent = deduplicateContentItems(content);
+    return { content: uniqueContent, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents };
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, using the latest workspace snapshot:', error);
     const cached = getCachedWorkspaceData();
     if (cached) {
       const { savedAt: _savedAt, ...workspace } = cached;
-      return workspace;
+      return {
+        ...workspace,
+        content: deduplicateContentItems(workspace.content || []),
+      };
     }
-    return getLocalData();
+    const local = getLocalData();
+    return {
+      ...local,
+      content: deduplicateContentItems(local.content || []),
+    };
   }
+}
+
+export function deduplicateContentItems(items: ContentItem[]): ContentItem[] {
+  const seenIds = new Set<string>();
+  const seenKeys = new Set<string>();
+  const result: ContentItem[] = [];
+
+  for (const item of items) {
+    if (!item || !item.title) continue;
+    if (item.id && seenIds.has(item.id)) continue;
+
+    const titleClean = String(item.title || '').trim().toLowerCase();
+    const clientClean = String(item.client || '').trim().toLowerCase();
+    const brandClean = String(item.brand || '').trim().toLowerCase();
+    const dateClean = String(item.publishDate || item.dueDate || '').trim().toLowerCase();
+
+    const compositeKey = `${titleClean}::${clientClean}::${brandClean}::${dateClean}`;
+    if (seenKeys.has(compositeKey)) continue;
+
+    if (item.id) seenIds.add(item.id);
+    seenKeys.add(compositeKey);
+    result.push(item);
+  }
+
+  return result;
 }
 
 // True multi-user login verify API call (Supports Supabase, Google Apps Script, Cached Team, & Admin Fallback)

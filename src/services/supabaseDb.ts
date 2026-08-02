@@ -1,13 +1,14 @@
 import { supabase } from './supabase';
-import type {
-  ContentItem,
-  TeamMember,
-  Channel,
-  ClientBrand,
-  CommentItem,
-  KpiDefinition,
-  KpiUpdate,
-  DocumentItem,
+import {
+  deduplicateContentItems,
+  type ContentItem,
+  type TeamMember,
+  type Channel,
+  type ClientBrand,
+  type CommentItem,
+  type KpiDefinition,
+  type KpiUpdate,
+  type DocumentItem,
 } from './sheets';
 import { normalizeUrl } from '../utils/url';
 
@@ -266,7 +267,7 @@ export async function fetchSupabaseInitialData(): Promise<{
   }));
 
   return {
-    content,
+    content: deduplicateContentItems(content),
     team,
     channels,
     clients,
@@ -275,6 +276,43 @@ export async function fetchSupabaseInitialData(): Promise<{
     kpiUpdates,
     documents,
   };
+}
+
+/**
+ * Clean up / delete duplicate tasks in Supabase DB based on title + client + brand + publish_date
+ */
+export async function purgeSupabaseDuplicateTasks(): Promise<{ deleted: number }> {
+  if (!supabase) return { deleted: 0 };
+  const { data: tasks, error } = await supabase.from('tasks').select('id, title, client, brand, publish_date, created_at').order('created_at', { ascending: false });
+  if (error || !tasks || tasks.length === 0) return { deleted: 0 };
+
+  const seen = new Set<string>();
+  const duplicateIdsToDelete: string[] = [];
+
+  for (const task of tasks) {
+    const titleClean = String(task.title || '').trim().toLowerCase();
+    const clientClean = String(task.client || '').trim().toLowerCase();
+    const brandClean = String(task.brand || '').trim().toLowerCase();
+    const publishDateClean = String(task.publish_date || '').trim().toLowerCase();
+
+    const compositeKey = `${titleClean}::${clientClean}::${brandClean}::${publishDateClean}`;
+
+    if (seen.has(compositeKey)) {
+      duplicateIdsToDelete.push(task.id);
+    } else {
+      seen.add(compositeKey);
+    }
+  }
+
+  if (duplicateIdsToDelete.length > 0) {
+    const { error: delErr } = await supabase.from('tasks').delete().in('id', duplicateIdsToDelete);
+    if (delErr) {
+      console.error('Failed to delete duplicate tasks:', delErr);
+      return { deleted: 0 };
+    }
+  }
+
+  return { deleted: duplicateIdsToDelete.length };
 }
 
 // ----------------------------------------------------------------------
