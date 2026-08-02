@@ -683,7 +683,7 @@ export async function fetchData(): Promise<WorkspaceData> {
 
     const comments = (data.comments || []).map((item: any) => ({
       id: String(item.id || ''),
-      contentId: String(item.contentId || ''),
+      contentId: String(item.contentId || item.content_id || item.taskId || item.task_id || ''),
       author: String(item.author || ''),
       text: String(item.text || ''),
       attachmentUrl: item.attachmentUrl ? String(item.attachmentUrl) : undefined,
