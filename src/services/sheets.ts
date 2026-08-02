@@ -821,14 +821,28 @@ export function toDeterministicUuid(str: string | null | undefined): string | nu
   return uuid.toLowerCase();
 }
 
-export function isCommentForTask(comment: CommentItem, taskId: string): boolean {
-  if (!comment || !taskId) return false;
+export function isCommentForTask(comment: CommentItem, taskIdOrItem: string | { id: string; title?: string }): boolean {
+  if (!comment || !taskIdOrItem) return false;
+  const taskId = typeof taskIdOrItem === 'string' ? taskIdOrItem : taskIdOrItem?.id;
+  const taskTitle = typeof taskIdOrItem === 'object' ? taskIdOrItem?.title : '';
+
+  if (!taskId) return false;
   const cId = String(comment.contentId || '').trim().toLowerCase();
   const tId = String(taskId || '').trim().toLowerCase();
-  if (cId === tId) return true;
-  const uuidC = toDeterministicUuid(cId);
-  const uuidT = toDeterministicUuid(tId);
-  return !!uuidC && uuidC === uuidT;
+
+  if (cId && tId) {
+    if (cId === tId) return true;
+    const uuidC = toDeterministicUuid(cId);
+    const uuidT = toDeterministicUuid(tId);
+    if (uuidC && uuidC === uuidT) return true;
+  }
+
+  if (cId && taskTitle) {
+    const cleanTitle = taskTitle.trim().toLowerCase();
+    if (cId === cleanTitle) return true;
+  }
+
+  return false;
 }
 
 // True multi-user login verify API call (Supports Supabase, Google Apps Script, Cached Team, & Admin Fallback)

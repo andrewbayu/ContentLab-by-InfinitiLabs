@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import {
   deduplicateContentItems,
+  fetchData,
   type ContentItem,
   type TeamMember,
   type Channel,
@@ -211,7 +212,7 @@ export async function fetchSupabaseInitialData(): Promise<{
     active: row.active !== false,
   }));
 
-  const comments: CommentItem[] = (commentsRes.data || []).map((row: any) => ({
+  let comments: CommentItem[] = (commentsRes.data || []).map((row: any) => ({
     id: String(row.id),
     contentId: String(row.task_id),
     author: String(row.author || ''),
@@ -220,6 +221,18 @@ export async function fetchSupabaseInitialData(): Promise<{
     attachmentUrl: row.attachment_url ? normalizeUrl(row.attachment_url) : undefined,
     mentionedUserIds: Array.isArray(row.mentioned_user_ids) ? row.mentioned_user_ids.map(String) : [],
   }));
+
+  // Fallback: If Supabase comments DB is currently empty, fetch live comments from Google Sheets
+  if (comments.length === 0) {
+    try {
+      const sheetsData = await fetchData();
+      if (sheetsData?.comments && sheetsData.comments.length > 0) {
+        comments = sheetsData.comments;
+      }
+    } catch (e) {
+      console.warn('Could not fetch fallback comments from Google Sheets:', e);
+    }
+  }
 
   const kpiDefinitions: KpiDefinition[] = (kpiDefRes.data || []).map((row: any) => ({
     id: String(row.id),

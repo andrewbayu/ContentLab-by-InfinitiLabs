@@ -116,7 +116,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [isAddingClient, setIsAddingClient] = useState(false);
 
   // Filter comments for this specific item
-  const itemComments = comments.filter((c) => item?.id && isCommentForTask(c, item.id));
+  const itemComments = comments.filter((c) => item && isCommentForTask(c, item));
 
   // Update form fields when modal opens or item changes
   useEffect(() => {
