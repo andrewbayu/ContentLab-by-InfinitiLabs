@@ -793,18 +793,20 @@ export function deduplicateContentItems(items: ContentItem[]): ContentItem[] {
 
 export function toDeterministicUuid(str: string | null | undefined): string | null {
   if (!str || typeof str !== 'string') return null;
-  const trimmed = str.trim();
-  if (!trimmed) return null;
+  const cleanStr = str.trim().toLowerCase();
+  if (!cleanStr) return null;
 
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (uuidRegex.test(trimmed)) {
-    return trimmed.toLowerCase();
+  // Universal 36-character UUID regex test (case-insensitive)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(cleanStr)) {
+    return cleanStr;
   }
 
+  // Generate deterministic 32-character hex hash from lowercased string
   let hash1 = 0x811c9dc5;
   let hash2 = 0x01000193;
-  for (let i = 0; i < trimmed.length; i++) {
-    const code = trimmed.charCodeAt(i);
+  for (let i = 0; i < cleanStr.length; i++) {
+    const code = cleanStr.charCodeAt(i);
     hash1 = Math.imul(hash1 ^ code, 0x01000193);
     hash2 = Math.imul(hash2 ^ code, 0x811c9dc5);
   }
@@ -821,8 +823,8 @@ export function toDeterministicUuid(str: string | null | undefined): string | nu
 
 export function isCommentForTask(comment: CommentItem, taskId: string): boolean {
   if (!comment || !taskId) return false;
-  const cId = String(comment.contentId || '').trim();
-  const tId = String(taskId || '').trim();
+  const cId = String(comment.contentId || '').trim().toLowerCase();
+  const tId = String(taskId || '').trim().toLowerCase();
   if (cId === tId) return true;
   const uuidC = toDeterministicUuid(cId);
   const uuidT = toDeterministicUuid(tId);
