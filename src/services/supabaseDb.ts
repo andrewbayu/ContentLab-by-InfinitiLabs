@@ -183,8 +183,10 @@ export async function fetchSupabaseInitialData(): Promise<{
     supabase.from('documents').select('*').order('updated_at', { ascending: false }),
   ]);
 
-  if (tasksRes.error) console.error('Error fetching Supabase tasks:', tasksRes.error);
-  if (teamRes.error) console.error('Error fetching Supabase team:', teamRes.error);
+  if (tasksRes.error || commentsRes.error) {
+    console.warn('Supabase fetch encountered an error, falling back to Google Sheets:', tasksRes.error || commentsRes.error);
+    return await fetchData();
+  }
 
   const content: ContentItem[] = (tasksRes.data || []).map(mapTaskRowToContentItem);
 
