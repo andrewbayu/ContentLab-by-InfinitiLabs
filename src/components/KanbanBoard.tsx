@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { isCommentForTask, type ContentItem, type Channel, type VariablesConfig, type TaskType, type CommentItem } from '../services/sheets';
+import React, { useState, useMemo, memo } from 'react';
+import { toDeterministicUuid, type ContentItem, type Channel, type VariablesConfig, type TaskType, type CommentItem } from '../services/sheets';
+
+
 import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare } from 'lucide-react';
 
 interface KanbanBoardProps {
@@ -33,7 +35,7 @@ const GENERAL_COLUMNS: KanbanColumn[] = [
   { label: 'Done', status: 'Done' },
 ];
 
-export function KanbanBoard({
+function KanbanBoardComponent({
   items,
   comments = [],
   channels,
@@ -51,6 +53,34 @@ export function KanbanBoard({
   const showLaneSwitch = showContentLane && showGeneralLane;
 
   const displayedItems = items;
+
+  // Index comment counts by (canonical) task id ONCE per comments change, instead
+  // of scanning the whole comments array for every card on every render. This turns
+  // the old O(cards × comments) work into O(comments) build + O(1) per-card lookup.
+  const commentCountByTask = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of comments) {
+      const key = toDeterministicUuid(c.contentId) || String(c.contentId || '');
+      if (!key) continue;
+      map.set(key, (map.get(key) || 0) + 1);
+    }
+    return map;
+  }, [comments]);
+
+  // Pre-resolve channel styling into a lookup map so each card is O(1) instead of
+  // running Array.find over all channels.
+  const channelStyleMap = useMemo(() => {
+    const map = new Map<string, React.CSSProperties>();
+    for (const channel of channels) {
+      map.set(channel.name.toLowerCase(), {
+        backgroundColor: `${channel.color}15`,
+        color: channel.color,
+        border: `1px solid ${channel.color}25`,
+      });
+    }
+    return map;
+  }, [channels]);
+
 
   const handleDragStart = (event: React.DragEvent, item: ContentItem) => {
     event.dataTransfer.setData('text/plain', item.id);
@@ -81,21 +111,14 @@ export function KanbanBoard({
     if (draggedItem?.taskType === laneType) onMoveItem(itemId, targetStatus);
   };
 
-  const getChannelStyle = (channelName: string) => {
-    const channel = channels.find((entry) => entry.name.toLowerCase() === channelName.toLowerCase());
-    if (channel) {
-      return {
-        backgroundColor: `${channel.color}15`,
-        color: channel.color,
-        border: `1px solid ${channel.color}25`,
-      };
-    }
-    return {
-      backgroundColor: 'rgba(113, 113, 122, 0.08)',
-      color: '#475569',
-      border: '1px solid rgba(113, 113, 122, 0.15)',
-    };
+  const DEFAULT_CHANNEL_STYLE: React.CSSProperties = {
+    backgroundColor: 'rgba(113, 113, 122, 0.08)',
+    color: '#475569',
+    border: '1px solid rgba(113, 113, 122, 0.15)',
   };
+  const getChannelStyle = (channelName: string) =>
+    channelStyleMap.get(channelName.toLowerCase()) || DEFAULT_CHANNEL_STYLE;
+
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -116,7 +139,9 @@ export function KanbanBoard({
 
   const renderCard = (item: ContentItem) => {
     const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
-    const itemCommentCount = comments.filter((c) => isCommentForTask(c, item.id)).length;
+    const itemKey = toDeterministicUuid(item.id) || String(item.id || '');
+    const itemCommentCount = commentCountByTask.get(itemKey) || 0;
+
     return (
       <div
         key={item.id}
@@ -261,3 +286,9 @@ export function KanbanBoard({
     </div>
   );
 }
+
+// Memoized so the board only re-renders when its own props change — not on every
+// parent (App) re-render such as a toast appearing or an unrelated tab switch.
+export const KanbanBoard = memo(KanbanBoardComponent);
+
+

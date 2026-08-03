@@ -1,16 +1,19 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { AppShell } from './components/AppShell';
-import { DashboardView } from './components/DashboardView';
-import { ClientPortal } from './components/ClientPortal';
-import { KanbanBoard } from './components/KanbanBoard';
-import { ListView } from './components/ListView';
-import { SettingsView } from './components/SettingsView';
-import { TaskModal } from './components/TaskModal';
 import { LoginPage } from './components/LoginPage';
-import { CalendarView } from './components/CalendarView';
-import { AnalyticsView } from './components/AnalyticsView';
-import { DocumentsView } from './components/DocumentsView';
-import { ReportsView } from './components/ReportsView';
+
+// Route-level code splitting: each view ships in its own async chunk and is only
+// downloaded when the user first navigates to it. Keeps the initial bundle lean.
+const DashboardView = lazy(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
+const ClientPortal = lazy(() => import('./components/ClientPortal').then((m) => ({ default: m.ClientPortal })));
+const KanbanBoard = lazy(() => import('./components/KanbanBoard').then((m) => ({ default: m.KanbanBoard })));
+const ListView = lazy(() => import('./components/ListView').then((m) => ({ default: m.ListView })));
+const SettingsView = lazy(() => import('./components/SettingsView').then((m) => ({ default: m.SettingsView })));
+const TaskModal = lazy(() => import('./components/TaskModal').then((m) => ({ default: m.TaskModal })));
+const CalendarView = lazy(() => import('./components/CalendarView').then((m) => ({ default: m.CalendarView })));
+const AnalyticsView = lazy(() => import('./components/AnalyticsView').then((m) => ({ default: m.AnalyticsView })));
+const DocumentsView = lazy(() => import('./components/DocumentsView').then((m) => ({ default: m.DocumentsView })));
+const ReportsView = lazy(() => import('./components/ReportsView').then((m) => ({ default: m.ReportsView })));
 import {
   fetchData,
   createContent,
@@ -143,6 +146,32 @@ function App() {
     }
   };
 
+  // Keep a live pointer to the latest loadData so long-lived subscriptions/timers
+  // always invoke the current closure (avoids stale state) without re-subscribing.
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+
+  // Coalesce bursts of realtime events into a single refresh. Previously every
+  // task/comment change triggered its own full-workspace refetch, so N concurrent
+  // edits caused N full downloads. Debouncing collapses them into one.
+  const reloadTimerRef = useRef<number | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = window.setTimeout(() => {
+      reloadTimerRef.current = null;
+      loadDataRef.current(false);
+    }, 400);
+  }, []);
+
+  // Live refs to the latest state so the stable (useCallback) handlers below can
+  // read fresh values without listing `items`/`currentUser` as deps — that would
+  // recreate the handler on every data change and defeat child memoization.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
@@ -151,13 +180,14 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated && localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured()) {
-      const unsubscribe = subscribeToSupabaseRealtime(
-        () => loadData(false),
-        () => loadData(false)
-      );
-      return () => unsubscribe();
+      const unsubscribe = subscribeToSupabaseRealtime(scheduleReload, scheduleReload);
+      return () => {
+        unsubscribe();
+        if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      };
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, scheduleReload]);
+
 
   useEffect(() => {
     if (!isAuthenticated || !hasWorkspaceData.current) return;
@@ -176,8 +206,9 @@ function App() {
     return () => window.clearTimeout(cacheTimer);
   }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents]);
 
-  const beginWrite = () => setPendingWrites((count) => count + 1);
-  const endWrite = () => setPendingWrites((count) => Math.max(0, count - 1));
+  const beginWrite = useCallback(() => setPendingWrites((count) => count + 1), []);
+  const endWrite = useCallback(() => setPendingWrites((count) => Math.max(0, count - 1)), []);
+
 
   useEffect(() => {
     if (activeTab === 'settings' && currentUser?.role !== 'super') {
@@ -811,8 +842,9 @@ function App() {
             </div>
           </div>
         ) : (
-          <>
+          <Suspense fallback={<div className="workspace-skeleton" aria-label="Loading view" style={{ padding: 24 }}><div className="workspace-skeleton-heading skeleton-line" /></div>}>
         {['board', 'calendar', 'list'].includes(activeTab) && currentUser.role !== 'client' && (
+
           <div className="task-view-bar">
             <div className="task-view-tabs">
               {([
@@ -958,37 +990,43 @@ function App() {
             documents={documents}
           />
         )}
-          </>
+          </Suspense>
         )}
       </div>
 
-      {/* Task Creation & Editing Drawer Slide-Over */}
-      <TaskModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedItem(null);
-        }}
-        onSave={handleSaveItem}
-        onDelete={handleDeleteItem}
-        item={selectedItem}
-        initialStatus={initialStatusForModal}
-        team={team}
-        channels={channels}
-        clients={clients}
-        defaultClientBrand={selectedBrand}
-        variablesConfig={variablesConfig}
-        customTags={allAvailableTags}
-        activeUser={currentUser.name}
-        activeUserId={currentUser.id}
-        comments={comments}
-        onAddComment={handleAddComment}
-        onAddCreator={handleAddCreator}
-        onAddChannel={handleAddChannel}
-        onAddClientBrand={handleAddClientBrand}
-        onAddTag={handleAddTag}
-        canManageRegistries={currentUser.role === 'super'}
-      />
+      {/* Task Creation & Editing Drawer Slide-Over.
+          Kept out of the tree (and its chunk unfetched) until first opened. */}
+      {(isModalOpen || selectedItem) && (
+        <Suspense fallback={null}>
+          <TaskModal
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedItem(null);
+            }}
+            onSave={handleSaveItem}
+            onDelete={handleDeleteItem}
+            item={selectedItem}
+            initialStatus={initialStatusForModal}
+            team={team}
+            channels={channels}
+            clients={clients}
+            defaultClientBrand={selectedBrand}
+            variablesConfig={variablesConfig}
+            customTags={allAvailableTags}
+            activeUser={currentUser.name}
+            activeUserId={currentUser.id}
+            comments={comments}
+            onAddComment={handleAddComment}
+            onAddCreator={handleAddCreator}
+            onAddChannel={handleAddChannel}
+            onAddClientBrand={handleAddClientBrand}
+            onAddTag={handleAddTag}
+            canManageRegistries={currentUser.role === 'super'}
+          />
+        </Suspense>
+      )}
+
 
       {/* Toast Alert System overlay */}
       <div className="toast-container">
