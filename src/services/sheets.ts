@@ -868,8 +868,8 @@ export async function loginUser(
 
   // 1. Try Supabase Auth if Supabase DB is active/configured
   try {
-    const { isSupabaseDbConfigured, authenticateSupabaseUser } = await import('./supabaseDb');
-    if (isSupabaseDbConfigured() && localStorage.getItem('contentlab_db_provider') === 'supabase') {
+    const { isUsingSupabaseDb, authenticateSupabaseUser } = await import('./supabaseDb');
+    if (isUsingSupabaseDb()) {
       const supaRes = await authenticateSupabaseUser(username, password);
       if (supaRes.success) return supaRes;
       // Only block on definitive wrong password — otherwise fall through

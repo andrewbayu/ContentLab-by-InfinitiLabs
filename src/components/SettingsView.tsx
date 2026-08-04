@@ -21,7 +21,7 @@ import {
   Database,
   RefreshCw
 } from 'lucide-react';
-import { importGoogleSheetsToSupabase, isSupabaseDbConfigured, purgeSupabaseDuplicateTasks } from '../services/supabaseDb';
+import { importGoogleSheetsToSupabase, isSupabaseDbConfigured, purgeSupabaseDuplicateTasks, getPreferredDbProvider } from '../services/supabaseDb';
 import { fetchData } from '../services/sheets';
 import type { CommentItem, ContentItem, KpiDefinition, KpiUpdate, DocumentItem } from '../services/sheets';
 
@@ -86,7 +86,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     addToast(`Primary database switched to ${provider === 'supabase' ? 'Supabase Postgres' : 'Google Sheets'}.`, 'success');
   };
 
-  const currentProvider = localStorage.getItem('contentlab_db_provider') === 'supabase' ? 'supabase' : 'sheets';
+  const currentProvider = getPreferredDbProvider();
 
   const handleImportToSupabase = async () => {
     if (!isSupabaseDbConfigured()) {
@@ -1177,7 +1177,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                       Status Database: <span style={{ color: isSupabaseDbConfigured() ? '#16a34a' : '#d97706' }}>{isSupabaseDbConfigured() ? 'Connected & Ready' : 'Configuration Missing'}</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                      Primary Database Mode: <strong>{localStorage.getItem('contentlab_db_provider') === 'supabase' ? 'Supabase Postgres (Active)' : 'Google Sheets Mode'}</strong>
+                      Primary Database Mode: <strong>{currentProvider === 'supabase' ? 'Supabase Postgres (Active)' : 'Google Sheets Mode'}</strong>
                     </div>
                   </div>
 

@@ -20,6 +20,18 @@ export function isSupabaseDbConfigured(): boolean {
   return !!supabase;
 }
 
+export function getPreferredDbProvider(): 'supabase' | 'sheets' {
+  const saved = localStorage.getItem('contentlab_db_provider');
+  if (saved === 'sheets') return 'sheets';
+  if (saved === 'supabase') return 'supabase';
+  // Default for all workspace users on all devices: Supabase if configured
+  return isSupabaseDbConfigured() ? 'supabase' : 'sheets';
+}
+
+export function isUsingSupabaseDb(): boolean {
+  return isSupabaseDbConfigured() && getPreferredDbProvider() === 'supabase';
+}
+
 // ----------------------------------------------------------------------
 // DATA MAPPING HELPERS (Database Columns <-> React Domain Models)
 // ----------------------------------------------------------------------

@@ -48,7 +48,7 @@ import {
   deleteSupabaseContent,
   createSupabaseComment,
   subscribeToSupabaseRealtime,
-  isSupabaseDbConfigured
+  isUsingSupabaseDb,
 } from './services/supabaseDb';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, UserRole } from './services/sheets';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
@@ -107,7 +107,7 @@ function App() {
     if (showLoading && !hasWorkspaceData.current) setIsInitialLoading(true);
     setIsSyncing(true);
     try {
-      const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+      const useSupabase = isUsingSupabaseDb();
       const data = useSupabase ? await fetchSupabaseInitialData() : await fetchData();
       setItems(data.content);
       setTeam(data.team);
@@ -179,7 +179,7 @@ function App() {
   }, [isMock, isAuthenticated]);
 
   useEffect(() => {
-    if (isAuthenticated && localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured()) {
+    if (isAuthenticated && isUsingSupabaseDb()) {
       const unsubscribe = subscribeToSupabaseRealtime(scheduleReload, scheduleReload);
       return () => {
         unsubscribe();
@@ -287,7 +287,7 @@ function App() {
 
       // 2. SILENT BACKGROUND SYNC
       try {
-        const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+        const useSupabase = isUsingSupabaseDb();
         const serverUpdated = useSupabase
           ? await updateSupabaseContent(updatedPayload)
           : await updateContent(updatedPayload);
@@ -345,7 +345,7 @@ function App() {
 
       // 2. SILENT BACKGROUND SYNC
       try {
-        const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+        const useSupabase = isUsingSupabaseDb();
         const created = useSupabase
           ? await createSupabaseContent({
               ...itemPayload,
@@ -393,7 +393,12 @@ function App() {
     beginWrite();
 
     try {
-      await updateContent(updatedItem);
+      const useSupabase = isUsingSupabaseDb();
+      if (useSupabase) {
+        await updateSupabaseContent(updatedItem);
+      } else {
+        await updateContent(updatedItem);
+      }
       addToast(`Rescheduled to ${newDate}`, 'success');
     } catch (e) {
       console.error(e);
@@ -434,7 +439,12 @@ function App() {
     beginWrite();
 
     try {
-      await updateContent(updatedItem);
+      const useSupabase = isUsingSupabaseDb();
+      if (useSupabase) {
+        await updateSupabaseContent(updatedItem);
+      } else {
+        await updateContent(updatedItem);
+      }
       addToast(`Status updated to "${newStatus}"`, 'success');
     } catch (e) {
       console.error(e);
@@ -455,7 +465,7 @@ function App() {
     beginWrite();
 
     try {
-      const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+      const useSupabase = isUsingSupabaseDb();
       if (useSupabase) {
         await deleteSupabaseContent(id);
       } else {
@@ -481,7 +491,7 @@ function App() {
       const explicitNames = new Set(team.filter((member) => mentionedUserIds.includes(member.id)).map((member) => member.name.toLocaleLowerCase()));
       const detectedIds = team.filter((member) => !explicitNames.has(member.name.toLocaleLowerCase()) && normalizedText.includes(`@${member.name.toLocaleLowerCase()}`)).map((member) => member.id);
       const mentionIds = [...new Set([...mentionedUserIds, ...detectedIds])];
-      const useSupabase = localStorage.getItem('contentlab_db_provider') === 'supabase' && isSupabaseDbConfigured();
+      const useSupabase = isUsingSupabaseDb();
       const created = useSupabase
         ? await createSupabaseComment(contentId, currentUser?.name || 'Anonymous', text, attachmentUrl, mentionIds, currentUser?.id)
         : await createComment({
