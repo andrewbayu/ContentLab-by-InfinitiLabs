@@ -3,7 +3,8 @@
 > **Project Name**: ContentLab Studio Planner (by InfinitiLabs)  
 > **Workspace Path**: `/Users/macbook/Documents/Works/InfinitiLabs/ContentLab-by-InfinitiLabs-2026-07-20`  
 > **Repository**: `git@github.com:andrewbayu/ContentLab-by-InfinitiLabs.git`  
-> **Last Updated**: 2026-08-02  
+> **Last Updated**: 2026-08-03  
+
 
 ---
 
@@ -96,8 +97,30 @@ Path Executable: [`mcp-server/dist/index.js`](file:///Users/macbook/Documents/Wo
 4. **Task Deduplication Engine & Purge Button**:
    - `deduplicateContentItems()` automatically filters out duplicate task cards in React state by `id` and composite key `title::client::brand::publishDate`.
    - `purgeSupabaseDuplicateTasks()` and **`🧹 Hapus Task Ganda`** button in `SettingsView.tsx` purges duplicate rows from Supabase DB with 1 click.
+5. **Comments Visibility on Cards (Sheets Fallback + UUID Matching)**:
+   - `isCommentForTask()` matches comments to tasks via deterministic UUID + case-insensitive title matching.
+   - `sheets.ts` provides a Google Sheets comments fallback when the Supabase `comments` table is empty.
+   - Comment counter badges rendered on Kanban task cards (O(1) comment-count map).
+6. **Performance P0 (commit `ba87ae2`)**:
+   - `App.tsx`: `React.lazy` + `Suspense` for all views; `TaskModal` chunk lazy-loaded until opened.
+   - `App.tsx`: debounced/coalesced realtime reload via `loadDataRef` (fixes N-fetch storm + stale closure).
+   - `KanbanBoard.tsx`: O(1) comment-count + channel-style maps, wrapped in `React.memo`.
+   - `vite.config.ts`: `manualChunks` for `react-vendor` / `supabase-vendor`. Bundle: 655kB monolith → 74kB shell + split chunks. See `PERF-AUDIT.md`.
+7. **Supabase Client Repoint + Fetch Fallback (commit `64af57b`)**:
+   - `supabase.ts` default client now points to active project `jpjsycnbamvxnwmziedh` (was `kfpbctylsnkvwmlugago`).
+   - `supabaseDb.ts`: `fetchSupabaseInitialData()` falls back to Google Sheets (`fetchData()`) if `tasks`/`comments` fetch errors.
 
 ---
+
+## 🔄 Git Sync Status (2026-08-03)
+
+- Local rebased on top of remote `origin/main`. HEAD = `64af57b` (local fix) over `ba87ae2` (perf P0).
+- `npm run build` passes (tsc type-check OK, Vite build ~401ms, code-splitting active).
+- Local is **ahead 1** commit — pending `git push` to publish the Supabase client repoint + Sheets fallback fix.
+- Untracked (not committed): `.env` (secrets — keep local), `src/documents.css`, `src/assets/{react,vite}.svg`.
+
+---
+
 
 ## ⚡ 6. Quick Start & Verification Commands
 
