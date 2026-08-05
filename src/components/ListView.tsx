@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { isUserInvolved, isCommentForTask } from '../services/sheets';
 import type { ContentItem, Channel, VariablesConfig, TeamMember, CommentItem } from '../services/sheets';
 import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck, MessageSquare } from 'lucide-react';
+import { RichTextPreview } from './RichText';
+import { richTextToPlainText } from '../utils/richText';
 
 interface ListViewProps {
   items: ContentItem[];
@@ -59,7 +61,7 @@ export const ListView: React.FC<ListViewProps> = ({
       .filter((item) => {
         const matchesSearch =
           item.title.toLowerCase().includes(search.toLowerCase()) ||
-          item.brief.toLowerCase().includes(search.toLowerCase()) ||
+          richTextToPlainText(item.brief).toLowerCase().includes(search.toLowerCase()) ||
           (item.tags && item.tags.toLowerCase().includes(search.toLowerCase())) ||
           (item.client && item.client.toLowerCase().includes(search.toLowerCase())) ||
           (item.brand && item.brand.toLowerCase().includes(search.toLowerCase())) ||
@@ -285,7 +287,7 @@ export const ListView: React.FC<ListViewProps> = ({
 
                       {/* Brief text */}
                       {variablesConfig.brief && item.brief && (
-                        <p className="scheduler-card-brief">{item.brief}</p>
+                        <p className="scheduler-card-brief"><RichTextPreview value={item.brief} /></p>
                       )}
 
                       {/* Custom Tags pills */}
@@ -415,7 +417,7 @@ export const ListView: React.FC<ListViewProps> = ({
                         <div style={{ fontWeight: 600 }}>{item.title}</div>
                         {variablesConfig.brief && item.brief && (
                           <div className="text-secondary" style={{ fontSize: '12px', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                            {item.brief}
+                            <RichTextPreview value={item.brief} />
                           </div>
                         )}
                       </td>

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { isCommentForTask, type CommentItem, type ContentItem, type TeamMember } from '../services/sheets';
 import { normalizeUrl } from '../utils/url';
+import { RichTextContent, RichTextPreview } from './RichText';
 
 interface ClientPortalProps {
   items: ContentItem[];
@@ -265,7 +266,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             {/* Brief & Assets */}
             <div className="client-review-copy">
               <h4>Content Brief</h4>
-              <p>{selectedDrawerItem.brief || 'No brief provided.'}</p>
+              {selectedDrawerItem.brief ? <RichTextContent value={selectedDrawerItem.brief} /> : <p>No brief provided.</p>}
 
               <div className="client-review-meta-row">
                 {selectedDrawerItem.publishDate && (
@@ -739,7 +740,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   </div>
                   <h4 className="client-card-title">{item.title}</h4>
                   <p className="client-card-brief">
-                    {item.brief ? item.brief : 'No brief provided.'}
+                    {item.brief ? <RichTextPreview value={item.brief} /> : 'No brief provided.'}
                   </p>
                 </div>
                 <div className="client-card-footer">

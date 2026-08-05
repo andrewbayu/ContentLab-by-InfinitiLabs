@@ -3,6 +3,9 @@ import { uploadCoverImage, isCommentForTask } from '../services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from '../services/sheets';
 import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus } from 'lucide-react';
 import { normalizeUrl } from '../utils/url';
+import { normalizeRichTextValue } from '../utils/richText';
+import { RichTextEditor } from './RichText';
+import { SearchablePicker } from './SearchablePicker';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -245,7 +248,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     onSave({
       id: item?.id,
       title,
-      brief: variablesConfig.brief ? brief : '',
+      brief: variablesConfig.brief ? normalizeRichTextValue(brief) : '',
       status,
       channel: taskType === 'Content' ? channel : '',
       format: taskType === 'Content' ? format : 'Article',
@@ -451,18 +454,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     }
   };
 
-  const handleChannelDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (val === '__add_new__') {
-      setShowAddChannelForm(true);
-    } else {
-      setChannel(val);
-      setShowAddChannelForm(false);
-    }
-  };
-
-  const handleOwnerDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const handleOwnerDropdownChange = (val: string) => {
     if (val === '__add_new__') {
       setShowAddCreatorForm(true);
     } else {
@@ -558,17 +550,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Client / Brand</label>
-                  <select
-                    className="form-select"
+                  <SearchablePicker
                     value={clients.find((entry) => entry.client === client && entry.brand === brand)?.id || ''}
-                    onChange={(e) => handleClientBrandChange(e.target.value)}
-                  >
-                    <option value="">Internal / Unassigned</option>
-                    {clients.filter((entry) => entry.active).map((entry) => (
-                      <option key={entry.id} value={entry.id}>{entry.client} — {entry.brand}</option>
-                    ))}
-                    {canManageRegistries && <option value="__add_new__">➕ Add Client / Brand...</option>}
-                  </select>
+                    options={clients.filter((entry) => entry.active).map((entry) => ({
+                      value: entry.id,
+                      label: `${entry.client} — ${entry.brand}`,
+                      description: entry.client,
+                      color: entry.color,
+                    }))}
+                    placeholder="Internal / Unassigned"
+                    searchPlaceholder="Search client or brand..."
+                    onChange={handleClientBrandChange}
+                    onAdd={canManageRegistries ? () => setShowAddClientForm(true) : undefined}
+                    addLabel={canManageRegistries ? 'Add Client / Brand' : undefined}
+                  />
                 </div>
               </div>
 
@@ -601,12 +596,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               {variablesConfig.brief && (
                 <div className="form-group">
                   <label className="form-label">{taskType === 'Content' ? 'Content Brief & Description' : 'Task Description'}</label>
-                  <textarea
-                    className="form-textarea"
-                    placeholder="Write outline, ideas, or brief visual layouts..."
+                  <RichTextEditor
                     value={brief}
-                    onChange={(e) => setBrief(e.target.value)}
-                    style={{ minHeight: '100px' }}
+                    onChange={setBrief}
+                    placeholder={taskType === 'Content' ? 'Write outline, ideas, or brief visual direction...' : 'Describe the outcome and next action...'}
+                    minHeight={150}
                   />
                 </div>
               )}
@@ -615,43 +609,43 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Status</label>
-                  <select
-                    className="form-select"
+                  <SearchablePicker
                     value={status}
-                    onChange={(e) => setStatus(e.target.value as ContentItem['status'])}
-                  >
-                    {taskType === 'Content' ? (
-                      <>
-                        <option value="Idea">Idea</option>
-                        <option value="Scripting/Writing">Scripting/Writing</option>
-                        <option value="Production/Design">Production/Design</option>
-                        <option value="Review/Editing">Review/Editing</option>
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Published">Published</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="To Do">To Do</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Done">Done</option>
-                      </>
-                    )}
-                  </select>
+                    options={taskType === 'Content' ? [
+                      { value: 'Idea', label: 'Idea', color: '#64748b' },
+                      { value: 'Scripting/Writing', label: 'Scripting / Writing', color: '#8b5cf6' },
+                      { value: 'Production/Design', label: 'Production / Design', color: '#2563eb' },
+                      { value: 'Review/Editing', label: 'Review / Editing', color: '#f59e0b' },
+                      { value: 'Scheduled', label: 'Scheduled', color: '#0891b2' },
+                      { value: 'Published', label: 'Published', color: '#16a34a' },
+                    ] : [
+                      { value: 'To Do', label: 'To Do', color: '#64748b' },
+                      { value: 'In Progress', label: 'In Progress', color: '#2563eb' },
+                      { value: 'Done', label: 'Done', color: '#16a34a' },
+                    ]}
+                    placeholder="Select status"
+                    searchPlaceholder="Search status..."
+                    allowClear={false}
+                    onChange={(nextValue) => setStatus(nextValue as ContentItem['status'])}
+                  />
                 </div>
 
                 {taskType === 'Content' ? <div className="form-group">
                   <label className="form-label">Content Format</label>
-                  <select
-                    className="form-select"
+                  <SearchablePicker
                     value={format}
-                    onChange={(e) => setFormat(e.target.value as ContentItem['format'])}
-                  >
-                    <option value="Video">Video (Landscape)</option>
-                    <option value="Short">Short / Reel / Vertical</option>
-                    <option value="Carousel">Carousel Slider</option>
-                    <option value="Graphic">Single Image/Infographic</option>
-                    <option value="Article">Blog Post / Article</option>
-                  </select>
+                    options={[
+                      { value: 'Video', label: 'Video (Landscape)' },
+                      { value: 'Short', label: 'Short / Reel / Vertical' },
+                      { value: 'Carousel', label: 'Carousel Slider' },
+                      { value: 'Graphic', label: 'Single Image / Infographic' },
+                      { value: 'Article', label: 'Blog Post / Article' },
+                    ]}
+                    placeholder="Select format"
+                    searchPlaceholder="Search format..."
+                    allowClear={false}
+                    onChange={(nextValue) => setFormat(nextValue as ContentItem['format'])}
+                  />
                 </div> : <div className="form-group">
                   <label className="form-label">Category</label>
                   <input className="form-input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Admin, Finance, Client Follow-up" />
@@ -663,24 +657,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <div className="form-group" style={{ position: 'relative' }}>
                 <label className="form-label">Publishing Channel</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <select
-                    className="form-select"
+                  <SearchablePicker
                     value={channel}
-                    onChange={handleChannelDropdownChange}
-                    style={{ flexGrow: 1 }}
-                  >
-                    <option value="">Select Channel</option>
-                    {channels.map((ch) => (
-                      <option key={ch.id} value={ch.name}>
-                        {ch.name}
-                      </option>
-                    ))}
-                    {canManageRegistries && (
-                      <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                        ➕ Add Custom Channel...
-                      </option>
-                    )}
-                  </select>
+                    options={channels.map((ch) => ({ value: ch.name, label: ch.name, color: ch.color }))}
+                    placeholder="Select channel"
+                    searchPlaceholder="Search channel..."
+                    onChange={(nextValue) => {
+                      setChannel(nextValue);
+                      setShowAddChannelForm(false);
+                    }}
+                    onAdd={canManageRegistries ? () => setShowAddChannelForm(true) : undefined}
+                    addLabel={canManageRegistries ? 'Add Custom Channel' : undefined}
+                  />
                 </div>
 
                 {/* Inline Add Channel Form */}
@@ -747,23 +735,19 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <div className="form-group">
                 <label className="form-label">PIC / Owner</label>
                 <span className="form-help">Satu orang yang bertanggung jawab menyelesaikan task.</span>
-                <select
-                  className="form-select"
+                <SearchablePicker
                   value={ownerId}
+                  options={team.map((member) => ({
+                    value: member.id,
+                    label: member.name,
+                    description: member.email,
+                  }))}
+                  placeholder="Unassigned"
+                  searchPlaceholder="Search team members..."
                   onChange={handleOwnerDropdownChange}
-                >
-                  <option value="">Unassigned</option>
-                  {team.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}{member.email ? ` — ${member.email}` : ''}
-                    </option>
-                  ))}
-                  {canManageRegistries && (
-                    <option value="__add_new__" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                      ➕ Add Team Member...
-                    </option>
-                  )}
-                </select>
+                  onAdd={canManageRegistries ? () => setShowAddCreatorForm(true) : undefined}
+                  addLabel={canManageRegistries ? 'Add Team Member' : undefined}
+                />
                 {assignmentError && <span className="form-error">{assignmentError}</span>}
 
                 {/* Inline Add Creator Form */}
@@ -842,21 +826,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <div className="form-group">
                 <label className="form-label">Reviewer / Approver</label>
                 <span className="form-help">Opsional; cocok untuk content atau task yang memerlukan approval.</span>
-                <select
-                  className="form-select"
+                <SearchablePicker
                   value={reviewerId}
-                  onChange={(e) => {
-                    setReviewerId(e.target.value);
-                    setCollaboratorIds((previous) => previous.filter((id) => id !== e.target.value));
+                  options={team.filter((member) => member.id !== ownerId).map((member) => ({
+                    value: member.id,
+                    label: member.name,
+                    description: member.email,
+                  }))}
+                  placeholder="No reviewer"
+                  searchPlaceholder="Search reviewers..."
+                  onChange={(nextValue) => {
+                    setReviewerId(nextValue);
+                    setCollaboratorIds((previous) => previous.filter((id) => id !== nextValue));
                   }}
-                >
-                  <option value="">No reviewer</option>
-                  {team.filter((member) => member.id !== ownerId).map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}{member.email ? ` — ${member.email}` : ''}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               </div>
 
@@ -864,16 +847,19 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Priority Level</label>
-                  <select
-                    className="form-select"
+                  <SearchablePicker
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value as ContentItem['priority'])}
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
-                  </select>
+                    options={[
+                      { value: 'Low', label: 'Low', color: '#94a3b8' },
+                      { value: 'Medium', label: 'Medium', color: '#f59e0b' },
+                      { value: 'High', label: 'High', color: '#f97316' },
+                      { value: 'Urgent', label: 'Urgent', color: '#ef4444' },
+                    ]}
+                    placeholder="Select priority"
+                    searchPlaceholder="Search priority..."
+                    allowClear={false}
+                    onChange={(nextValue) => setPriority(nextValue as ContentItem['priority'])}
+                  />
                 </div>
 
                 {taskType === 'Content' && variablesConfig.publishDate ? (

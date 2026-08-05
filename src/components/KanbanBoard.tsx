@@ -3,6 +3,7 @@ import { toDeterministicUuid, type ContentItem, type Channel, type VariablesConf
 
 
 import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare } from 'lucide-react';
+import { RichTextPreview } from './RichText';
 
 interface KanbanBoardProps {
   items: ContentItem[];
@@ -166,7 +167,7 @@ function KanbanBoardComponent({
 
         <h4 className="card-title">{item.title}</h4>
 
-        {variablesConfig.brief && item.brief && <p className="card-brief kanban-card-brief">{item.brief}</p>}
+        {variablesConfig.brief && item.brief && <p className="card-brief kanban-card-brief"><RichTextPreview value={item.brief} /></p>}
 
         {variablesConfig.tags && tagList.length > 0 && (
           <div className="kanban-card-tags">
@@ -290,5 +291,4 @@ function KanbanBoardComponent({
 // Memoized so the board only re-renders when its own props change — not on every
 // parent (App) re-render such as a toast appearing or an unrelated tab switch.
 export const KanbanBoard = memo(KanbanBoardComponent);
-
 

@@ -776,7 +776,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                 <div className="variable-toggle-row">
                   <div className="variable-toggle-info">
                     <span className="variable-title">Content Brief & Description (Description)</span>
-                    <span className="variable-description">Kolom text area untuk menulis ringkasan ide, outline script, atau brief visual.</span>
+                    <span className="variable-description">Editor brief untuk menulis ringkasan ide, outline script, atau brief visual dengan format dasar.</span>
                   </div>
                   <label className="switch-control">
                     <input
