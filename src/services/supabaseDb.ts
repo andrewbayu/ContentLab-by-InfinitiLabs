@@ -10,6 +10,8 @@ import {
   type KpiDefinition,
   type KpiUpdate,
   type DocumentItem,
+  type TaskResource,
+  normalizeTaskResource,
 } from './sheets';
 import { normalizeUrl } from '../utils/url';
 
@@ -170,6 +172,7 @@ export async function fetchSupabaseInitialData(): Promise<{
   kpiDefinitions: KpiDefinition[];
   kpiUpdates: KpiUpdate[];
   documents: DocumentItem[];
+  resources: TaskResource[];
 }> {
   if (!supabase) {
     throw new Error('Supabase client is not initialized.');
@@ -184,6 +187,7 @@ export async function fetchSupabaseInitialData(): Promise<{
     kpiDefRes,
     kpiUpdRes,
     docsRes,
+    resourcesRes,
   ] = await Promise.all([
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
     supabase.from('team_members').select('*').order('created_at', { ascending: true }),
@@ -193,11 +197,13 @@ export async function fetchSupabaseInitialData(): Promise<{
     supabase.from('kpi_definitions').select('*').order('created_at', { ascending: true }),
     supabase.from('kpi_updates').select('*').order('period', { ascending: true }),
     supabase.from('documents').select('*').order('updated_at', { ascending: false }),
+    supabase.from('task_resources').select('*').order('created_at', { ascending: false }),
   ]);
 
   if (tasksRes.error || commentsRes.error) {
     console.warn('Supabase fetch encountered an error, falling back to Google Sheets:', tasksRes.error || commentsRes.error);
-    return await fetchData();
+    const fallback = await fetchData();
+    return { ...fallback, resources: fallback.resources || [] };
   }
 
   const content: ContentItem[] = (tasksRes.data || []).map(mapTaskRowToContentItem);
@@ -293,6 +299,29 @@ export async function fetchSupabaseInitialData(): Promise<{
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
   }));
 
+  const resources: TaskResource[] = resourcesRes.error
+    ? []
+    : (resourcesRes.data || []).map((row: any) => normalizeTaskResource({
+        id: row.id,
+        taskId: row.task_id,
+        type: row.type,
+        title: row.title,
+        url: row.url,
+        storagePath: row.storage_path,
+        mimeType: row.mime_type,
+        fileSize: row.file_size,
+        visibility: row.visibility,
+        client: row.client,
+        brand: row.brand,
+        pinned: row.pinned,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+  if (resourcesRes.error) {
+    console.warn('Task resources table is not available yet; continuing without resource records.', resourcesRes.error.message);
+  }
+
   return {
     content: deduplicateContentItems(content),
     team,
@@ -302,6 +331,7 @@ export async function fetchSupabaseInitialData(): Promise<{
     kpiDefinitions,
     kpiUpdates,
     documents,
+    resources,
   };
 }
 
@@ -392,6 +422,72 @@ export async function deleteSupabaseContent(id: string): Promise<boolean> {
 }
 
 // ----------------------------------------------------------------------
+// TASK RESOURCES (links and uploaded images)
+// ----------------------------------------------------------------------
+
+export async function createSupabaseTaskResource(
+  resource: Omit<TaskResource, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<TaskResource> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+
+  const createdByUuid = resource.createdBy && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resource.createdBy)
+    ? resource.createdBy
+    : null;
+  const row = {
+    task_id: toDeterministicUuid(resource.taskId),
+    type: resource.type,
+    title: resource.title.trim() || 'Untitled resource',
+    url: resource.url ? normalizeUrl(resource.url) : '',
+    storage_path: resource.storagePath || '',
+    mime_type: resource.mimeType || '',
+    file_size: resource.fileSize || null,
+    visibility: resource.visibility === 'client' ? 'client' : 'internal',
+    client: resource.client || '',
+    brand: resource.brand || '',
+    pinned: resource.pinned === true,
+    created_by: createdByUuid,
+  };
+
+  if (!row.task_id) throw new Error('Task belum tersimpan. Simpan task terlebih dahulu sebelum menambahkan resource.');
+
+  const { data, error } = await supabase.from('task_resources').insert([row]).select().single();
+  if (error) {
+    console.error('Failed to create task resource in Supabase:', error);
+    throw error;
+  }
+
+  return normalizeTaskResource({
+    id: data.id,
+    taskId: data.task_id,
+    type: data.type,
+    title: data.title,
+    url: data.url,
+    storagePath: data.storage_path,
+    mimeType: data.mime_type,
+    fileSize: data.file_size,
+    visibility: data.visibility,
+    client: data.client,
+    brand: data.brand,
+    pinned: data.pinned,
+    createdBy: data.created_by,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  });
+}
+
+export async function deleteSupabaseTaskResource(id: string): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(id);
+  if (!uuid) return false;
+  const { error } = await supabase.from('task_resources').delete().eq('id', uuid);
+  if (error) {
+    console.error('Failed to delete task resource in Supabase:', error);
+    throw error;
+  }
+  return true;
+}
+
+// ----------------------------------------------------------------------
 // COMMENTS CRUD (Supabase)
 // ----------------------------------------------------------------------
 
@@ -438,7 +534,8 @@ export async function createSupabaseComment(
 
 export function subscribeToSupabaseRealtime(
   onTaskChange: (payload: any) => void,
-  onCommentChange: (payload: any) => void
+  onCommentChange: (payload: any) => void,
+  onResourceChange?: (payload: any) => void,
 ) {
   if (!supabase) return () => {};
 
@@ -449,6 +546,9 @@ export function subscribeToSupabaseRealtime(
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, (payload) => {
       onCommentChange(payload);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'task_resources' }, (payload) => {
+      onResourceChange?.(payload);
     })
     .subscribe();
 
@@ -717,4 +817,3 @@ export async function authenticateSupabaseUser(
     return { success: false, error: e?.message || 'Gagal terhubung ke Supabase DB.' };
   }
 }
-

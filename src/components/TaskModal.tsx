@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { uploadCoverImage, isCommentForTask } from '../services/sheets';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType } from '../services/sheets';
-import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus } from 'lucide-react';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType, TaskResource, DocumentItem } from '../services/sheets';
+import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus, FileText, ExternalLink } from 'lucide-react';
 import { normalizeUrl } from '../utils/url';
 import { normalizeRichTextValue } from '../utils/richText';
 import { RichTextEditor } from './RichText';
@@ -23,6 +23,10 @@ interface TaskModalProps {
   activeUser: string;
   activeUserId: string;
   comments: CommentItem[];
+  resources: TaskResource[];
+  documents: DocumentItem[];
+  onCreateResource: (resource: Omit<TaskResource, 'id' | 'createdAt' | 'updatedAt'>) => Promise<TaskResource>;
+  onDeleteResource: (id: string) => Promise<void>;
   onAddComment: (contentId: string, text: string, attachmentUrl?: string, mentionedUserIds?: string[]) => void;
   onAddCreator: (name: string, email: string) => Promise<TeamMember>;
   onAddChannel: (name: string, color: string) => Promise<Channel>;
@@ -54,6 +58,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   activeUser,
   activeUserId,
   comments,
+  resources,
+  documents,
+  onCreateResource,
+  onDeleteResource,
   onAddComment,
   onAddCreator,
   onAddChannel,
@@ -83,6 +91,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [dueDate, setDueDate] = useState('');
   const [client, setClient] = useState('');
   const [brand, setBrand] = useState('');
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [resourceVisibility, setResourceVisibility] = useState<'internal' | 'client'>('internal');
+  const [resourceError, setResourceError] = useState('');
+  const [isAddingResource, setIsAddingResource] = useState(false);
 
   // Extra optional variables
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -206,6 +219,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setAssignmentError('');
     setCoverUploadError('');
     setIsUploadingCover(false);
+    setResourceTitle('');
+    setResourceUrl('');
+    setResourceVisibility('internal');
+    setResourceError('');
+    setIsAddingResource(false);
   }, [item, initialStatus, isOpen, team, channels, activeUser, activeUserId, defaultClientBrand]);
 
   if (!isOpen) return null;
@@ -222,6 +240,73 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setCoverUploadError(error instanceof Error ? error.message : 'Upload gambar gagal.');
     } finally {
       setIsUploadingCover(false);
+    }
+  };
+
+  const taskResources = item ? resources.filter((resource) => resource.taskId === item.id) : [];
+  const linkedDocuments = item ? documents.filter((document) => document.taskId === item.id) : [];
+
+  const handleAddResourceLink = async () => {
+    if (!item || !resourceUrl.trim()) {
+      setResourceError('Masukkan URL resource terlebih dahulu.');
+      return;
+    }
+    if (resourceVisibility === 'client' && !(client || item.client || '').trim()) {
+      setResourceError('Pilih Client/Brand task terlebih dahulu sebelum membagikan ke client.');
+      return;
+    }
+    setResourceError('');
+    setIsAddingResource(true);
+    try {
+      await onCreateResource({
+        taskId: item.id,
+        type: 'link',
+        title: resourceTitle.trim() || resourceUrl.trim(),
+        url: normalizeUrl(resourceUrl),
+        visibility: resourceVisibility,
+        client: client || item.client || '',
+        brand: brand || item.brand || '',
+        pinned: false,
+        createdBy: activeUserId,
+      });
+      setResourceTitle('');
+      setResourceUrl('');
+    } catch (error) {
+      setResourceError(error instanceof Error ? error.message : 'Resource gagal ditambahkan.');
+    } finally {
+      setIsAddingResource(false);
+    }
+  };
+
+  const handleAddResourceImage = async (file?: File) => {
+    if (!item || !file) return;
+    if (resourceVisibility === 'client' && !(client || item.client || '').trim()) {
+      setResourceError('Pilih Client/Brand task terlebih dahulu sebelum membagikan ke client.');
+      return;
+    }
+    setResourceError('');
+    setIsAddingResource(true);
+    try {
+      const uploaded = await uploadCoverImage(file);
+      await onCreateResource({
+        taskId: item.id,
+        type: 'image',
+        title: resourceTitle.trim() || file.name,
+        url: uploaded.url,
+        storagePath: uploaded.id,
+        mimeType: file.type,
+        fileSize: file.size,
+        visibility: resourceVisibility,
+        client: client || item.client || '',
+        brand: brand || item.brand || '',
+        pinned: false,
+        createdBy: activeUserId,
+      });
+      setResourceTitle('');
+    } catch (error) {
+      setResourceError(error instanceof Error ? error.message : 'Upload gambar gagal.');
+    } finally {
+      setIsAddingResource(false);
     }
   };
 
@@ -1153,7 +1238,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 <div className="form-group" style={{ marginBottom: '16px' }}>
                   <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ImagePlus size={14} /> Cover Image</label>
                   <input type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingCover} onChange={(event) => handleCoverUpload(event.target.files?.[0])} />
-                  <small className="form-help">JPG, PNG, atau WebP · maksimal 5 MB. Gambar disimpan ke Google Drive workspace.</small>
+                  <small className="form-help">JPG, PNG, atau WebP · maksimal 25 MB. Gambar disimpan ke workspace storage.</small>
                   {isUploadingCover && <small className="form-help">Mengunggah gambar…</small>}
                   {coverUploadError && <small className="form-error">{coverUploadError}</small>}
                   {coverImageUrl && <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}><img src={coverImageUrl} alt="Cover preview" style={{ width: '88px', height: '56px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border-subtle)' }} /><button type="button" className="btn btn-secondary" style={{ padding: '6px 9px', fontSize: '11px' }} onClick={() => { setCoverImageUrl(''); setCoverImageId(''); }}>Remove image</button></div>}
@@ -1176,6 +1261,80 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   onBlur={() => setAssetsLink((prev) => normalizeUrl(prev))}
                 />
               </div>
+
+              {item && (
+                <div className="task-resources-panel" style={{ marginBottom: '16px' }}>
+                  <div className="task-resources-heading">
+                    <div>
+                      <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <FileText size={14} /> Resources
+                      </label>
+                      <small className="form-help">Link dan gambar yang terkait langsung dengan task ini.</small>
+                    </div>
+                    <span className="task-resources-count">{taskResources.length + linkedDocuments.length}</span>
+                  </div>
+
+                  {(taskResources.length > 0 || linkedDocuments.length > 0) && (
+                    <div className="task-resources-list">
+                      {taskResources.map((resource) => (
+                        <div className="task-resource-row" key={resource.id}>
+                          <span className="task-resource-icon">{resource.type === 'image' ? <ImagePlus size={14} /> : <Link size={14} />}</span>
+                          <a href={resource.url} target="_blank" rel="noreferrer" className="task-resource-title">{resource.title}</a>
+                          <span className={`task-resource-visibility ${resource.visibility}`}>{resource.visibility === 'client' ? 'Client' : 'Internal'}</span>
+                          <button type="button" className="task-resource-delete" title="Remove resource" onClick={() => onDeleteResource(resource.id)}>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                      {linkedDocuments.map((document) => (
+                        <div className="task-resource-row linked" key={`document-${document.id}`}>
+                          <span className="task-resource-icon"><FileText size={14} /></span>
+                          {document.url ? (
+                            <a href={document.url} target="_blank" rel="noreferrer" className="task-resource-title">{document.title}</a>
+                          ) : (
+                            <span className="task-resource-title">{document.title}</span>
+                          )}
+                          <span className={`task-resource-visibility ${document.visibility === 'client' ? 'client' : 'internal'}`}>{document.visibility === 'client' ? 'Client' : 'Doc'}</span>
+                          {document.url && <ExternalLink size={12} className="task-resource-external" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="task-resource-form">
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Resource title (optional)"
+                      value={resourceTitle}
+                      onChange={(event) => setResourceTitle(event.target.value)}
+                    />
+                    <div className="task-resource-form-row">
+                      <input
+                        type="url"
+                        className="form-input"
+                        placeholder="https://drive.google.com/..."
+                        value={resourceUrl}
+                        onChange={(event) => setResourceUrl(event.target.value)}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={handleAddResourceLink} disabled={isAddingResource || !resourceUrl.trim()}>
+                        <Plus size={14} /> Add link
+                      </button>
+                    </div>
+                    <div className="task-resource-form-row">
+                      <label className="btn btn-secondary task-resource-upload-label">
+                        <ImagePlus size={14} /> {isAddingResource ? 'Uploading…' : 'Upload image'}
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden disabled={isAddingResource} onChange={(event) => handleAddResourceImage(event.target.files?.[0])} />
+                      </label>
+                      <select className="form-select" value={resourceVisibility} onChange={(event) => setResourceVisibility(event.target.value as 'internal' | 'client')}>
+                        <option value="internal">Internal only</option>
+                        <option value="client">Show in client portal</option>
+                      </select>
+                    </div>
+                    {resourceError && <small className="form-error">{resourceError}</small>}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* RIGHT COLUMN: Revision & Discussion Thread */}

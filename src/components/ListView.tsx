@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { isUserInvolved, isCommentForTask } from '../services/sheets';
-import type { ContentItem, Channel, VariablesConfig, TeamMember, CommentItem } from '../services/sheets';
-import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck, MessageSquare } from 'lucide-react';
+import type { ContentItem, Channel, VariablesConfig, TeamMember, CommentItem, TaskResource } from '../services/sheets';
+import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck, MessageSquare, Paperclip } from 'lucide-react';
 import { RichTextPreview } from './RichText';
 import { richTextToPlainText } from '../utils/richText';
 
 interface ListViewProps {
   items: ContentItem[];
+  resources: TaskResource[];
   comments?: CommentItem[];
   channels: Channel[];
   variablesConfig: VariablesConfig;
@@ -19,6 +20,7 @@ type SortOrder = 'asc' | 'desc';
 
 export const ListView: React.FC<ListViewProps> = ({
   items,
+  resources = [],
   comments = [],
   channels,
   variablesConfig,
@@ -107,6 +109,12 @@ export const ListView: React.FC<ListViewProps> = ({
       return true;
     });
   }, [filteredAndSortedItems, onlyMyTasks, currentUser]);
+
+  const resourceCountByTask = useMemo(() => {
+    const counts = new Map<string, number>();
+    resources.forEach((resource) => counts.set(resource.taskId, (counts.get(resource.taskId) || 0) + 1));
+    return counts;
+  }, [resources]);
 
   // Dynamic style mapper helper
   const getChannelStyle = (channelName: string) => {
@@ -366,6 +374,12 @@ export const ListView: React.FC<ListViewProps> = ({
                             </span>
                           );
                         })()}
+                        {(resourceCountByTask.get(item.id) || 0) > 0 && (
+                          <span title={`${resourceCountByTask.get(item.id)} resources`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, padding: '2px 6px', backgroundColor: '#f1f5f9', borderRadius: '4px' }}>
+                            <Paperclip size={12} />
+                            {resourceCountByTask.get(item.id)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

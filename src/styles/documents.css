@@ -22,6 +22,7 @@
 .document-card-title-row strong { overflow: hidden; color: var(--text-primary); font: 650 14px/1.35 var(--font-headings); text-overflow: ellipsis; white-space: nowrap; }
 .document-card-title-row svg { flex-shrink: 0; color: #eab308; }
 .document-card-preview { display: -webkit-box; overflow: hidden; color: var(--text-secondary); font-size: 11px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-wrap: anywhere; }
+.document-card-preview .rich-text-preview { display: inline; }
 .document-card-footer { min-height: 42px; padding: 9px 15px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 9px; }
 .document-card-footer > span { flex-shrink: 0; }
 .document-chips { min-width: 0; display: flex; gap: 5px; overflow: hidden; }

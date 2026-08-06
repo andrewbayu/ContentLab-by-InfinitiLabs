@@ -12,6 +12,7 @@ import {
   Filter,
   LayoutGrid,
   Link2,
+  Image as ImageIcon,
   List,
   MessageSquare,
   Search,
@@ -21,12 +22,13 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { isCommentForTask, type CommentItem, type ContentItem, type TeamMember } from '../services/sheets';
+import { isCommentForTask, type CommentItem, type ContentItem, type TeamMember, type TaskResource } from '../services/sheets';
 import { normalizeUrl } from '../utils/url';
 import { RichTextContent, RichTextPreview } from './RichText';
 
 interface ClientPortalProps {
   items: ContentItem[];
+  resources: TaskResource[];
   comments: CommentItem[];
   team?: TeamMember[];
   currentUser: TeamMember;
@@ -41,6 +43,7 @@ const isReadyForReview = (item: ContentItem) => item.status === 'Review/Editing'
 
 export const ClientPortal: React.FC<ClientPortalProps> = ({
   items,
+  resources = [],
   comments,
   team = [],
   currentUser,
@@ -175,6 +178,13 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     return comments.filter((entry) => isCommentForTask(entry, selectedDrawerItem.id));
   }, [comments, selectedDrawerItem]);
 
+  const clientResourceMatches = (resource: TaskResource, task: ContentItem) => {
+    if (resource.taskId !== task.id || resource.visibility !== 'client') return false;
+    const assignedClients = String(currentUser.client || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+    if (!resource.client || assignedClients.length === 0) return false;
+    return assignedClients.some((value) => value === resource.client.trim().toLowerCase());
+  };
+
   const awaitingReview = contentItems.filter(isReadyForReview);
   const approved = contentItems.filter((item) => item.status === 'Scheduled' || item.status === 'Published');
   const recent = [...contentItems].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 4);
@@ -228,6 +238,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   // Reusable Right Side Drawer Panel Render Function
   const renderRightDrawer = () => {
     if (!selectedDrawerItem) return null;
+    const activeResources = resources.filter((resource) => clientResourceMatches(resource, selectedDrawerItem));
 
     return (
       <div className="client-drawer-backdrop" onClick={() => setSelectedDrawerItem(null)}>
@@ -281,6 +292,21 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 )}
               </div>
             </div>
+
+            {activeResources.length > 0 && (
+              <div className="client-task-resources">
+                <h4><FileText size={15} /> Shared resources</h4>
+                <div className="client-task-resources-list">
+                  {activeResources.map((resource) => (
+                    <a key={resource.id} href={resource.url} target="_blank" rel="noreferrer" className="client-task-resource-card">
+                      {resource.type === 'image' ? <ImageIcon size={16} /> : <Link2 size={16} />}
+                      <span>{resource.title}</span>
+                      <ExternalLink size={13} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Discussion & Feedback */}
             <div className="client-comments">

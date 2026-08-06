@@ -8,6 +8,8 @@ export type KpiCadence = 'Weekly' | 'Monthly' | 'Quarterly';
 export type TaskMemberRole = 'creator' | 'owner' | 'collaborator' | 'reviewer';
 export type DocumentType = 'Note' | 'Link';
 export type DocumentVisibility = 'personal' | 'team' | 'client';
+export type TaskResourceType = 'image' | 'link';
+export type TaskResourceVisibility = 'internal' | 'client';
 export type TaskStatus =
   | 'Idea'
   | 'Scripting/Writing'
@@ -202,6 +204,45 @@ export interface DocumentItem {
   updatedAt: string;
 }
 
+export interface TaskResource {
+  id: string;
+  taskId: string;
+  type: TaskResourceType;
+  title: string;
+  url: string;
+  storagePath?: string;
+  mimeType?: string;
+  fileSize?: number;
+  visibility: TaskResourceVisibility;
+  client: string;
+  brand: string;
+  pinned: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function normalizeTaskResource(item: Partial<TaskResource> & { id?: unknown; taskId?: unknown; task_id?: unknown }): TaskResource {
+  const now = new Date().toISOString();
+  return {
+    id: String(item.id || `resource-${Math.random().toString(36).slice(2, 10)}`),
+    taskId: String(item.taskId || item.task_id || ''),
+    type: item.type === 'image' ? 'image' : 'link',
+    title: String(item.title || 'Untitled resource'),
+    url: normalizeUrl(String(item.url || '')),
+    storagePath: item.storagePath ? String(item.storagePath) : undefined,
+    mimeType: item.mimeType ? String(item.mimeType) : undefined,
+    fileSize: item.fileSize ? Number(item.fileSize) : undefined,
+    visibility: item.visibility === 'client' ? 'client' : 'internal',
+    client: String(item.client || ''),
+    brand: String(item.brand || ''),
+    pinned: item.pinned === true,
+    createdBy: String(item.createdBy || ''),
+    createdAt: String(item.createdAt || now),
+    updatedAt: String(item.updatedAt || now),
+  };
+}
+
 export interface VariablesConfig {
   brief: boolean;
   publishDate: boolean;
@@ -220,6 +261,7 @@ export interface WorkspaceData {
   kpiDefinitions: KpiDefinition[];
   kpiUpdates: KpiUpdate[];
   documents: DocumentItem[];
+  resources?: TaskResource[];
 }
 
 export interface CachedWorkspaceData extends WorkspaceData {
@@ -235,6 +277,7 @@ const MOCK_CLIENTS_KEY = 'contentlab_mock_clients';
 const MOCK_KPI_DEFINITIONS_KEY = 'contentlab_mock_kpi_definitions';
 const MOCK_KPI_UPDATES_KEY = 'contentlab_mock_kpi_updates';
 const MOCK_DOCUMENTS_KEY = 'contentlab_mock_documents';
+const MOCK_TASK_RESOURCES_KEY = 'contentlab_task_resources';
 const VARIABLES_CONFIG_KEY = 'contentlab_variables_config';
 const CUSTOM_TAGS_KEY = 'contentlab_custom_tags';
 const WORKSPACE_CACHE_KEY = 'contentlab_workspace_cache_v1';
@@ -486,6 +529,7 @@ export function getCachedWorkspaceData(): CachedWorkspaceData | null {
     return {
       ...cached,
       documents: Array.isArray(cached.documents) ? cached.documents : [],
+      resources: Array.isArray(cached.resources) ? cached.resources : [],
     };
   } catch {
     localStorage.removeItem(WORKSPACE_CACHE_KEY);
@@ -518,6 +562,7 @@ function getLocalData(): WorkspaceData {
   let kpiDefinitions = INITIAL_MOCK_KPI_DEFINITIONS;
   let kpiUpdates = INITIAL_MOCK_KPI_UPDATES;
   let documents = INITIAL_MOCK_DOCUMENTS;
+  let resources: TaskResource[] = [];
 
   const savedContent = localStorage.getItem(MOCK_CONTENT_KEY);
   const savedChannels = localStorage.getItem(MOCK_CHANNELS_KEY);
@@ -526,6 +571,7 @@ function getLocalData(): WorkspaceData {
   const savedKpiDefinitions = localStorage.getItem(MOCK_KPI_DEFINITIONS_KEY);
   const savedKpiUpdates = localStorage.getItem(MOCK_KPI_UPDATES_KEY);
   const savedDocuments = localStorage.getItem(MOCK_DOCUMENTS_KEY);
+  const savedResources = localStorage.getItem(MOCK_TASK_RESOURCES_KEY);
 
   if (savedContent) {
     content = JSON.parse(savedContent).map((item: ContentItem) => ({
@@ -574,10 +620,16 @@ function getLocalData(): WorkspaceData {
     localStorage.setItem(MOCK_DOCUMENTS_KEY, JSON.stringify(documents));
   }
 
-  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents };
+  if (savedResources) {
+    resources = JSON.parse(savedResources);
+  } else {
+    localStorage.setItem(MOCK_TASK_RESOURCES_KEY, JSON.stringify(resources));
+  }
+
+  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources };
 }
 
-function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[], kpiDefinitions?: KpiDefinition[], kpiUpdates?: KpiUpdate[], documents?: DocumentItem[]) {
+function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[], kpiDefinitions?: KpiDefinition[], kpiUpdates?: KpiUpdate[], documents?: DocumentItem[], resources?: TaskResource[]) {
   localStorage.setItem(MOCK_CONTENT_KEY, JSON.stringify(content));
   if (channels) localStorage.setItem(MOCK_CHANNELS_KEY, JSON.stringify(channels));
   if (comments) localStorage.setItem(MOCK_COMMENTS_KEY, JSON.stringify(comments));
@@ -585,6 +637,7 @@ function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: 
   if (kpiDefinitions) localStorage.setItem(MOCK_KPI_DEFINITIONS_KEY, JSON.stringify(kpiDefinitions));
   if (kpiUpdates) localStorage.setItem(MOCK_KPI_UPDATES_KEY, JSON.stringify(kpiUpdates));
   if (documents) localStorage.setItem(MOCK_DOCUMENTS_KEY, JSON.stringify(documents));
+  if (resources) localStorage.setItem(MOCK_TASK_RESOURCES_KEY, JSON.stringify(resources));
 }
 
 export async function fetchData(): Promise<WorkspaceData> {
@@ -747,7 +800,8 @@ export async function fetchData(): Promise<WorkspaceData> {
     })) as DocumentItem[];
 
     const uniqueContent = deduplicateContentItems(content);
-    return { content: uniqueContent, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents };
+    const resources = (data.resources || []).map((item: any) => normalizeTaskResource(item));
+    return { content: uniqueContent, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources };
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, using the latest workspace snapshot:', error);
     const cached = getCachedWorkspaceData();
@@ -1409,6 +1463,29 @@ export async function deleteDocument(id: string): Promise<boolean> {
   });
   const result = await response.json();
   if (!result?.success) throw new Error(result?.error || 'Server failed to delete document');
+  return true;
+}
+
+// Task resources are Supabase-first. When the legacy Sheets provider is active,
+// keep them in the browser workspace cache so links/images remain usable without
+// requiring a new Apps Script endpoint.
+export async function createTaskResource(
+  resource: Omit<TaskResource, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<TaskResource> {
+  const created = normalizeTaskResource({
+    ...resource,
+    id: `resource-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  const data = getLocalData();
+  saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, data.kpiDefinitions, data.kpiUpdates, data.documents, [created, ...(data.resources || [])]);
+  return created;
+}
+
+export async function deleteTaskResource(id: string): Promise<boolean> {
+  const data = getLocalData();
+  saveLocalData(data.content, data.team, data.channels, data.comments, data.clients, data.kpiDefinitions, data.kpiUpdates, data.documents, (data.resources || []).filter((resource) => resource.id !== id));
   return true;
 }
 

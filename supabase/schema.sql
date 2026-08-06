@@ -137,6 +137,29 @@ CREATE TABLE IF NOT EXISTS public.documents (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 9. Task Resources (links and uploaded images)
+CREATE TABLE IF NOT EXISTS public.task_resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'link' CHECK (type IN ('image', 'link')),
+  title TEXT NOT NULL DEFAULT 'Untitled resource',
+  url TEXT NOT NULL DEFAULT '',
+  storage_path TEXT DEFAULT '',
+  mime_type TEXT DEFAULT '',
+  file_size BIGINT,
+  visibility TEXT NOT NULL DEFAULT 'internal' CHECK (visibility IN ('internal', 'client')),
+  client TEXT DEFAULT '',
+  brand TEXT DEFAULT '',
+  pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by UUID REFERENCES public.team_members(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_resources_task_id ON public.task_resources (task_id);
+CREATE INDEX IF NOT EXISTS idx_task_resources_visibility_client ON public.task_resources (visibility, client, brand);
+
 -- Enable Supabase Realtime on Tasks and Comments
 ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.comments;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.task_resources;

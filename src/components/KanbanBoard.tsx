@@ -1,12 +1,13 @@
 import React, { useState, useMemo, memo } from 'react';
-import { toDeterministicUuid, type ContentItem, type Channel, type VariablesConfig, type TaskType, type CommentItem } from '../services/sheets';
+import { toDeterministicUuid, type ContentItem, type Channel, type VariablesConfig, type TaskType, type CommentItem, type TaskResource } from '../services/sheets';
 
 
-import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare } from 'lucide-react';
+import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare, Paperclip } from 'lucide-react';
 import { RichTextPreview } from './RichText';
 
 interface KanbanBoardProps {
   items: ContentItem[];
+  resources: TaskResource[];
   comments?: CommentItem[];
   channels: Channel[];
   variablesConfig: VariablesConfig;
@@ -38,6 +39,7 @@ const GENERAL_COLUMNS: KanbanColumn[] = [
 
 function KanbanBoardComponent({
   items,
+  resources = [],
   comments = [],
   channels,
   variablesConfig,
@@ -67,6 +69,15 @@ function KanbanBoardComponent({
     }
     return map;
   }, [comments]);
+
+  const resourceCountByTask = useMemo(() => {
+    const map = new Map<string, number>();
+    resources.forEach((resource) => {
+      const key = toDeterministicUuid(resource.taskId) || resource.taskId;
+      if (key) map.set(key, (map.get(key) || 0) + 1);
+    });
+    return map;
+  }, [resources]);
 
   // Pre-resolve channel styling into a lookup map so each card is O(1) instead of
   // running Array.find over all channels.
@@ -142,6 +153,7 @@ function KanbanBoardComponent({
     const tagList = item.tags ? item.tags.split(',').filter(Boolean) : [];
     const itemKey = toDeterministicUuid(item.id) || String(item.id || '');
     const itemCommentCount = commentCountByTask.get(itemKey) || 0;
+    const itemResourceCount = resourceCountByTask.get(itemKey) || 0;
 
     return (
       <div
@@ -192,6 +204,12 @@ function KanbanBoardComponent({
               <div className="card-meta-item" title={`${itemCommentCount} comment(s)`} style={{ color: '#2563eb' }}>
                 <MessageSquare className="card-meta-icon" size={12} />
                 <span style={{ fontSize: '11px', fontWeight: 600 }}>{itemCommentCount}</span>
+              </div>
+            )}
+            {itemResourceCount > 0 && (
+              <div className="card-meta-item" title={`${itemResourceCount} resource(s)`} style={{ color: '#64748b' }}>
+                <Paperclip className="card-meta-icon" size={12} />
+                <span style={{ fontSize: '11px', fontWeight: 600 }}>{itemResourceCount}</span>
               </div>
             )}
           </div>
@@ -291,4 +309,3 @@ function KanbanBoardComponent({
 // Memoized so the board only re-renders when its own props change — not on every
 // parent (App) re-render such as a toast appearing or an unrelated tab switch.
 export const KanbanBoard = memo(KanbanBoardComponent);
-

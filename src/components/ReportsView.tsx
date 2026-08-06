@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Download, ExternalLink, FileText, List, LayoutGrid, Search } from 'lucide-react';
 import type { DocumentItem, TeamMember } from '../services/sheets';
+import { richTextToPlainText } from '../utils/richText';
+import { RichTextPreview } from './RichText';
 import '../styles/reports.css';
 
 interface ReportsViewProps {
@@ -23,7 +25,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ documents, currentUser
     const normalized = query.trim().toLowerCase();
     return documents
       .filter((document) => document.visibility === 'client' && document.client === currentUser.client)
-      .filter((document) => !normalized || [document.title, document.body, document.client, document.brand, document.tags]
+      .filter((document) => !normalized || [document.title, document.type === 'Note' ? richTextToPlainText(document.body) : document.body, document.client, document.brand, document.tags]
         .some((value) => String(value || '').toLowerCase().includes(normalized)))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
   }, [documents, currentUser.client, query]);
@@ -38,7 +40,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ documents, currentUser
       anchor.click();
       return;
     }
-    const blob = new Blob([document.body || document.title], { type: 'text/plain;charset=utf-8' });
+    const body = document.type === 'Note' ? richTextToPlainText(document.body) : document.body;
+    const blob = new Blob([body || document.title], { type: 'text/plain;charset=utf-8' });
     const href = URL.createObjectURL(blob);
     const anchor = window.document.createElement('a');
     anchor.href = href;
@@ -76,7 +79,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ documents, currentUser
                 <div className="report-card-content">
                   <div className="report-card-title-row"><strong>{report.title}</strong>{report.pinned && <span className="report-pinned">Pinned</span>}</div>
                   <span className="report-card-meta">{report.client || 'All clients'}{report.brand ? ` · ${report.brand}` : ''} · Updated {formatDate(report.updatedAt)}</span>
-                  <p>{report.body || 'Shared report or file.'}</p>
+                  <p>{report.body ? report.type === 'Note' ? <RichTextPreview value={report.body} /> : report.body : 'Shared report or file.'}</p>
                   <div className="report-card-actions">
                     <button type="button" className="btn btn-primary btn-small" onClick={() => download(report)}><Download size={14} /> {report.url ? 'Open / download' : 'Download'}</button>
                     {report.url && <a className="report-open-link" href={report.url} target="_blank" rel="noreferrer">Open link <ExternalLink size={13} /></a>}

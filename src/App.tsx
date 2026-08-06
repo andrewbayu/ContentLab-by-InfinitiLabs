@@ -31,6 +31,8 @@ import {
   createDocument,
   updateDocument,
   deleteDocument,
+  createTaskResource,
+  deleteTaskResource,
   getVariablesConfig,
   saveVariablesConfig,
   getCustomTags,
@@ -47,10 +49,12 @@ import {
   updateSupabaseContent,
   deleteSupabaseContent,
   createSupabaseComment,
+  createSupabaseTaskResource,
+  deleteSupabaseTaskResource,
   subscribeToSupabaseRealtime,
   isUsingSupabaseDb,
 } from './services/supabaseDb';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, UserRole } from './services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, UserRole } from './services/sheets';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -82,6 +86,7 @@ function App() {
   const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>(() => initialCache?.kpiDefinitions || []);
   const [kpiUpdates, setKpiUpdates] = useState<KpiUpdate[]>(() => initialCache?.kpiUpdates || []);
   const [documents, setDocuments] = useState<DocumentItem[]>(() => initialCache?.documents || []);
+  const [resources, setResources] = useState<TaskResource[]>(() => initialCache?.resources || []);
   const [scopeKey, setScopeKey] = useState(() => localStorage.getItem('contentlab_scope_key') || 'all');
   const [taskView, setTaskView] = useState<TaskView>(() => (localStorage.getItem('contentlab_task_view') as TaskView) || 'all');
   
@@ -117,6 +122,7 @@ function App() {
       setKpiDefinitions(data.kpiDefinitions || []);
       setKpiUpdates(data.kpiUpdates || []);
       setDocuments(data.documents || []);
+      setResources(data.resources || []);
       hasWorkspaceData.current = true;
       setLastSyncedAt(saveCachedWorkspaceData(data));
 
@@ -180,7 +186,7 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated && isUsingSupabaseDb()) {
-      const unsubscribe = subscribeToSupabaseRealtime(scheduleReload, scheduleReload);
+      const unsubscribe = subscribeToSupabaseRealtime(scheduleReload, scheduleReload, scheduleReload);
       return () => {
         unsubscribe();
         if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
@@ -201,10 +207,11 @@ function App() {
         kpiDefinitions,
         kpiUpdates,
         documents,
+        resources,
       });
     }, 120);
     return () => window.clearTimeout(cacheTimer);
-  }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents]);
+  }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources]);
 
   const beginWrite = useCallback(() => setPendingWrites((count) => count + 1), []);
   const endWrite = useCallback(() => setPendingWrites((count) => Math.max(0, count - 1)), []);
@@ -704,6 +711,43 @@ function App() {
     }
   };
 
+  const handleCreateTaskResource = async (
+    resource: Omit<TaskResource, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<TaskResource> => {
+    beginWrite();
+    try {
+      const payload = { ...resource, createdBy: currentUser?.id || resource.createdBy };
+      const created = isUsingSupabaseDb()
+        ? await createSupabaseTaskResource(payload)
+        : await createTaskResource(payload);
+      setResources((previous) => [created, ...previous]);
+      addToast(`Added resource "${created.title}".`, 'success');
+      return created;
+    } catch (error) {
+      console.error(error);
+      addToast(error instanceof Error ? error.message : 'Failed to add task resource.', 'error');
+      throw error;
+    } finally {
+      endWrite();
+    }
+  };
+
+  const handleDeleteTaskResource = async (id: string): Promise<void> => {
+    beginWrite();
+    try {
+      if (isUsingSupabaseDb()) await deleteSupabaseTaskResource(id);
+      else await deleteTaskResource(id);
+      setResources((previous) => previous.filter((resource) => resource.id !== id));
+      addToast('Resource removed.', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to remove resource.', 'error');
+      throw error;
+    } finally {
+      endWrite();
+    }
+  };
+
   // Variable toggles
   const handleSaveVariablesConfig = (config: VariablesConfig) => {
     saveVariablesConfig(config);
@@ -778,6 +822,26 @@ function App() {
     }
     return true;
   }), [scopedItems, taskView, currentUser]);
+
+  // Treat Documents & Notes linked to a task as card resources too, while
+  // retaining the full document model for the editor and Reports page.
+  const cardResources = useMemo<TaskResource[]>(() => [
+    ...resources,
+    ...documents.filter((document) => document.taskId).map((document) => ({
+      id: `document-resource-${document.id}`,
+      taskId: document.taskId,
+      type: 'link' as const,
+      title: document.title,
+      url: document.url,
+      visibility: document.visibility === 'client' ? 'client' as const : 'internal' as const,
+      client: document.client,
+      brand: document.brand,
+      pinned: document.pinned,
+      createdBy: document.ownerId,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
+    })),
+  ], [resources, documents]);
 
   const scopeLabel = selectedBrand
     ? `${selectedBrand.client} / ${selectedBrand.brand}`
@@ -874,6 +938,7 @@ function App() {
           currentUser.role === 'client'
             ? <ClientPortal
                 items={scopedItems}
+                resources={resources}
                 comments={comments}
                 team={team}
                 currentUser={currentUser}
@@ -889,6 +954,7 @@ function App() {
         {activeTab === 'review' && currentUser.role === 'client' && (
           <ClientPortal
             items={scopedItems}
+            resources={resources}
             comments={comments}
             team={team}
             currentUser={currentUser}
@@ -903,6 +969,7 @@ function App() {
         {activeTab === 'board' && (
           <KanbanBoard
             items={filteredItems}
+            resources={cardResources}
             comments={comments}
             onMoveItem={handleMoveItem}
             onEditItem={handleOpenEditModal}
@@ -917,6 +984,7 @@ function App() {
           currentUser.role === 'client'
             ? <ClientPortal
                 items={scopedItems}
+                resources={resources}
                 comments={comments}
                 team={team}
                 currentUser={currentUser}
@@ -928,6 +996,7 @@ function App() {
               />
             : <CalendarView
                 items={filteredItems}
+                resources={cardResources}
                 channels={channels}
                 onEditItem={handleOpenEditModal}
                 onMoveDate={handleMoveDate}
@@ -937,6 +1006,7 @@ function App() {
         {activeTab === 'list' && (
           <ListView
             items={filteredItems}
+            resources={cardResources}
             comments={comments}
             onEditItem={handleOpenEditModal}
             channels={channels}
@@ -1027,6 +1097,10 @@ function App() {
             activeUser={currentUser.name}
             activeUserId={currentUser.id}
             comments={comments}
+            resources={resources}
+            documents={documents}
+            onCreateResource={handleCreateTaskResource}
+            onDeleteResource={handleDeleteTaskResource}
             onAddComment={handleAddComment}
             onAddCreator={handleAddCreator}
             onAddChannel={handleAddChannel}

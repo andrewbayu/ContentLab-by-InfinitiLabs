@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import type { ContentItem, Channel } from '../services/sheets';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import type { ContentItem, Channel, TaskResource } from '../services/sheets';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Paperclip } from 'lucide-react';
 
 interface CalendarViewProps {
   items: ContentItem[];
+  resources: TaskResource[];
   channels: Channel[];
   onEditItem: (item: ContentItem) => void;
   onMoveDate: (id: string, newDate: string) => void;
@@ -11,6 +12,7 @@ interface CalendarViewProps {
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   items,
+  resources = [],
   channels,
   onEditItem,
   onMoveDate,
@@ -91,6 +93,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const dateStr = `${y}-${mStr}-${dStr}`;
     return items.filter((item) => (item.taskType === 'General' ? item.dueDate : item.publishDate) === dateStr);
   };
+
+  const resourceCount = (item: ContentItem) => resources.filter((resource) => resource.taskId === item.id).length;
 
   const isToday = (d: number, isCurrent: boolean) => {
     const today = new Date();
@@ -211,7 +215,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     }}
                     title={item.title}
                   >
-                    {item.title}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</span>
+                    {resourceCount(item) > 0 && <Paperclip size={11} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
                   </div>
                 ))}
               </div>
@@ -302,6 +307,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         {item.assignee.split(' ')[0]}
                       </span>
                     )}
+                    {resourceCount(item) > 0 && <Paperclip size={11} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
                   </div>
                 ))}
               </div>
@@ -352,7 +358,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     }}
                     title={item.title}
                   >
-                    {item.title}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</span>
+                    {resourceCount(item) > 0 && <Paperclip size={11} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
                   </div>
                 ))}
               </div>
