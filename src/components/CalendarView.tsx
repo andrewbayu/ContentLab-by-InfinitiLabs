@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { ContentItem, Channel, TaskResource } from '../services/sheets';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Paperclip } from 'lucide-react';
+import { ContextMenu } from './ContextMenu';
 
 interface CalendarViewProps {
   items: ContentItem[];
   resources: TaskResource[];
   channels: Channel[];
   onEditItem: (item: ContentItem) => void;
+  onDuplicateItem: (item: ContentItem) => void;
+  onDeleteItem: (id: string) => void;
   onMoveDate: (id: string, newDate: string) => void;
 }
 
@@ -15,9 +18,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   resources = [],
   channels,
   onEditItem,
+  onDuplicateItem,
+  onDeleteItem,
   onMoveDate,
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: ContentItem } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, item: ContentItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   // Calendar dates generation
   const year = currentDate.getFullYear();
@@ -273,6 +289,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     draggable
                     onDragStart={(e) => handleDragStart(e, item.id)}
                     onClick={() => onEditItem(item)}
+                    onContextMenu={(e) => handleContextMenu(e, item)}
                     style={{
                       fontSize: '11px',
                       padding: '5px 8px',
@@ -367,6 +384,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           );
         })}
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          item={contextMenu.item}
+          onClose={closeContextMenu}
+          onEdit={onEditItem}
+          onDuplicate={onDuplicateItem}
+          onDelete={onDeleteItem}
+        />
+      )}
     </div>
   );
 };

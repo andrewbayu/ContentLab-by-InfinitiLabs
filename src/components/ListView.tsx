@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { isUserInvolved, isCommentForTask } from '../services/sheets';
 import type { ContentItem, Channel, VariablesConfig, TeamMember, CommentItem, TaskResource } from '../services/sheets';
 import { Search, Calendar, ArrowUpDown, ExternalLink, LayoutGrid, List, UserCheck, MessageSquare, Paperclip } from 'lucide-react';
 import { RichTextPreview } from './RichText';
 import { richTextToPlainText } from '../utils/richText';
+import { ContextMenu } from './ContextMenu';
 
 interface ListViewProps {
   items: ContentItem[];
@@ -12,6 +13,8 @@ interface ListViewProps {
   channels: Channel[];
   variablesConfig: VariablesConfig;
   onEditItem: (item: ContentItem) => void;
+  onDuplicateItem: (item: ContentItem) => void;
+  onDeleteItem: (id: string) => void;
   currentUser: TeamMember;
 }
 
@@ -25,6 +28,8 @@ export const ListView: React.FC<ListViewProps> = ({
   channels,
   variablesConfig,
   onEditItem,
+  onDuplicateItem,
+  onDeleteItem,
   currentUser,
 }) => {
   const [search, setSearch] = useState('');
@@ -34,9 +39,20 @@ export const ListView: React.FC<ListViewProps> = ({
   const [sortField, setSortField] = useState<SortField>('publishDate');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: ContentItem } | null>(null);
   
   // Default visual layout format is 'cards'
   const [viewLayout, setViewLayout] = useState<'cards' | 'list'>('cards');
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, item: ContentItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   // Gather unique options for filters
   const assignees = useMemo(() => {
@@ -274,6 +290,7 @@ export const ListView: React.FC<ListViewProps> = ({
                     key={item.id}
                     className="scheduler-card"
                     onClick={() => onEditItem(item)}
+                    onContextMenu={(e) => handleContextMenu(e, item)}
                   >
                     {/* Top Platform Color Accent Banner Line */}
                     <div
@@ -523,6 +540,18 @@ export const ListView: React.FC<ListViewProps> = ({
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          item={contextMenu.item}
+          onClose={closeContextMenu}
+          onEdit={onEditItem}
+          onDuplicate={onDuplicateItem}
+          onDelete={onDeleteItem}
+        />
+      )}
     </div>
   );
 };

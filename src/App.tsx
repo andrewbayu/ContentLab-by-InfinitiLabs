@@ -462,6 +462,98 @@ function App() {
     }
   };
 
+  // Duplicate task (clone locally + sync to backend)
+  const handleDuplicateItem = async (item: ContentItem) => {
+    const tempId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const duplicated: ContentItem = {
+      ...item,
+      id: tempId,
+      title: `${item.title} (copy)`,
+      status: item.taskType === 'General' ? 'To Do' : 'Idea',
+      createdAt: now,
+      updatedAt: now,
+      actorId: currentUser?.id || '',
+      creatorId: currentUser?.id || '',
+      coverImageUrl: item.coverImageUrl || '',
+      coverImageId: item.coverImageId || '',
+    };
+
+    setItems((prev) => [duplicated, ...prev]);
+    addToast(`Duplicated "${item.title}"`, 'success');
+    beginWrite();
+
+    try {
+      const useSupabase = isUsingSupabaseDb();
+      const created = useSupabase
+        ? await createSupabaseContent({
+            title: duplicated.title,
+            brief: duplicated.brief || '',
+            channel: duplicated.channel || '',
+            format: duplicated.format || 'Feed/Reels',
+            assetsLink: duplicated.assetsLink || '',
+            taskType: duplicated.taskType || 'Content',
+            status: duplicated.status,
+            priority: duplicated.priority || 'Medium',
+            assignee: duplicated.assignee || '',
+            publishDate: duplicated.publishDate || '',
+            dueDate: duplicated.dueDate || '',
+            client: duplicated.client || '',
+            brand: duplicated.brand || '',
+            createdBy: currentUser?.name || 'Anonymous',
+            creatorId: currentUser?.id || '',
+            actorId: currentUser?.id || '',
+            checklist: duplicated.checklist || '',
+            coverImageUrl: duplicated.coverImageUrl,
+            coverImageId: duplicated.coverImageId,
+            tags: duplicated.tags || '',
+            budget: duplicated.budget || '',
+            platformNotes: duplicated.platformNotes || '',
+            targetAudience: duplicated.targetAudience || '',
+            category: duplicated.category || '',
+            views: duplicated.views || '',
+            likes: duplicated.likes || '',
+            engagement: duplicated.engagement || '',
+          })
+        : await createContent({
+            title: duplicated.title,
+            brief: duplicated.brief || '',
+            channel: duplicated.channel || '',
+            format: duplicated.format || 'Feed/Reels',
+            assetsLink: duplicated.assetsLink || '',
+            taskType: duplicated.taskType || 'Content',
+            status: duplicated.status,
+            priority: duplicated.priority || 'Medium',
+            assignee: duplicated.assignee || '',
+            publishDate: duplicated.publishDate || '',
+            dueDate: duplicated.dueDate || '',
+            client: duplicated.client || '',
+            brand: duplicated.brand || '',
+            createdBy: currentUser?.name || 'Anonymous',
+            creatorId: currentUser?.id || '',
+            actorId: currentUser?.id || '',
+            checklist: duplicated.checklist || '',
+            coverImageUrl: duplicated.coverImageUrl,
+            coverImageId: duplicated.coverImageId,
+            tags: duplicated.tags || '',
+            budget: duplicated.budget || '',
+            platformNotes: duplicated.platformNotes || '',
+            targetAudience: duplicated.targetAudience || '',
+            category: duplicated.category || '',
+            views: duplicated.views || '',
+            likes: duplicated.likes || '',
+            engagement: duplicated.engagement || '',
+          });
+      const merged: ContentItem = { ...duplicated, ...created };
+      setItems((prev) => prev.map((i) => (i.id === tempId ? merged : i)));
+    } catch (e) {
+      console.error('Duplicate sync failed:', e);
+      addToast('Duplicated locally (sync pending)', 'info');
+    } finally {
+      endWrite();
+    }
+  };
+
   // Delete task
   const handleDeleteItem = async (id: string) => {
     setIsModalOpen(false);
@@ -973,6 +1065,8 @@ function App() {
             comments={comments}
             onMoveItem={handleMoveItem}
             onEditItem={handleOpenEditModal}
+            onDuplicateItem={handleDuplicateItem}
+            onDeleteItem={handleDeleteItem}
             onOpenCreateModalWithStatus={handleOpenCreateModalWithStatus}
             channels={channels}
             variablesConfig={variablesConfig}
@@ -999,6 +1093,8 @@ function App() {
                 resources={cardResources}
                 channels={channels}
                 onEditItem={handleOpenEditModal}
+                onDuplicateItem={handleDuplicateItem}
+                onDeleteItem={handleDeleteItem}
                 onMoveDate={handleMoveDate}
               />
         )}
@@ -1009,6 +1105,8 @@ function App() {
             resources={cardResources}
             comments={comments}
             onEditItem={handleOpenEditModal}
+            onDuplicateItem={handleDuplicateItem}
+            onDeleteItem={handleDeleteItem}
             channels={channels}
             variablesConfig={variablesConfig}
             currentUser={currentUser}

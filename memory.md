@@ -109,14 +109,25 @@ Path Executable: [`mcp-server/dist/index.js`](file:///Users/macbook/Documents/Wo
 7. **Supabase Client Repoint + Fetch Fallback (commit `64af57b`)**:
    - `supabase.ts` default client now points to active project `jpjsycnbamvxnwmziedh` (was `kfpbctylsnkvwmlugago`).
    - `supabaseDb.ts`: `fetchSupabaseInitialData()` falls back to Google Sheets (`fetchData()`) if `tasks`/`comments` fetch errors.
+8. **Right-Click Context Menu + Task Duplication (2026-08-06)**:
+   - New `ContextMenu.tsx` reusable component with Edit, Duplicate, Delete actions.
+   - Integrated across all 3 task views: KanbanBoard, ListView (cards mode), CalendarView.
+   - `handleDuplicateItem()` in `App.tsx` creates a deep copy with `Duplicate of ...` prefix and new `id`.
+   - Fixed `onDeleteItem` signature to `(id: string)` across all views for consistency.
+   - CSS styling in `index.css` with `.context-menu-*` classes (header, divider, items, danger variant, fade-in animation).
+   - Field mapping fix for duplicate: `description→brief`, `contentType→format`, `assetsLink` preserved.
 
 ---
 
-## 🔄 Git Sync Status (2026-08-03)
+## 🔄 Git Sync Status (2026-08-06)
 
-- Local rebased on top of remote `origin/main`. HEAD = `64af57b` (local fix) over `ba87ae2` (perf P0).
-- `npm run build` passes (tsc type-check OK, Vite build ~401ms, code-splitting active).
-- Local is **ahead 1** commit — pending `git push` to publish the Supabase client repoint + Sheets fallback fix.
+- Repo fully in sync: `HEAD == origin/main` (0 ahead, 0 behind).
+- Latest commit: `8aa1c7c` — feat: add rich notes and task resources.
+- New commits since last sync:
+  - `686e6d9` — fix: default database provider to Supabase for all crew members across all devices
+  - `638304b` — feat: improve task editor and field pickers
+  - `8aa1c7c` — feat: add rich notes and task resources
+- `npm run build` passes (tsc type-check OK, Vite build).
 - Untracked (not committed): `.env` (secrets — keep local), `src/documents.css`, `src/assets/{react,vite}.svg`.
 
 ---

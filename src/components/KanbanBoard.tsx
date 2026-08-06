@@ -1,9 +1,10 @@
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useCallback } from 'react';
 import { toDeterministicUuid, type ContentItem, type Channel, type VariablesConfig, type TaskType, type CommentItem, type TaskResource } from '../services/sheets';
 
 
 import { Calendar, Link, Plus, FileText, Video, RefreshCw, Clapperboard, ListChecks, MessageSquare, Paperclip } from 'lucide-react';
 import { RichTextPreview } from './RichText';
+import { ContextMenu } from './ContextMenu';
 
 interface KanbanBoardProps {
   items: ContentItem[];
@@ -13,6 +14,8 @@ interface KanbanBoardProps {
   variablesConfig: VariablesConfig;
   onMoveItem: (id: string, newStatus: ContentItem['status']) => void;
   onEditItem: (item: ContentItem) => void;
+  onDuplicateItem: (item: ContentItem) => void;
+  onDeleteItem: (id: string) => void;
   onOpenCreateModalWithStatus: (status: ContentItem['status']) => void;
   taskView: 'all' | 'content' | 'general' | 'mine' | 'overdue';
 }
@@ -45,15 +48,28 @@ function KanbanBoardComponent({
   variablesConfig,
   onMoveItem,
   onEditItem,
+  onDuplicateItem,
+  onDeleteItem,
   onOpenCreateModalWithStatus,
   taskView,
 }: KanbanBoardProps) {
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
   const [draggedItemType, setDraggedItemType] = useState<TaskType | null>(null);
   const [mobileLane, setMobileLane] = useState<TaskType>('Content');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: ContentItem } | null>(null);
   const showContentLane = taskView !== 'general';
   const showGeneralLane = taskView !== 'content';
   const showLaneSwitch = showContentLane && showGeneralLane;
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, item: ContentItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   const displayedItems = items;
 
@@ -163,6 +179,7 @@ function KanbanBoardComponent({
         onDragStart={(event) => handleDragStart(event, item)}
         onDragEnd={resetDragState}
         onClick={() => onEditItem(item)}
+        onContextMenu={(e) => handleContextMenu(e, item)}
       >
         {item.taskType === 'Content' && item.coverImageUrl && <img className="kanban-card-cover" src={item.coverImageUrl} alt="" loading="lazy" />}
         <div className="card-tags">
@@ -302,6 +319,18 @@ function KanbanBoardComponent({
         {showContentLane && renderLane('Content', CONTENT_COLUMNS)}
         {showGeneralLane && renderLane('General', GENERAL_COLUMNS)}
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          item={contextMenu.item}
+          onClose={closeContextMenu}
+          onEdit={onEditItem}
+          onDuplicate={onDuplicateItem}
+          onDelete={onDeleteItem}
+        />
+      )}
     </div>
   );
 }
