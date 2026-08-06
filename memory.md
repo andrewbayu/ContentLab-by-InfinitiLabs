@@ -122,11 +122,10 @@ Path Executable: [`mcp-server/dist/index.js`](file:///Users/macbook/Documents/Wo
 ## 🔄 Git Sync Status (2026-08-06)
 
 - Repo fully in sync: `HEAD == origin/main` (0 ahead, 0 behind).
-- Latest commit: `8aa1c7c` — feat: add rich notes and task resources.
+- Latest commit: `91e14eb` — feat: right-click context menu + duplicate task across all views
 - New commits since last sync:
-  - `686e6d9` — fix: default database provider to Supabase for all crew members across all devices
-  - `638304b` — feat: improve task editor and field pickers
   - `8aa1c7c` — feat: add rich notes and task resources
+  - `91e14eb` — feat: right-click context menu + duplicate task across all views
 - `npm run build` passes (tsc type-check OK, Vite build).
 - Untracked (not committed): `.env` (secrets — keep local), `src/documents.css`, `src/assets/{react,vite}.svg`.
 
