@@ -11,15 +11,14 @@ Security (RLS) secara aman.
 - Migration `20260827063153_auth_foundation.sql` sudah diterapkan ke database.
 - Kolom `team_members.auth_user_id` dan helper authorization di schema `private`
   sudah tersedia.
-- Migration `20260827063200_auth_rls_policies.sql` sudah diuji secara
-  transactional (`BEGIN`/`ROLLBACK`), tetapi **belum diterapkan permanen**.
-- Aplikasi saat ini masih berjalan dalam mode legacy karena
-  `VITE_SUPABASE_AUTH_ENABLED=false`.
+- Migration `20260827063200_auth_rls_policies.sql` sudah diterapkan permanen.
+- Semua 6 row `team_members` sudah ter-map ke `auth.users` (`6/6/0`).
+- Aplikasi production sudah memakai Supabase Auth melalui
+  `VITE_SUPABASE_AUTH_ENABLED=true`.
 
-RLS belum diaktifkan dengan sengaja. Saat ini baru sebagian row `team_members`
-yang memiliki pasangan `auth.users` (cek angka terbaru dengan query di bawah).
-Mengaktifkan RLS sebelum mapping lengkap dapat membuat anggota tim tidak bisa
-login atau melihat data.
+Cutover project aktif sudah selesai. Bagian di bawah dipertahankan sebagai
+runbook untuk penambahan user berikutnya dan recovery; jangan menjalankan ulang
+migration yang sudah tercatat di remote.
 
 ## 1. Buat akun Supabase Auth
 
@@ -92,9 +91,10 @@ perbaiki mapping secara manual berdasarkan UUID Auth yang benar. Migration RLS
 memiliki preflight check dan akan menolak cutover jika masih ada row yang belum
 terpetakan.
 
-## 3. Terapkan RLS
+## 3. Terapkan RLS (sudah selesai di project aktif)
 
-Setelah verifikasi mapping lulus, buka file
+Untuk project baru atau recovery terkontrol, setelah verifikasi mapping lulus,
+buka file
 `supabase/migrations/20260827063200_auth_rls_policies.sql`, copy seluruh isinya,
 lalu jalankan di SQL Editor. Migration ini:
 
@@ -121,11 +121,11 @@ where schemaname = 'public'
 order by tablename;
 ```
 
-Semua row `rowsecurity` harus `true`.
+Semua row `rowsecurity` harus `true`. Pada project aktif, hasilnya sudah `10/10`.
 
-## 4. Aktifkan Auth di deployment
+## 4. Aktifkan Auth di deployment (sudah selesai di production)
 
-Setelah RLS aktif dan smoke test selesai:
+Setelah RLS aktif dan smoke test selesai (sudah dilakukan pada deployment aktif):
 
 1. Tambahkan environment variable `VITE_SUPABASE_AUTH_ENABLED=true` pada
    environment Production di Vercel.
@@ -133,9 +133,9 @@ Setelah RLS aktif dan smoke test selesai:
 3. Untuk lokal, set variable yang sama di `.env.local`; jangan commit file env
    yang berisi secret.
 
-Sebelum flag ini diaktifkan, login lama masih tersedia sebagai fallback dan
-   RLS belum boleh dinyalakan. Setelah flag aktif, login memakai email/password
-   Supabase Auth dan session dikelola oleh Supabase.
+Login production sekarang memakai email/password Supabase Auth dan session
+dikelola oleh Supabase. Untuk deployment baru, pastikan flag diaktifkan hanya
+setelah mapping dan RLS selesai.
 
 ## 5. Smoke test wajib
 
