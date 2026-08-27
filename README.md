@@ -1,6 +1,6 @@
 # ContentLab
 
-ContentLab is a React + TypeScript workspace for content operations, backed by Google Sheets integrations.
+ContentLab is a React + TypeScript workspace for content operations, backed by Supabase Postgres. Google Sheets remains available only as a legacy/import integration during the Auth + RLS cutover.
 
 ## Project structure
 
@@ -9,6 +9,7 @@ ContentLab is a React + TypeScript workspace for content operations, backed by G
 - `integrations/` — external integrations and deployment-side scripts.
 - `docs/` — project notes and durable documentation.
 - `public/` — static files served as-is by Vite.
+- `docs/AUTH_RLS_CUTOVER.md` — step-by-step Supabase Auth and RLS cutover runbook.
 
 ## Development
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Layers, KeyRound, AlertCircle, Eye, EyeOff, Sparkles, BarChart3, Users } from 'lucide-react';
 import { loginUser } from '../services/sheets';
+import { isSupabaseAuthEnabled } from '../services/supabaseDb';
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void;
@@ -23,9 +24,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     try {
       const result = await loginUser(username.trim(), password);
       if (result.success && result.user) {
-        // Save auth data to localStorage
-        localStorage.setItem('contentlab_is_authenticated', 'true');
-        localStorage.setItem('contentlab_logged_user', JSON.stringify(result.user));
+        // Supabase Auth persists the verified session itself. Keep the legacy
+        // localStorage profile only while the temporary migration mode is on.
+        if (!isSupabaseAuthEnabled()) {
+          localStorage.setItem('contentlab_is_authenticated', 'true');
+          localStorage.setItem('contentlab_logged_user', JSON.stringify(result.user));
+        }
 
         onLoginSuccess(result.user);
       } else {
@@ -177,7 +181,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </form>
 
           <div className="login-hint">
-            Gunakan nama atau email yang terdaftar di tab <code>Team</code>.
+            {isSupabaseAuthEnabled()
+              ? <>Gunakan email dan password akun <code>Supabase Auth</code>.</>
+              : <>Gunakan nama atau email yang terdaftar di tab <code>Team</code>.</>}
           </div>
         </div>
       </div>

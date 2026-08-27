@@ -23,8 +23,13 @@ CREATE TABLE IF NOT EXISTS public.team_members (
   role TEXT NOT NULL DEFAULT 'team' CHECK (role IN ('super', 'team', 'client')),
   client_access TEXT DEFAULT '',
   avatar_url TEXT DEFAULT '',
+  auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_team_members_auth_user_id
+  ON public.team_members (auth_user_id)
+  WHERE auth_user_id IS NOT NULL;
 
 -- 3. Channels Table
 CREATE TABLE IF NOT EXISTS public.channels (

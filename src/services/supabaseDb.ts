@@ -24,6 +24,17 @@ export function isSupabaseDbConfigured(): boolean {
   return !!supabase;
 }
 
+/**
+ * Auth cutover switch. Keep this disabled until every active Team member has
+ * an account in Supabase Auth and a matching team_members.auth_user_id.
+ * Vercel can enable it with VITE_SUPABASE_AUTH_ENABLED=true for the cutover.
+ */
+export function isSupabaseAuthEnabled(): boolean {
+  return String(import.meta.env.VITE_SUPABASE_AUTH_ENABLED || '').toLowerCase() === 'true';
+}
+
+const TEAM_MEMBER_COLUMNS = 'id,name,email,role,client_access,avatar_url,auth_user_id,created_at';
+
 export function getPreferredDbProvider(): 'supabase' | 'sheets' {
   const saved = localStorage.getItem('contentlab_db_provider');
   // Supabase is the single operational source of truth. Migrate any legacy
@@ -203,7 +214,7 @@ export async function fetchSupabaseInitialData(userId?: string): Promise<{
     notificationsRes,
   ] = await Promise.all([
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-    supabase.from('team_members').select('*').order('created_at', { ascending: true }),
+    supabase.from('team_members').select(TEAM_MEMBER_COLUMNS).order('created_at', { ascending: true }),
     supabase.from('channels').select('*').order('name', { ascending: true }),
     supabase.from('client_brands').select('*').order('client', { ascending: true }),
     supabase.from('comments').select('*').order('created_at', { ascending: true }),
@@ -239,15 +250,7 @@ export async function fetchSupabaseInitialData(userId?: string): Promise<{
 
   const content: ContentItem[] = (tasksRes.data || []).map(mapTaskRowToContentItem);
 
-  const team: TeamMember[] = (teamRes.data || []).map((row: any) => ({
-    id: String(row.id),
-    name: String(row.name || ''),
-    email: String(row.email || ''),
-    password: String(row.password || ''),
-    role: String(row.role || 'team') as TeamMember['role'],
-    client: String(row.client_access || row.client || ''),
-    avatar: row.avatar_url || '',
-  }));
+  const team: TeamMember[] = (teamRes.data || []).map(mapSupabaseTeamMember);
 
   const channels: Channel[] = (channelsRes.data || []).map((row: any) => ({
     id: String(row.id),
@@ -468,15 +471,19 @@ export async function deleteSupabaseContent(id: string): Promise<boolean> {
 // ----------------------------------------------------------------------
 
 function mapSupabaseTeamMember(row: any): TeamMember {
-  return {
+  const member: TeamMember = {
     id: String(row.id),
     name: String(row.name || ''),
     email: String(row.email || ''),
-    password: String(row.password || ''),
     role: String(row.role || 'team') as TeamMember['role'],
     client: String(row.client_access || row.client || ''),
     avatar: String(row.avatar_url || ''),
   };
+  if (row.auth_user_id) member.authUserId = String(row.auth_user_id);
+  // Passwords are intentionally omitted from normal Auth-mode reads. Keep
+  // this only for the temporary legacy login path while RLS is still off.
+  if (Object.prototype.hasOwnProperty.call(row, 'password')) member.password = String(row.password || '');
+  return member;
 }
 
 export async function createSupabaseTeamMember(
@@ -484,15 +491,17 @@ export async function createSupabaseTeamMember(
 ): Promise<TeamMember> {
   if (!supabase) throw new Error('Supabase client is not initialized.');
 
-  const row = {
+  const row: Record<string, unknown> = {
     name: member.name.trim(),
     email: member.email.trim().toLowerCase(),
-    password: member.password || '',
     role: member.role || 'team',
     client_access: member.client || '',
     avatar_url: '',
   };
-  const { data, error } = await supabase.from('team_members').insert([row]).select().single();
+  // Password storage is retained only for the temporary legacy mode. New
+  // Auth-mode users must be provisioned through Supabase Auth instead.
+  if (!isSupabaseAuthEnabled()) row.password = member.password || '';
+  const { data, error } = await supabase.from('team_members').insert([row]).select(TEAM_MEMBER_COLUMNS).single();
   if (error) throw error;
   return mapSupabaseTeamMember(data);
 }
@@ -509,9 +518,9 @@ export async function updateSupabaseTeamMember(member: TeamMember): Promise<Team
     client_access: member.client || '',
     avatar_url: member.avatar || '',
   };
-  if (member.password !== undefined) row.password = member.password;
+  if (member.password !== undefined && !isSupabaseAuthEnabled()) row.password = member.password;
 
-  const { data, error } = await supabase.from('team_members').update(row).eq('id', uuid).select().single();
+  const { data, error } = await supabase.from('team_members').update(row).eq('id', uuid).select(TEAM_MEMBER_COLUMNS).single();
   if (error) throw error;
   return mapSupabaseTeamMember(data);
 }
@@ -1111,11 +1120,92 @@ export async function importGoogleSheetsToSupabase(sheetsData: {
 // USER AUTHENTICATION (Supabase DB Team Members)
 // ----------------------------------------------------------------------
 
+async function resolveAuthMember(authUserId: string): Promise<TeamMember | null> {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('team_members')
+    .select(TEAM_MEMBER_COLUMNS)
+    .eq('auth_user_id', authUserId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapSupabaseTeamMember(data) : null;
+}
+
+/** Return the team profile for the currently signed-in Supabase Auth user. */
+export async function getSupabaseAuthUser(): Promise<TeamMember | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  if (!data.session?.user) return null;
+  return resolveAuthMember(data.session.user.id);
+}
+
+/** Subscribe to Auth session changes without doing async work in the callback. */
+export function subscribeToSupabaseAuth(onUserChange: (user: TeamMember | null) => void): () => void {
+  if (!supabase) return () => undefined;
+
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Supabase advises keeping auth callbacks synchronous. Defer the profile
+    // lookup so it cannot deadlock another Supabase request.
+    window.setTimeout(() => {
+      if (!session?.user) {
+        onUserChange(null);
+        return;
+      }
+      void resolveAuthMember(session.user.id)
+        .then(onUserChange)
+        .catch((error) => {
+          console.error('Failed to resolve Supabase Auth profile:', error);
+          onUserChange(null);
+        });
+    }, 0);
+  });
+
+  return () => data.subscription.unsubscribe();
+}
+
+export async function signOutSupabaseUser(): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+async function authenticateWithSupabaseAuth(
+  username: string,
+  password: string
+): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
+  if (!supabase) return { success: false, error: 'Supabase client is not initialized.' };
+
+  const email = username.trim().toLowerCase();
+  if (!email.includes('@')) {
+    return { success: false, error: 'Mode Auth aktif: gunakan email akun Supabase.' };
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) {
+    return { success: false, error: error?.message || 'Email atau password salah.' };
+  }
+
+  const member = await resolveAuthMember(data.user.id);
+  if (!member) {
+    await supabase.auth.signOut();
+    return { success: false, error: 'Akun Auth belum dipetakan ke Team Member. Hubungi super admin.' };
+  }
+
+  return { success: true, user: member };
+}
+
 export async function authenticateSupabaseUser(
   username: string,
   password: string
 ): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
   if (!supabase) return { success: false, error: 'Supabase client is not initialized.' };
+
+  if (isSupabaseAuthEnabled()) {
+    return authenticateWithSupabaseAuth(username, password);
+  }
 
   const cleanUser = username.trim().toLowerCase();
   const cleanPass = password.trim();

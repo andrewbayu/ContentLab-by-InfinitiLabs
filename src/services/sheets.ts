@@ -98,6 +98,8 @@ export interface TeamMember {
   email: string;
   avatar: string;
   password?: string; // New field for multi-user authentication
+  /** Supabase Auth user id. Populated after the Auth migration cutover. */
+  authUserId?: string;
   role: UserRole;
   client?: string;
 }
@@ -939,8 +941,10 @@ export async function loginUser(
 ): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
   const cleanUser = username.trim().toLowerCase();
 
-  // 0. ALWAYS CHECK EMERGENCY ADMIN FALLBACK FIRST (cannot be blocked by any network/DB error)
-  if (cleanUser === 'admin' || cleanUser === 'superadmin' || cleanUser === 'admin@contentlab.com') {
+  // 0. Temporary emergency fallback for the pre-Auth migration only. It is
+  // deliberately disabled once Supabase Auth is enabled.
+  const { isSupabaseAuthEnabled } = await import('./supabaseDb');
+  if (!isSupabaseAuthEnabled() && (cleanUser === 'admin' || cleanUser === 'superadmin' || cleanUser === 'admin@contentlab.com')) {
     const adminUser: TeamMember = {
       id: 'super-admin-default',
       name: 'Super Admin',

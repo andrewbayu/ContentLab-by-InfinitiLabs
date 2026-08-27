@@ -46,6 +46,10 @@ import {
   markSupabaseNotificationRead,
   markAllSupabaseNotificationsRead,
   subscribeToSupabaseRealtime,
+  getSupabaseAuthUser,
+  subscribeToSupabaseAuth,
+  signOutSupabaseUser,
+  isSupabaseAuthEnabled,
   isSupabaseDbConfigured,
 } from './services/supabaseDb';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, NotificationItem, UserRole } from './services/sheets';
@@ -60,15 +64,18 @@ interface Toast {
 type TaskView = 'all' | 'content' | 'general' | 'mine' | 'overdue';
 
 function App() {
+  const authEnabled = isSupabaseAuthEnabled();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    localStorage.getItem('contentlab_is_authenticated') === 'true'
+    authEnabled ? false : localStorage.getItem('contentlab_is_authenticated') === 'true'
   );
 
   // Active Authenticated User profile state
   const [currentUser, setCurrentUser] = useState<TeamMember | null>(() => {
+    if (authEnabled) return null;
     const saved = localStorage.getItem('contentlab_logged_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(authEnabled);
 
   const [initialCache] = useState(() => getCachedWorkspaceData());
   const [items, setItems] = useState<ContentItem[]>(() => initialCache?.content || []);
@@ -150,6 +157,41 @@ function App() {
   // always invoke the current closure (avoids stale state) without re-subscribing.
   const loadDataRef = useRef(loadData);
   loadDataRef.current = loadData;
+
+  // Supabase Auth owns the session once the cutover flag is enabled. The
+  // legacy localStorage session remains available only during the staged
+  // migration so the current production build is not interrupted.
+  useEffect(() => {
+    if (!authEnabled) {
+      setIsAuthChecking(false);
+      return;
+    }
+
+    let active = true;
+    const applyAuthUser = (user: TeamMember | null) => {
+      if (!active) return;
+      setCurrentUser(user);
+      setIsAuthenticated(Boolean(user));
+      if (user) {
+        localStorage.removeItem('contentlab_is_authenticated');
+        localStorage.removeItem('contentlab_logged_user');
+      }
+      setIsAuthChecking(false);
+    };
+
+    void getSupabaseAuthUser()
+      .then(applyAuthUser)
+      .catch((error) => {
+        console.error('Failed to restore Supabase Auth session:', error);
+        applyAuthUser(null);
+      });
+
+    const unsubscribe = subscribeToSupabaseAuth(applyAuthUser);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [authEnabled]);
 
   // Coalesce bursts of realtime events into a single refresh. Previously every
   // task/comment change triggered its own full-workspace refetch, so N concurrent
@@ -252,6 +294,7 @@ function App() {
 
   // Logout Handler
   const handleLogout = () => {
+    if (authEnabled) void signOutSupabaseUser();
     localStorage.removeItem('contentlab_is_authenticated');
     localStorage.removeItem('contentlab_logged_user');
     setCurrentUser(null);
@@ -908,6 +951,10 @@ function App() {
     setTaskView(nextView);
     localStorage.setItem('contentlab_task_view', nextView);
   };
+
+  if (isAuthChecking) {
+    return <div className="app-loading-screen">Checking secure session…</div>;
+  }
 
   // Render Login page if not authenticated
   if (!isAuthenticated || !currentUser) {
