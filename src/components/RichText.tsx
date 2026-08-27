@@ -1,5 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Pilcrow, Strikethrough, Underline, Undo2, Redo2, RemoveFormatting } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Pilcrow, Strikethrough, Underline as UnderlineIcon, Undo2, Redo2, RemoveFormatting } from 'lucide-react';
 import { richTextToPlainText, sanitizeRichText, toEditorHtml } from '../utils/richText';
 
 interface RichTextEditorProps {
@@ -11,16 +16,20 @@ interface RichTextEditorProps {
 
 interface ToolbarButtonProps {
   label: string;
+  active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, onClick, children }) => (
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, active = false, disabled = false, onClick, children }) => (
   <button
     type="button"
-    className="rich-text-toolbar-button"
+    className={`rich-text-toolbar-button${active ? ' is-active' : ''}`}
     aria-label={label}
+    aria-pressed={active}
     title={label}
+    disabled={disabled}
     onMouseDown={(event) => event.preventDefault()}
     onClick={onClick}
   >
@@ -28,84 +37,85 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, onClick, children 
   </button>
 );
 
+/**
+ * Shared editor for task briefs and notes. Values remain sanitized HTML strings,
+ * preserving existing Supabase records and legacy plain-text values.
+ */
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
   placeholder = 'Write a brief, outline, or description...',
   minHeight = 150,
 }) => {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const [isFocused, setIsFocused] = useState(false);
+  const lastEmittedValue = useRef('');
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ heading: { levels: [2, 3, 4] } }),
+      Underline,
+      Link.configure({
+        autolink: true,
+        linkOnPaste: true,
+        openOnClick: false,
+        HTMLAttributes: { rel: 'noreferrer noopener', target: '_blank' },
+        validate: (href) => /^(https?:|mailto:)/i.test(href.trim()),
+      }),
+      Placeholder.configure({ placeholder }),
+    ],
+    content: toEditorHtml(value),
+    editorProps: {
+      attributes: {
+        class: 'rich-text-content rich-text-editor-input',
+        'aria-label': placeholder,
+      },
+    },
+    onUpdate: ({ editor: instance }) => {
+      const nextValue = sanitizeRichText(instance.getHTML());
+      lastEmittedValue.current = nextValue;
+      onChange(nextValue);
+    },
+  });
 
   useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor || isFocused) return;
-    const nextHtml = toEditorHtml(value);
-    if (editor.innerHTML !== nextHtml) editor.innerHTML = nextHtml;
-  }, [value, isFocused]);
-
-  const emitChange = () => {
-    const editor = editorRef.current;
     if (!editor) return;
-    onChange(sanitizeRichText(editor.innerHTML));
-  };
-
-  const runCommand = (command: string, commandValue?: string) => {
-    editorRef.current?.focus();
-    document.execCommand(command, false, commandValue);
-    emitChange();
-  };
+    const nextValue = sanitizeRichText(toEditorHtml(value));
+    if (nextValue === lastEmittedValue.current || nextValue === sanitizeRichText(editor.getHTML())) return;
+    editor.commands.setContent(nextValue, { emitUpdate: false });
+  }, [editor, value]);
 
   const addLink = () => {
-    const url = window.prompt('Paste a URL (https://...)');
-    if (!url?.trim() || !/^https?:\/\//i.test(url.trim())) return;
-    runCommand('createLink', url.trim());
+    if (!editor) return;
+    const previousUrl = editor.getAttributes('link').href as string | undefined;
+    const url = window.prompt('Paste a URL (https://...)', previousUrl || '');
+    if (url === null) return;
+    if (!url.trim()) {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+    if (!/^(https?:|mailto:)/i.test(url.trim())) return;
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run();
   };
 
-  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const html = event.clipboardData.getData('text/html');
-    const text = event.clipboardData.getData('text/plain');
-    const safeHtml = html ? sanitizeRichText(html) : toEditorHtml(text);
-    document.execCommand('insertHTML', false, safeHtml);
-    emitChange();
-  };
+  if (!editor) return null;
 
   return (
     <div className="rich-text-editor">
-      <div className="rich-text-toolbar" role="toolbar" aria-label="Brief formatting">
-        <ToolbarButton label="Bold" onClick={() => runCommand('bold')}><Bold size={15} /></ToolbarButton>
-        <ToolbarButton label="Italic" onClick={() => runCommand('italic')}><Italic size={15} /></ToolbarButton>
-        <ToolbarButton label="Underline" onClick={() => runCommand('underline')}><Underline size={15} /></ToolbarButton>
-        <ToolbarButton label="Strikethrough" onClick={() => runCommand('strikeThrough')}><Strikethrough size={15} /></ToolbarButton>
+      <div className="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
+        <ToolbarButton label="Bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={15} /></ToolbarButton>
+        <ToolbarButton label="Italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></ToolbarButton>
+        <ToolbarButton label="Underline" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon size={15} /></ToolbarButton>
+        <ToolbarButton label="Strikethrough" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough size={15} /></ToolbarButton>
         <span className="rich-text-toolbar-divider" aria-hidden="true" />
-        <ToolbarButton label="Paragraph" onClick={() => runCommand('formatBlock', 'p')}><Pilcrow size={15} /></ToolbarButton>
-        <ToolbarButton label="Heading" onClick={() => runCommand('formatBlock', 'h3')}><span className="rich-text-toolbar-letter">H</span></ToolbarButton>
-        <ToolbarButton label="Bulleted list" onClick={() => runCommand('insertUnorderedList')}><List size={15} /></ToolbarButton>
-        <ToolbarButton label="Numbered list" onClick={() => runCommand('insertOrderedList')}><ListOrdered size={15} /></ToolbarButton>
-        <ToolbarButton label="Add link" onClick={addLink}><LinkIcon size={15} /></ToolbarButton>
+        <ToolbarButton label="Paragraph" active={editor.isActive('paragraph')} onClick={() => editor.chain().focus().setParagraph().run()}><Pilcrow size={15} /></ToolbarButton>
+        <ToolbarButton label="Heading" active={editor.isActive('heading')} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}><span className="rich-text-toolbar-letter">H</span></ToolbarButton>
+        <ToolbarButton label="Bulleted list" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></ToolbarButton>
+        <ToolbarButton label="Numbered list" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered size={15} /></ToolbarButton>
+        <ToolbarButton label="Add or edit link" active={editor.isActive('link')} onClick={addLink}><LinkIcon size={15} /></ToolbarButton>
         <span className="rich-text-toolbar-spacer" />
-        <ToolbarButton label="Undo" onClick={() => runCommand('undo')}><Undo2 size={15} /></ToolbarButton>
-        <ToolbarButton label="Redo" onClick={() => runCommand('redo')}><Redo2 size={15} /></ToolbarButton>
-        <ToolbarButton label="Clear formatting" onClick={() => runCommand('removeFormat')}><RemoveFormatting size={15} /></ToolbarButton>
+        <ToolbarButton label="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}><Undo2 size={15} /></ToolbarButton>
+        <ToolbarButton label="Redo" disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}><Redo2 size={15} /></ToolbarButton>
+        <ToolbarButton label="Clear formatting" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}><RemoveFormatting size={15} /></ToolbarButton>
       </div>
-      <div
-        ref={editorRef}
-        className="rich-text-content rich-text-editor-input"
-        contentEditable
-        suppressContentEditableWarning
-        role="textbox"
-        aria-multiline="true"
-        data-placeholder={placeholder}
-        style={{ minHeight }}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => {
-          setIsFocused(false);
-          emitChange();
-        }}
-        onInput={emitChange}
-        onPaste={handlePaste}
-      />
+      <EditorContent editor={editor} style={{ minHeight }} />
     </div>
   );
 };

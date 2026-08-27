@@ -11,6 +11,7 @@ const ALLOWED_TAGS = new Set([
   'UL',
   'OL',
   'LI',
+  'H2',
   'H3',
   'H4',
   'BLOCKQUOTE',
