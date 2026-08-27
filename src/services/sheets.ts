@@ -76,6 +76,22 @@ export interface CommentItem {
   createdAt: string;
 }
 
+export type NotificationType = 'mention' | 'comment' | 'assignment';
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  commentId?: string;
+  taskId?: string;
+  actorId?: string;
+  actorName: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export interface TeamMember {
   id: string;
   name: string;
@@ -262,6 +278,7 @@ export interface WorkspaceData {
   kpiUpdates: KpiUpdate[];
   documents: DocumentItem[];
   resources?: TaskResource[];
+  notifications?: NotificationItem[];
 }
 
 export interface CachedWorkspaceData extends WorkspaceData {
@@ -530,6 +547,7 @@ export function getCachedWorkspaceData(): CachedWorkspaceData | null {
       ...cached,
       documents: Array.isArray(cached.documents) ? cached.documents : [],
       resources: Array.isArray(cached.resources) ? cached.resources : [],
+      notifications: Array.isArray(cached.notifications) ? cached.notifications : [],
     };
   } catch {
     localStorage.removeItem(WORKSPACE_CACHE_KEY);
@@ -563,6 +581,7 @@ function getLocalData(): WorkspaceData {
   let kpiUpdates = INITIAL_MOCK_KPI_UPDATES;
   let documents = INITIAL_MOCK_DOCUMENTS;
   let resources: TaskResource[] = [];
+  let notifications: NotificationItem[] = [];
 
   const savedContent = localStorage.getItem(MOCK_CONTENT_KEY);
   const savedChannels = localStorage.getItem(MOCK_CHANNELS_KEY);
@@ -626,7 +645,7 @@ function getLocalData(): WorkspaceData {
     localStorage.setItem(MOCK_TASK_RESOURCES_KEY, JSON.stringify(resources));
   }
 
-  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources };
+  return { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources, notifications };
 }
 
 function saveLocalData(content: ContentItem[], _team?: TeamMember[], channels?: Channel[], comments?: CommentItem[], clients?: ClientBrand[], kpiDefinitions?: KpiDefinition[], kpiUpdates?: KpiUpdate[], documents?: DocumentItem[], resources?: TaskResource[]) {
@@ -801,7 +820,20 @@ export async function fetchData(): Promise<WorkspaceData> {
 
     const uniqueContent = deduplicateContentItems(content);
     const resources = (data.resources || []).map((item: any) => normalizeTaskResource(item));
-    return { content: uniqueContent, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources };
+    const notifications = (data.notifications || []).map((item: any) => ({
+      id: String(item.id || ''),
+      userId: String(item.userId || item.user_id || ''),
+      commentId: item.commentId || item.comment_id ? String(item.commentId || item.comment_id) : undefined,
+      taskId: item.taskId || item.task_id ? String(item.taskId || item.task_id) : undefined,
+      actorId: item.actorId || item.actor_id ? String(item.actorId || item.actor_id) : undefined,
+      actorName: String(item.actorName || item.actor_name || ''),
+      type: ['mention', 'comment', 'assignment'].includes(String(item.type)) ? String(item.type) as NotificationType : 'mention',
+      title: String(item.title || ''),
+      body: String(item.body || ''),
+      read: String(item.read ?? 'false').toLowerCase() === 'true' || item.read === true,
+      createdAt: String(item.createdAt || item.created_at || new Date().toISOString()),
+    })) as NotificationItem[];
+    return { content: uniqueContent, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources, notifications };
   } catch (error) {
     console.error('Failed to fetch from Google Sheets script, using the latest workspace snapshot:', error);
     const cached = getCachedWorkspaceData();
@@ -899,13 +931,13 @@ export function isCommentForTask(comment: CommentItem, taskIdOrItem: string | { 
   return false;
 }
 
-// True multi-user login verify API call (Supports Supabase, Google Apps Script, Cached Team, & Admin Fallback)
+// True multi-user login verify API call. Supabase is the only operational
+// identity source; Apps Script and cached team data are migration-only paths.
 export async function loginUser(
   username: string, 
   password: string
 ): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
   const cleanUser = username.trim().toLowerCase();
-  const cleanPass = password.trim();
 
   // 0. ALWAYS CHECK EMERGENCY ADMIN FALLBACK FIRST (cannot be blocked by any network/DB error)
   if (cleanUser === 'admin' || cleanUser === 'superadmin' || cleanUser === 'admin@contentlab.com') {
@@ -920,64 +952,15 @@ export async function loginUser(
     return { success: true, user: adminUser };
   }
 
-  // 1. Try Supabase Auth if Supabase DB is active/configured
+  // Supabase is the only operational identity source. Do not fall back to a
+  // browser cache or Google Sheets because that would create split sessions.
   try {
-    const { isUsingSupabaseDb, authenticateSupabaseUser } = await import('./supabaseDb');
-    if (isUsingSupabaseDb()) {
-      const supaRes = await authenticateSupabaseUser(username, password);
-      if (supaRes.success) return supaRes;
-      // Only block on definitive wrong password — otherwise fall through
-      if (supaRes.error && supaRes.error.includes('Password salah')) {
-        return supaRes;
-      }
-    }
+    const { authenticateSupabaseUser } = await import('./supabaseDb');
+    return await authenticateSupabaseUser(username, password);
   } catch (err) {
-    console.warn('Supabase auth attempt skipped:', err);
+    console.error('Supabase authentication failed:', err);
+    return { success: false, error: 'Gagal terhubung ke Supabase. Silakan coba lagi.' };
   }
-
-  // 2. Try Google Apps Script if URL is set — only return on SUCCESS or wrong password
-  const url = getScriptUrl();
-  if (url) {
-    try {
-      const rawText = await fetch(url, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'login', username, password }),
-      }).then((r) => r.text());
-      const result = JSON.parse(rawText);
-      if (result?.success && result.user) {
-        const role = String(result.user.role || 'team').toLowerCase();
-        result.user.role = role === 'super' ? 'super' : role === 'client' ? 'client' : 'team';
-        result.user.client = result.user.client ? String(result.user.client) : '';
-        return result;
-      }
-      // Only hard-stop on definitive wrong-password signal from Apps Script
-      if (result?.error && (result.error.toLowerCase().includes('password') || result.error.toLowerCase().includes('salah'))) {
-        return result;
-      }
-      // Otherwise fall through to cache/fallback
-    } catch (e) {
-      console.warn('Google Apps Script auth call failed, falling back to local cache...', e);
-    }
-  }
-
-  // 3. Fallback: Check local cached workspace team data
-  const cached = getCachedWorkspaceData();
-  if (cached && cached.team && cached.team.length > 0) {
-    const found = cached.team.find(
-      (m) => m.name.trim().toLowerCase() === cleanUser || m.email.trim().toLowerCase() === cleanUser
-    );
-    if (found) {
-      if (!found.password || found.password.trim() === '' || found.password.trim() === cleanPass) {
-        return { success: true, user: found };
-      } else {
-        return { success: false, error: 'Password salah.' };
-      }
-    }
-  }
-
-  return { success: false, error: 'Username atau email tidak ditemukan. Coba gunakan "admin" untuk akses Super Admin.' };
 }
 
 

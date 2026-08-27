@@ -15,24 +15,6 @@ const AnalyticsView = lazy(() => import('./components/AnalyticsView').then((m) =
 const DocumentsView = lazy(() => import('./components/DocumentsView').then((m) => ({ default: m.DocumentsView })));
 const ReportsView = lazy(() => import('./components/ReportsView').then((m) => ({ default: m.ReportsView })));
 import {
-  fetchData,
-  createContent,
-  updateContent,
-  deleteContent,
-  createChannel,
-  deleteChannel,
-  createClientBrand,
-  createTeamMember,
-  updateTeamMember,
-  deleteTeamMember,
-  createComment,
-  createKpiDefinition,
-  createKpiUpdate,
-  createDocument,
-  updateDocument,
-  deleteDocument,
-  createTaskResource,
-  deleteTaskResource,
   getVariablesConfig,
   saveVariablesConfig,
   getCustomTags,
@@ -41,20 +23,32 @@ import {
   saveCachedWorkspaceData,
   isUserInvolved,
   hasClientAccess,
-  isMockMode
 } from './services/sheets';
 import {
   fetchSupabaseInitialData,
   createSupabaseContent,
   updateSupabaseContent,
   deleteSupabaseContent,
+  createSupabaseTeamMember,
+  updateSupabaseTeamMember,
+  deleteSupabaseTeamMember,
+  createSupabaseChannel,
+  deleteSupabaseChannel,
+  createSupabaseClientBrand,
+  createSupabaseKpiDefinition,
+  createSupabaseKpiUpdate,
+  createSupabaseDocument,
+  updateSupabaseDocument,
+  deleteSupabaseDocument,
   createSupabaseComment,
   createSupabaseTaskResource,
   deleteSupabaseTaskResource,
+  markSupabaseNotificationRead,
+  markAllSupabaseNotificationsRead,
   subscribeToSupabaseRealtime,
-  isUsingSupabaseDb,
+  isSupabaseDbConfigured,
 } from './services/supabaseDb';
-import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, UserRole } from './services/sheets';
+import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, NotificationItem, UserRole } from './services/sheets';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -67,12 +61,11 @@ type TaskView = 'all' | 'content' | 'general' | 'mine' | 'overdue';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    !isMockMode() && localStorage.getItem('contentlab_is_authenticated') === 'true'
+    localStorage.getItem('contentlab_is_authenticated') === 'true'
   );
 
   // Active Authenticated User profile state
   const [currentUser, setCurrentUser] = useState<TeamMember | null>(() => {
-    if (isMockMode()) return null;
     const saved = localStorage.getItem('contentlab_logged_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -87,6 +80,7 @@ function App() {
   const [kpiUpdates, setKpiUpdates] = useState<KpiUpdate[]>(() => initialCache?.kpiUpdates || []);
   const [documents, setDocuments] = useState<DocumentItem[]>(() => initialCache?.documents || []);
   const [resources, setResources] = useState<TaskResource[]>(() => initialCache?.resources || []);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => initialCache?.notifications || []);
   const [scopeKey, setScopeKey] = useState(() => localStorage.getItem('contentlab_scope_key') || 'all');
   const [taskView, setTaskView] = useState<TaskView>(() => (localStorage.getItem('contentlab_task_view') as TaskView) || 'all');
   
@@ -103,17 +97,16 @@ function App() {
   const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
   const [initialStatusForModal, setInitialStatusForModal] = useState<ContentItem['status'] | undefined>(undefined);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [isMock, setIsMock] = useState<boolean>(isMockMode());
+  const [isMock, setIsMock] = useState<boolean>(!isSupabaseDbConfigured());
   const hasWorkspaceData = useRef<boolean>(!!initialCache);
 
-  // Load database (Google Sheets or Supabase)
+  // Load the single operational database (Supabase)
   const loadData = async (showLoading = true) => {
     if (!isAuthenticated) return;
     if (showLoading && !hasWorkspaceData.current) setIsInitialLoading(true);
     setIsSyncing(true);
     try {
-      const useSupabase = isUsingSupabaseDb();
-      const data = useSupabase ? await fetchSupabaseInitialData() : await fetchData();
+      const data = await fetchSupabaseInitialData(currentUser?.id);
       setItems(data.content);
       setTeam(data.team);
       setChannels(data.channels);
@@ -123,6 +116,7 @@ function App() {
       setKpiUpdates(data.kpiUpdates || []);
       setDocuments(data.documents || []);
       setResources(data.resources || []);
+      setNotifications(data.notifications || []);
       hasWorkspaceData.current = true;
       setLastSyncedAt(saveCachedWorkspaceData(data));
 
@@ -145,7 +139,7 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      addToast('Error loading data from Google Sheets.', 'error');
+      addToast('Error loading workspace from Supabase. Please refresh and try again.', 'error');
     } finally {
       setIsInitialLoading(false);
       setIsSyncing(false);
@@ -180,15 +174,20 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadData();
+      loadDataRef.current();
     }
-  }, [isMock, isAuthenticated]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (isAuthenticated && isUsingSupabaseDb()) {
-      const unsubscribe = subscribeToSupabaseRealtime(scheduleReload, scheduleReload, scheduleReload);
+    if (isAuthenticated) {
+      const unsubscribe = subscribeToSupabaseRealtime(scheduleReload, scheduleReload, scheduleReload, scheduleReload);
+      const refreshOnFocus = () => loadDataRef.current(false);
+      window.addEventListener('focus', refreshOnFocus);
+      window.addEventListener('online', refreshOnFocus);
       return () => {
         unsubscribe();
+        window.removeEventListener('focus', refreshOnFocus);
+        window.removeEventListener('online', refreshOnFocus);
         if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
       };
     }
@@ -208,10 +207,11 @@ function App() {
         kpiUpdates,
         documents,
         resources,
+        notifications,
       });
     }, 120);
     return () => window.clearTimeout(cacheTimer);
-  }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources]);
+  }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources, notifications]);
 
   const beginWrite = useCallback(() => setPendingWrites((count) => count + 1), []);
   const endWrite = useCallback(() => setPendingWrites((count) => Math.max(0, count - 1)), []);
@@ -233,7 +233,8 @@ function App() {
 
   // Handle connection settings change
   const handleConnectionChange = () => {
-    setIsMock(isMockMode());
+    setIsMock(!isSupabaseDbConfigured());
+    void loadDataRef.current(false);
   };
 
   // Toast Alerts
@@ -294,10 +295,7 @@ function App() {
 
       // 2. SILENT BACKGROUND SYNC
       try {
-        const useSupabase = isUsingSupabaseDb();
-        const serverUpdated = useSupabase
-          ? await updateSupabaseContent(updatedPayload)
-          : await updateContent(updatedPayload);
+        const serverUpdated = await updateSupabaseContent(updatedPayload);
         const merged: ContentItem = {
           ...updatedPayload,
           ...serverUpdated,
@@ -307,8 +305,9 @@ function App() {
         setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? merged : item)));
       } catch (e) {
         console.error('Background sync failed for task update:', e);
-        const message = e instanceof Error ? e.message : 'Sync error';
-        addToast(`Card updated locally (${message})`, 'info');
+        setItems((prev) => prev.map((item) => (item.id === itemPayload.id ? existing : item)));
+        const message = e instanceof Error ? e.message : 'Supabase sync error';
+        addToast(`Card update failed; changes were not saved (${message}).`, 'error');
       } finally {
         endWrite();
       }
@@ -352,15 +351,7 @@ function App() {
 
       // 2. SILENT BACKGROUND SYNC
       try {
-        const useSupabase = isUsingSupabaseDb();
-        const created = useSupabase
-          ? await createSupabaseContent({
-              ...itemPayload,
-              createdBy: currentUser?.name || 'Anonymous',
-              creatorId: currentUser?.id || '',
-              actorId: currentUser?.id || '',
-            })
-          : await createContent({
+        const created = await createSupabaseContent({
               ...itemPayload,
               createdBy: currentUser?.name || 'Anonymous',
               creatorId: currentUser?.id || '',
@@ -375,8 +366,9 @@ function App() {
         setItems((prev) => prev.map((item) => (item.id === tempId ? merged : item)));
       } catch (e) {
         console.error('Background sync failed for task creation:', e);
-        const message = e instanceof Error ? e.message : 'Sync error';
-        addToast(`Card created locally (${message})`, 'info');
+        setItems((prev) => prev.filter((item) => item.id !== tempId));
+        const message = e instanceof Error ? e.message : 'Supabase sync error';
+        addToast(`Card creation failed; nothing was saved (${message}).`, 'error');
       } finally {
         endWrite();
       }
@@ -400,12 +392,7 @@ function App() {
     beginWrite();
 
     try {
-      const useSupabase = isUsingSupabaseDb();
-      if (useSupabase) {
-        await updateSupabaseContent(updatedItem);
-      } else {
-        await updateContent(updatedItem);
-      }
+      await updateSupabaseContent(updatedItem);
       addToast(`Rescheduled to ${newDate}`, 'success');
     } catch (e) {
       console.error(e);
@@ -446,12 +433,7 @@ function App() {
     beginWrite();
 
     try {
-      const useSupabase = isUsingSupabaseDb();
-      if (useSupabase) {
-        await updateSupabaseContent(updatedItem);
-      } else {
-        await updateContent(updatedItem);
-      }
+      await updateSupabaseContent(updatedItem);
       addToast(`Status updated to "${newStatus}"`, 'success');
     } catch (e) {
       console.error(e);
@@ -484,38 +466,7 @@ function App() {
     beginWrite();
 
     try {
-      const useSupabase = isUsingSupabaseDb();
-      const created = useSupabase
-        ? await createSupabaseContent({
-            title: duplicated.title,
-            brief: duplicated.brief || '',
-            channel: duplicated.channel || '',
-            format: duplicated.format || 'Feed/Reels',
-            assetsLink: duplicated.assetsLink || '',
-            taskType: duplicated.taskType || 'Content',
-            status: duplicated.status,
-            priority: duplicated.priority || 'Medium',
-            assignee: duplicated.assignee || '',
-            publishDate: duplicated.publishDate || '',
-            dueDate: duplicated.dueDate || '',
-            client: duplicated.client || '',
-            brand: duplicated.brand || '',
-            createdBy: currentUser?.name || 'Anonymous',
-            creatorId: currentUser?.id || '',
-            actorId: currentUser?.id || '',
-            checklist: duplicated.checklist || '',
-            coverImageUrl: duplicated.coverImageUrl,
-            coverImageId: duplicated.coverImageId,
-            tags: duplicated.tags || '',
-            budget: duplicated.budget || '',
-            platformNotes: duplicated.platformNotes || '',
-            targetAudience: duplicated.targetAudience || '',
-            category: duplicated.category || '',
-            views: duplicated.views || '',
-            likes: duplicated.likes || '',
-            engagement: duplicated.engagement || '',
-          })
-        : await createContent({
+      const created = await createSupabaseContent({
             title: duplicated.title,
             brief: duplicated.brief || '',
             channel: duplicated.channel || '',
@@ -548,7 +499,8 @@ function App() {
       setItems((prev) => prev.map((i) => (i.id === tempId ? merged : i)));
     } catch (e) {
       console.error('Duplicate sync failed:', e);
-      addToast('Duplicated locally (sync pending)', 'info');
+      setItems((prev) => prev.filter((item) => item.id !== tempId));
+      addToast('Duplicate failed; nothing was saved to Supabase.', 'error');
     } finally {
       endWrite();
     }
@@ -564,12 +516,7 @@ function App() {
     beginWrite();
 
     try {
-      const useSupabase = isUsingSupabaseDb();
-      if (useSupabase) {
-        await deleteSupabaseContent(id);
-      } else {
-        await deleteContent(id);
-      }
+      await deleteSupabaseContent(id);
       addToast(`Successfully deleted "${itemToDelete?.title || 'Task'}"`, 'success');
     } catch (e) {
       console.error(e);
@@ -590,16 +537,7 @@ function App() {
       const explicitNames = new Set(team.filter((member) => mentionedUserIds.includes(member.id)).map((member) => member.name.toLocaleLowerCase()));
       const detectedIds = team.filter((member) => !explicitNames.has(member.name.toLocaleLowerCase()) && normalizedText.includes(`@${member.name.toLocaleLowerCase()}`)).map((member) => member.id);
       const mentionIds = [...new Set([...mentionedUserIds, ...detectedIds])];
-      const useSupabase = isUsingSupabaseDb();
-      const created = useSupabase
-        ? await createSupabaseComment(contentId, currentUser?.name || 'Anonymous', text, attachmentUrl, mentionIds, currentUser?.id)
-        : await createComment({
-            contentId,
-            author: currentUser.name,
-            text,
-            attachmentUrl,
-            mentionedUserIds: mentionIds
-          });
+      const created = await createSupabaseComment(contentId, currentUser.name, text, attachmentUrl, mentionIds, currentUser.id);
       setComments((prev) => [...prev, created]);
       if (mentionIds.length && (created as any).notification?.failed) addToast(`Comment saved, but ${(created as any).notification.failed} mention notification${(created as any).notification.failed === 1 ? '' : 's'} failed.`, 'error');
       else if (mentionIds.length) addToast(`Comment posted and ${(created as any).notification?.sent || mentionIds.length} notification${mentionIds.length === 1 ? '' : 's'} sent.`, 'success');
@@ -615,7 +553,7 @@ function App() {
   const handleClientUpdateItem = async (item: ContentItem) => {
     beginWrite();
     try {
-      const updated = await updateContent(item);
+      const updated = await updateSupabaseContent(item);
       setItems((prev) => prev.map((entry) => entry.id === updated.id ? updated : entry));
       addToast('Review status saved.', 'success');
     } finally {
@@ -628,13 +566,13 @@ function App() {
     if (currentUser?.role !== 'super') throw new Error('Super access required');
     beginWrite();
     try {
-      const created = await createTeamMember({ name, email, password, role, client });
+      const created = await createSupabaseTeamMember({ name, email, password, role, client });
       setTeam((prev) => [...prev, created]);
       addToast(`Added ${role === 'client' ? 'client user' : role === 'super' ? 'super admin' : 'team member'} "${name}".`, 'success');
       return created;
     } catch (e) {
       console.error(e);
-      addToast('Failed to add creator to Google Sheet.', 'error');
+      addToast('Failed to add creator to Supabase.', 'error');
       throw e;
     } finally {
       endWrite();
@@ -645,7 +583,7 @@ function App() {
     if (currentUser?.role !== 'super') throw new Error('Super access required');
     beginWrite();
     try {
-      const updated = await updateTeamMember(member);
+      const updated = await updateSupabaseTeamMember(member);
       setTeam((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       addToast(`Updated permissions for "${updated.name}".`, 'success');
       return updated;
@@ -662,7 +600,7 @@ function App() {
     if (currentUser?.role !== 'super') return;
     beginWrite();
     try {
-      await deleteTeamMember(id);
+      await deleteSupabaseTeamMember(id);
       setTeam((prev) => prev.filter((t) => t.id !== id));
       addToast('Crew member removed from team registry.', 'success');
     } catch (e) {
@@ -677,13 +615,13 @@ function App() {
     if (currentUser?.role !== 'super') throw new Error('Super access required');
     beginWrite();
     try {
-      const created = await createChannel({ name, color });
+      const created = await createSupabaseChannel({ name, color });
       setChannels((prev) => [...prev, created]);
       addToast(`Added channel "${name}" with color ${color}!`, 'success');
       return created;
     } catch (e) {
       console.error(e);
-      addToast('Failed to add channel to Google Sheet.', 'error');
+      addToast('Failed to add channel to Supabase.', 'error');
       throw e;
     } finally {
       endWrite();
@@ -694,7 +632,7 @@ function App() {
     if (currentUser?.role !== 'super') return;
     beginWrite();
     try {
-      await deleteChannel(id);
+      await deleteSupabaseChannel(id);
       setChannels((prev) => prev.filter((c) => c.id !== id));
       addToast('Channel removed from registry.', 'success');
     } catch (e) {
@@ -708,7 +646,7 @@ function App() {
     if (currentUser?.role !== 'super') throw new Error('Super access required');
     beginWrite();
     try {
-      const created = await createClientBrand({ client, brand, color, active: true });
+      const created = await createSupabaseClientBrand({ client, brand, color, active: true });
       setClients((prev) => [...prev, created]);
       addToast(`Added ${client} / ${brand}`, 'success');
       return created;
@@ -725,7 +663,7 @@ function App() {
     if (currentUser?.role !== 'super') throw new Error('Super access required');
     beginWrite();
     try {
-      const created = await createKpiDefinition(definition);
+      const created = await createSupabaseKpiDefinition(definition);
       setKpiDefinitions((previous) => [...previous, created]);
       addToast(`KPI "${created.name}" created for ${created.brand}.`, 'success');
       return created;
@@ -741,7 +679,7 @@ function App() {
   const handleCreateKpiUpdate = async (update: Omit<KpiUpdate, 'id' | 'updatedAt'>): Promise<KpiUpdate> => {
     beginWrite();
     try {
-      const created = await createKpiUpdate(update);
+      const created = await createSupabaseKpiUpdate(update);
       setKpiUpdates((previous) => [...previous, created]);
       addToast('KPI progress updated.', 'success');
       return created;
@@ -759,7 +697,7 @@ function App() {
   ): Promise<DocumentItem> => {
     beginWrite();
     try {
-      const created = await createDocument({ ...document, ownerId: currentUser?.id || document.ownerId });
+      const created = await createSupabaseDocument({ ...document, ownerId: currentUser?.id || document.ownerId });
       setDocuments((previous) => [created, ...previous]);
       addToast(`Saved "${created.title}".`, 'success');
       return created;
@@ -775,7 +713,7 @@ function App() {
   const handleUpdateDocument = async (document: DocumentItem): Promise<DocumentItem> => {
     beginWrite();
     try {
-      const updated = await updateDocument(document);
+      const updated = await updateSupabaseDocument(document);
       setDocuments((previous) => previous.map((item) => item.id === updated.id ? updated : item));
       addToast(`Updated "${updated.title}".`, 'success');
       return updated;
@@ -791,7 +729,7 @@ function App() {
   const handleDeleteDocument = async (id: string): Promise<void> => {
     beginWrite();
     try {
-      await deleteDocument(id);
+      await deleteSupabaseDocument(id);
       setDocuments((previous) => previous.filter((document) => document.id !== id));
       addToast('Document deleted.', 'success');
     } catch (error) {
@@ -809,9 +747,7 @@ function App() {
     beginWrite();
     try {
       const payload = { ...resource, createdBy: currentUser?.id || resource.createdBy };
-      const created = isUsingSupabaseDb()
-        ? await createSupabaseTaskResource(payload)
-        : await createTaskResource(payload);
+      const created = await createSupabaseTaskResource(payload);
       setResources((previous) => [created, ...previous]);
       addToast(`Added resource "${created.title}".`, 'success');
       return created;
@@ -827,8 +763,7 @@ function App() {
   const handleDeleteTaskResource = async (id: string): Promise<void> => {
     beginWrite();
     try {
-      if (isUsingSupabaseDb()) await deleteSupabaseTaskResource(id);
-      else await deleteTaskResource(id);
+      await deleteSupabaseTaskResource(id);
       setResources((previous) => previous.filter((resource) => resource.id !== id));
       addToast('Resource removed.', 'success');
     } catch (error) {
@@ -837,6 +772,31 @@ function App() {
       throw error;
     } finally {
       endWrite();
+    }
+  };
+
+  const handleMarkNotificationRead = async (id: string): Promise<void> => {
+    const previous = notifications;
+    setNotifications((current) => current.map((notification) => notification.id === id ? { ...notification, read: true } : notification));
+    try {
+      await markSupabaseNotificationRead(id, currentUser?.id);
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      setNotifications(previous);
+      addToast('Notification belum berhasil ditandai sudah dibaca.', 'error');
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async (): Promise<void> => {
+    const previous = notifications;
+    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+    if (!currentUser) return;
+    try {
+      await markAllSupabaseNotificationsRead(currentUser.id);
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+      setNotifications(previous);
+      addToast('Notifications belum berhasil ditandai sudah dibaca.', 'error');
     }
   };
 
@@ -991,6 +951,9 @@ function App() {
       syncStatus={pendingWrites > 0 ? 'saving' : isSyncing ? 'syncing' : 'saved'}
       lastSyncedAt={lastSyncedAt}
       onRefresh={() => loadData(false)}
+      notifications={notifications}
+      onMarkNotificationRead={handleMarkNotificationRead}
+      onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
     >
       {/* Pages Container */}
       <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

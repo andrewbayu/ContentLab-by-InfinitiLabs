@@ -80,12 +80,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'variables' | 'tags' | 'team' | 'channels' | 'clients' | 'connection'>('variables');
   const [isImportingSupabase, setIsImportingSupabase] = useState(false);
 
-  const handleSwitchProvider = (provider: 'sheets' | 'supabase') => {
-    localStorage.setItem('contentlab_db_provider', provider);
-    onConnectionChange();
-    addToast(`Primary database switched to ${provider === 'supabase' ? 'Supabase Postgres' : 'Google Sheets'}.`, 'success');
-  };
-
   const currentProvider = getPreferredDbProvider();
 
   const handleImportToSupabase = async () => {
@@ -259,7 +253,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       saveScriptUrl('');
       setUrl(globalUrl || '');
       onConnectionChange();
-      addToast(globalUrl ? 'Using global Google Sheets connection.' : 'Disconnected from Google Sheets.', 'info');
+      addToast(globalUrl ? 'Using global Sheets import endpoint.' : 'Sheets import endpoint cleared.', 'info');
       return;
     }
 
@@ -270,7 +264,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (valid) {
       saveScriptUrl(url);
       onConnectionChange();
-      addToast('Successfully connected to Google Sheets!', 'success');
+      addToast('Sheets import endpoint saved.', 'success');
     } else {
       addToast('Could not validate connection. Please verify script deployment or CORS settings.', 'error');
     }
@@ -280,7 +274,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     saveScriptUrl('');
     setUrl(globalUrl || '');
     onConnectionChange();
-    addToast(globalUrl ? 'Browser override removed. Using global connection.' : 'Disconnected from Google Sheets.', 'info');
+    addToast(globalUrl ? 'Browser override removed. Using global Sheets import endpoint.' : 'Sheets import endpoint cleared.', 'info');
   };
 
   const handleVariableToggle = (key: keyof VariablesConfig) => {
@@ -1164,11 +1158,11 @@ function deleteTaskMembers(spreadsheet, taskId) {
               <div className="insight-panel" style={{ gap: '16px', border: '1px solid #3b82f6', background: '#f0f9ff' }}>
                 <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1d4ed8' }}>
                   <Database size={20} style={{ color: '#2563eb' }} />
-                  <span>Supabase Postgres Database Engine (Recommended)</span>
+                  <span>Supabase Postgres Database Engine (Enforced)</span>
                 </h3>
 
                 <p style={{ fontSize: '13px', color: '#334155' }}>
-                  Gunakan Supabase PostgreSQL sebagai database utama aplikasi untuk performa super cepat (&lt;50ms), real-time collaboration, dan bebas dari kuota request Google Sheets.
+                  Semua workspace reads/writes dan realtime collaboration sekarang berjalan melalui Supabase PostgreSQL. Google Sheets hanya tersedia sebagai sumber import legacy.
                 </p>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '12px 16px', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
@@ -1177,29 +1171,14 @@ function deleteTaskMembers(spreadsheet, taskId) {
                       Status Database: <span style={{ color: isSupabaseDbConfigured() ? '#16a34a' : '#d97706' }}>{isSupabaseDbConfigured() ? 'Connected & Ready' : 'Configuration Missing'}</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                      Primary Database Mode: <strong>{currentProvider === 'supabase' ? 'Supabase Postgres (Active)' : 'Google Sheets Mode'}</strong>
+                      Primary Database Mode: <strong>{currentProvider === 'supabase' ? 'Supabase Postgres (Enforced)' : 'Configuration Missing'}</strong>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className={`btn ${currentProvider === 'sheets' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ fontSize: '12px', padding: '8px 12px' }}
-                      onClick={() => handleSwitchProvider('sheets')}
-                    >
-                      {currentProvider === 'sheets' ? '✓ Active: Google Sheets' : 'Switch to Google Sheets'}
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`btn ${currentProvider === 'supabase' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ fontSize: '12px', padding: '8px 12px' }}
-                      onClick={() => handleSwitchProvider('supabase')}
-                    >
-                      {currentProvider === 'supabase' ? '✓ Active: Supabase' : 'Switch to Supabase'}
-                    </button>
-
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span className="btn btn-primary" style={{ fontSize: '12px', padding: '8px 12px', cursor: 'default' }}>
+                      ✓ Supabase enforced
+                    </span>
                     <button
                       type="button"
                       className="btn btn-secondary"
@@ -1208,7 +1187,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                       disabled={isImportingSupabase || !isSupabaseDbConfigured()}
                     >
                       <RefreshCw size={14} className={isImportingSupabase ? 'spin' : ''} />
-                      {isImportingSupabase ? 'Importing...' : '1-Click Import -> Supabase'}
+                      {isImportingSupabase ? 'Importing...' : 'Import legacy Sheets -> Supabase'}
                     </button>
 
                     <button
@@ -1228,7 +1207,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
               <div className="insight-panel" style={{ gap: '16px' }}>
                 <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Link size={18} className="text-secondary" />
-                  <span>Google Sheets Connection Status</span>
+                  <span>Legacy Google Sheets Import Source</span>
                 </h3>
 
                 {currentUrl ? (
@@ -1236,7 +1215,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                     <CheckCircle size={20} style={{ color: '#16a34a', flexShrink: 0 }} />
                     <div style={{ flexGrow: 1 }}>
                       <div style={{ fontWeight: 600, color: '#16a34a', fontSize: '14px' }}>
-                        {hasLocalOverride ? 'Connected using browser override' : 'Connected using global workspace configuration'}
+                        {hasLocalOverride ? 'Available via browser override for import' : 'Available via global workspace configuration for import'}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all', fontFamily: 'monospace' }}>{currentUrl}</div>
                     </div>
@@ -1250,9 +1229,9 @@ function deleteTaskMembers(spreadsheet, taskId) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', backgroundColor: 'rgba(217, 119, 6, 0.06)', border: '1px solid rgba(217, 119, 6, 0.2)', borderRadius: '6px' }}>
                     <AlertCircle size={20} style={{ color: '#d97706', flexShrink: 0 }} />
                     <div style={{ flexGrow: 1 }}>
-                      <div style={{ fontWeight: 600, color: '#d97706', fontSize: '14px' }}>Google Sheets Not Connected</div>
+                      <div style={{ fontWeight: 600, color: '#d97706', fontSize: '14px' }}>Legacy Sheets Import Not Configured</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        All actions are saved in your local browser sandbox. Link your spreadsheet script below to save to your sheet in real time.
+                        Google Sheets tidak lagi dipakai untuk membaca atau menyimpan workspace. Endpoint ini hanya dipakai oleh fitur import legacy ke Supabase.
                       </div>
                     </div>
                   </div>
@@ -1260,7 +1239,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
 
                 <form onSubmit={handleSaveConnection} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
                   <div className="form-group">
-                    <label className="form-label">Optional Browser Override</label>
+                    <label className="form-label">Optional Import Endpoint Override</label>
                     <input
                       type="url"
                       className="form-input"
@@ -1268,7 +1247,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                     />
-                    <span className="form-help">Kosongkan untuk memakai konfigurasi global. Override hanya berlaku pada browser ini.</span>
+                    <span className="form-help">Kosongkan untuk memakai konfigurasi global. Override ini hanya berlaku untuk import Sheets pada browser ini.</span>
                   </div>
                   <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={isValidating}>
                     {isValidating ? 'Validating Connection...' : 'Save Override'}

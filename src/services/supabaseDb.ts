@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import {
   deduplicateContentItems,
-  fetchData,
   type ContentItem,
   type TeamMember,
   type Channel,
@@ -11,6 +10,9 @@ import {
   type KpiUpdate,
   type DocumentItem,
   type TaskResource,
+  type NotificationItem,
+  type NotificationType,
+  type UserRole,
   normalizeTaskResource,
 } from './sheets';
 import { normalizeUrl } from '../utils/url';
@@ -24,10 +26,13 @@ export function isSupabaseDbConfigured(): boolean {
 
 export function getPreferredDbProvider(): 'supabase' | 'sheets' {
   const saved = localStorage.getItem('contentlab_db_provider');
-  if (saved === 'sheets') return 'sheets';
-  if (saved === 'supabase') return 'supabase';
-  // Default for all workspace users on all devices: Supabase if configured
-  return isSupabaseDbConfigured() ? 'supabase' : 'sheets';
+  // Supabase is the single operational source of truth. Migrate any legacy
+  // browser-level Sheets preference in-place so older sessions cannot diverge.
+  if (isSupabaseDbConfigured()) {
+    if (saved !== 'supabase') localStorage.setItem('contentlab_db_provider', 'supabase');
+    return 'supabase';
+  }
+  return 'sheets';
 }
 
 export function isUsingSupabaseDb(): boolean {
@@ -66,6 +71,12 @@ export function toDeterministicUuid(str: string | null | undefined): string | nu
   const raw32 = (hex1 + hex2 + hex3 + hex4).slice(0, 32).padEnd(32, '0');
   const uuid = `${raw32.slice(0, 8)}-${raw32.slice(8, 12)}-4${raw32.slice(13, 16)}-a${raw32.slice(17, 20)}-${raw32.slice(20, 32)}`;
   return uuid.toLowerCase();
+}
+
+function toForeignKeyUuid(value: string | null | undefined): string | null {
+  // The emergency admin session is virtual and has no team_members row.
+  if (value === 'super-admin-default') return null;
+  return toDeterministicUuid(value);
 }
 
 function tryParseJson(jsonString: string | null | undefined): any {
@@ -123,9 +134,9 @@ function mapContentItemToTaskRow(item: Partial<ContentItem>): any {
     format: item.format || 'Feed/Reels',
     priority: item.priority || 'Medium',
     assignee: item.assignee || '',
-    owner_id: toDeterministicUuid(item.ownerId),
-    reviewer_id: toDeterministicUuid(item.reviewerId),
-    collaborator_ids: Array.isArray(item.collaboratorIds) ? item.collaboratorIds.map(toDeterministicUuid).filter(Boolean) : [],
+    owner_id: toForeignKeyUuid(item.ownerId),
+    reviewer_id: toForeignKeyUuid(item.reviewerId),
+    collaborator_ids: Array.isArray(item.collaboratorIds) ? item.collaboratorIds.map(toForeignKeyUuid).filter(Boolean) : [],
     publish_date: item.publishDate || '',
     assets_link: item.assetsLink ? normalizeUrl(item.assetsLink) : '',
     cover_image_url: item.coverImageUrl || '',
@@ -135,7 +146,7 @@ function mapContentItemToTaskRow(item: Partial<ContentItem>): any {
     platform_notes: item.platformNotes || '',
     target_audience: item.targetAudience || '',
     created_by: item.createdBy || '',
-    creator_id: toDeterministicUuid(item.creatorId),
+    creator_id: toForeignKeyUuid(item.creatorId),
     checklist: item.checklist ? (typeof item.checklist === 'string' ? tryParseJson(item.checklist) : item.checklist) : [],
     views: item.views || '',
     likes: item.likes || '',
@@ -163,7 +174,7 @@ function mapContentItemToTaskRow(item: Partial<ContentItem>): any {
 // INITIAL DATA FETCHING (Supabase)
 // ----------------------------------------------------------------------
 
-export async function fetchSupabaseInitialData(): Promise<{
+export async function fetchSupabaseInitialData(userId?: string): Promise<{
   content: ContentItem[];
   team: TeamMember[];
   channels: Channel[];
@@ -173,6 +184,7 @@ export async function fetchSupabaseInitialData(): Promise<{
   kpiUpdates: KpiUpdate[];
   documents: DocumentItem[];
   resources: TaskResource[];
+  notifications: NotificationItem[];
 }> {
   if (!supabase) {
     throw new Error('Supabase client is not initialized.');
@@ -188,6 +200,7 @@ export async function fetchSupabaseInitialData(): Promise<{
     kpiUpdRes,
     docsRes,
     resourcesRes,
+    notificationsRes,
   ] = await Promise.all([
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
     supabase.from('team_members').select('*').order('created_at', { ascending: true }),
@@ -198,12 +211,30 @@ export async function fetchSupabaseInitialData(): Promise<{
     supabase.from('kpi_updates').select('*').order('period', { ascending: true }),
     supabase.from('documents').select('*').order('updated_at', { ascending: false }),
     supabase.from('task_resources').select('*').order('created_at', { ascending: false }),
+    userId && toDeterministicUuid(userId)
+      ? supabase.from('notifications').select('*').eq('user_id', toDeterministicUuid(userId) as string).order('created_at', { ascending: false }).limit(50)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
-  if (tasksRes.error || commentsRes.error) {
-    console.warn('Supabase fetch encountered an error, falling back to Google Sheets:', tasksRes.error || commentsRes.error);
-    const fallback = await fetchData();
-    return { ...fallback, resources: fallback.resources || [] };
+  const queryErrors = [
+    ['tasks', tasksRes.error],
+    ['team_members', teamRes.error],
+    ['channels', channelsRes.error],
+    ['client_brands', clientsRes.error],
+    ['comments', commentsRes.error],
+    ['kpi_definitions', kpiDefRes.error],
+    ['kpi_updates', kpiUpdRes.error],
+    ['documents', docsRes.error],
+    ['task_resources', resourcesRes.error],
+    ['notifications', notificationsRes.error],
+  ].filter(([, error]) => Boolean(error));
+
+  if (queryErrors.length > 0) {
+    const detail = queryErrors
+      .map(([table, error]) => `${table}: ${(error as any)?.message || 'query failed'}`)
+      .join('; ');
+    console.error('Supabase workspace fetch failed; refusing to fall back to another data source:', detail);
+    throw new Error(`Supabase workspace load failed (${detail})`);
   }
 
   const content: ContentItem[] = (tasksRes.data || []).map(mapTaskRowToContentItem);
@@ -241,18 +272,6 @@ export async function fetchSupabaseInitialData(): Promise<{
     attachmentUrl: row.attachment_url ? normalizeUrl(row.attachment_url) : undefined,
     mentionedUserIds: Array.isArray(row.mentioned_user_ids) ? row.mentioned_user_ids.map(String) : [],
   }));
-
-  // Fallback: If Supabase comments DB is currently empty, fetch live comments from Google Sheets
-  if (comments.length === 0) {
-    try {
-      const sheetsData = await fetchData();
-      if (sheetsData?.comments && sheetsData.comments.length > 0) {
-        comments = sheetsData.comments;
-      }
-    } catch (e) {
-      console.warn('Could not fetch fallback comments from Google Sheets:', e);
-    }
-  }
 
   const kpiDefinitions: KpiDefinition[] = (kpiDefRes.data || []).map((row: any) => ({
     id: String(row.id),
@@ -322,6 +341,13 @@ export async function fetchSupabaseInitialData(): Promise<{
     console.warn('Task resources table is not available yet; continuing without resource records.', resourcesRes.error.message);
   }
 
+  const notifications: NotificationItem[] = notificationsRes.error
+    ? []
+    : (notificationsRes.data || []).map(mapNotificationRow);
+  if (notificationsRes.error && notificationsRes.error.code !== '42P01') {
+    console.warn('Notifications could not be loaded:', notificationsRes.error.message);
+  }
+
   return {
     content: deduplicateContentItems(content),
     team,
@@ -332,6 +358,23 @@ export async function fetchSupabaseInitialData(): Promise<{
     kpiUpdates,
     documents,
     resources,
+    notifications,
+  };
+}
+
+function mapNotificationRow(row: any): NotificationItem {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id || ''),
+    commentId: row.comment_id ? String(row.comment_id) : undefined,
+    taskId: row.task_id ? String(row.task_id) : undefined,
+    actorId: row.actor_id ? String(row.actor_id) : undefined,
+    actorName: String(row.actor_name || ''),
+    type: (['mention', 'comment', 'assignment'].includes(String(row.type)) ? String(row.type) : 'mention') as NotificationType,
+    title: String(row.title || ''),
+    body: String(row.body || ''),
+    read: row.read === true,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
   };
 }
 
@@ -351,7 +394,6 @@ export async function purgeSupabaseDuplicateTasks(): Promise<{ deleted: number }
     const clientClean = String(task.client || '').trim().toLowerCase();
     const brandClean = String(task.brand || '').trim().toLowerCase();
     const publishDateClean = String(task.publish_date || '').trim().toLowerCase();
-
     const compositeKey = `${titleClean}::${clientClean}::${brandClean}::${publishDateClean}`;
 
     if (seen.has(compositeKey)) {
@@ -418,6 +460,252 @@ export async function deleteSupabaseContent(id: string): Promise<boolean> {
     console.error('Failed to delete task in Supabase:', error);
     throw error;
   }
+  return true;
+}
+
+// ----------------------------------------------------------------------
+// WORKSPACE REGISTRIES (Supabase)
+// ----------------------------------------------------------------------
+
+function mapSupabaseTeamMember(row: any): TeamMember {
+  return {
+    id: String(row.id),
+    name: String(row.name || ''),
+    email: String(row.email || ''),
+    password: String(row.password || ''),
+    role: String(row.role || 'team') as TeamMember['role'],
+    client: String(row.client_access || row.client || ''),
+    avatar: String(row.avatar_url || ''),
+  };
+}
+
+export async function createSupabaseTeamMember(
+  member: Omit<TeamMember, 'id' | 'avatar' | 'role'> & { role?: UserRole }
+): Promise<TeamMember> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+
+  const row = {
+    name: member.name.trim(),
+    email: member.email.trim().toLowerCase(),
+    password: member.password || '',
+    role: member.role || 'team',
+    client_access: member.client || '',
+    avatar_url: '',
+  };
+  const { data, error } = await supabase.from('team_members').insert([row]).select().single();
+  if (error) throw error;
+  return mapSupabaseTeamMember(data);
+}
+
+export async function updateSupabaseTeamMember(member: TeamMember): Promise<TeamMember> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(member.id);
+  if (!uuid) throw new Error('Invalid team member ID.');
+
+  const row: Record<string, unknown> = {
+    name: member.name.trim(),
+    email: member.email.trim().toLowerCase(),
+    role: member.role,
+    client_access: member.client || '',
+    avatar_url: member.avatar || '',
+  };
+  if (member.password !== undefined) row.password = member.password;
+
+  const { data, error } = await supabase.from('team_members').update(row).eq('id', uuid).select().single();
+  if (error) throw error;
+  return mapSupabaseTeamMember(data);
+}
+
+export async function deleteSupabaseTeamMember(id: string): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(id);
+  if (!uuid) return false;
+  const { error } = await supabase.from('team_members').delete().eq('id', uuid);
+  if (error) throw error;
+  return true;
+}
+
+function mapSupabaseChannel(row: any): Channel {
+  return {
+    id: String(row.id),
+    name: String(row.name || ''),
+    color: String(row.color || '#2563eb'),
+  };
+}
+
+export async function createSupabaseChannel(channel: Omit<Channel, 'id'>): Promise<Channel> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const { data, error } = await supabase.from('channels').insert([{
+    name: channel.name.trim(),
+    color: channel.color || '#2563eb',
+  }]).select().single();
+  if (error) throw error;
+  return mapSupabaseChannel(data);
+}
+
+export async function deleteSupabaseChannel(id: string): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(id);
+  if (!uuid) return false;
+  const { error } = await supabase.from('channels').delete().eq('id', uuid);
+  if (error) throw error;
+  return true;
+}
+
+function mapSupabaseClientBrand(row: any): ClientBrand {
+  return {
+    id: String(row.id),
+    client: String(row.client || ''),
+    brand: String(row.brand || ''),
+    color: String(row.color || '#2563eb'),
+    active: row.active !== false,
+  };
+}
+
+export async function createSupabaseClientBrand(clientBrand: Omit<ClientBrand, 'id'>): Promise<ClientBrand> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const { data, error } = await supabase.from('client_brands').insert([{
+    client: clientBrand.client.trim(),
+    brand: clientBrand.brand.trim(),
+    color: clientBrand.color || '#2563eb',
+    active: clientBrand.active !== false,
+  }]).select().single();
+  if (error) throw error;
+  return mapSupabaseClientBrand(data);
+}
+
+function mapSupabaseKpiDefinition(row: any): KpiDefinition {
+  return {
+    id: String(row.id),
+    clientBrandId: row.client_brand_id ? String(row.client_brand_id) : '',
+    client: String(row.client || ''),
+    brand: String(row.brand || ''),
+    name: String(row.name || ''),
+    category: String(row.category || 'Business'),
+    unit: String(row.unit || 'Number'),
+    baseline: Number(row.baseline || 0),
+    target: Number(row.target || 0),
+    direction: String(row.direction || 'increase') as KpiDefinition['direction'],
+    cadence: String(row.cadence || 'Monthly') as KpiDefinition['cadence'],
+    weight: Number(row.weight || 1),
+    active: row.active !== false,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+  };
+}
+
+export async function createSupabaseKpiDefinition(
+  definition: Omit<KpiDefinition, 'id' | 'createdAt'>
+): Promise<KpiDefinition> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const { data, error } = await supabase.from('kpi_definitions').insert([{
+    client_brand_id: toDeterministicUuid(definition.clientBrandId),
+    client: definition.client || '',
+    brand: definition.brand || '',
+    name: definition.name.trim(),
+    category: definition.category || 'Business',
+    unit: definition.unit || 'Number',
+    baseline: Number(definition.baseline || 0),
+    target: Number(definition.target || 0),
+    direction: definition.direction || 'increase',
+    cadence: definition.cadence || 'Monthly',
+    weight: Number(definition.weight || 1),
+    active: definition.active !== false,
+  }]).select().single();
+  if (error) throw error;
+  return mapSupabaseKpiDefinition(data);
+}
+
+function mapSupabaseKpiUpdate(row: any): KpiUpdate {
+  return {
+    id: String(row.id),
+    kpiId: String(row.kpi_id),
+    period: String(row.period || '').slice(0, 10),
+    actual: Number(row.actual || 0),
+    notes: String(row.notes || ''),
+    sourceLink: row.source_link ? normalizeUrl(row.source_link) : '',
+    updatedBy: String(row.updated_by || ''),
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
+  };
+}
+
+export async function createSupabaseKpiUpdate(
+  update: Omit<KpiUpdate, 'id' | 'updatedAt'>
+): Promise<KpiUpdate> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const kpiId = toDeterministicUuid(update.kpiId);
+  if (!kpiId) throw new Error('Invalid KPI ID.');
+  const { data, error } = await supabase.from('kpi_updates').insert([{
+    kpi_id: kpiId,
+    period: update.period,
+    actual: Number(update.actual || 0),
+    notes: update.notes || '',
+    source_link: update.sourceLink ? normalizeUrl(update.sourceLink) : '',
+    updated_by: update.updatedBy || '',
+  }]).select().single();
+  if (error) throw error;
+  return mapSupabaseKpiUpdate(data);
+}
+
+function mapSupabaseDocument(row: any): DocumentItem {
+  return {
+    id: String(row.id),
+    title: String(row.title || ''),
+    type: String(row.type || 'Note') as DocumentItem['type'],
+    body: String(row.body || ''),
+    url: row.url ? normalizeUrl(row.url) : '',
+    ownerId: row.owner_id ? String(row.owner_id) : '',
+    visibility: String(row.visibility || 'team') as DocumentItem['visibility'],
+    client: String(row.client || ''),
+    brand: String(row.brand || ''),
+    taskId: row.task_id ? String(row.task_id) : '',
+    tags: String(row.tags || ''),
+    pinned: row.pinned === true,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
+  };
+}
+
+function mapDocumentToSupabaseRow(document: Partial<DocumentItem>): Record<string, unknown> {
+  return {
+    title: document.title?.trim() || 'Untitled document',
+    type: document.type || 'Note',
+    body: document.body || '',
+    url: document.url ? normalizeUrl(document.url) : '',
+    owner_id: document.ownerId === 'super-admin-default' ? null : toDeterministicUuid(document.ownerId),
+    visibility: document.visibility || 'team',
+    client: document.client || '',
+    brand: document.brand || '',
+    task_id: toDeterministicUuid(document.taskId),
+    tags: document.tags || '',
+    pinned: document.pinned === true,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export async function createSupabaseDocument(
+  document: Omit<DocumentItem, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<DocumentItem> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const { data, error } = await supabase.from('documents').insert([mapDocumentToSupabaseRow(document)]).select().single();
+  if (error) throw error;
+  return mapSupabaseDocument(data);
+}
+
+export async function updateSupabaseDocument(document: DocumentItem): Promise<DocumentItem> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(document.id);
+  if (!uuid) throw new Error('Invalid document ID.');
+  const { data, error } = await supabase.from('documents').update(mapDocumentToSupabaseRow(document)).eq('id', uuid).select().single();
+  if (error) throw error;
+  return mapSupabaseDocument(data);
+}
+
+export async function deleteSupabaseDocument(id: string): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(id);
+  if (!uuid) return false;
+  const { error } = await supabase.from('documents').delete().eq('id', uuid);
+  if (error) throw error;
   return true;
 }
 
@@ -504,10 +792,10 @@ export async function createSupabaseComment(
   const row = {
     task_id: toDeterministicUuid(contentId),
     author: authorName || 'Team Member',
-    author_id: toDeterministicUuid(authorId),
+    author_id: toForeignKeyUuid(authorId),
     text: text.trim(),
     attachment_url: attachmentUrl ? normalizeUrl(attachmentUrl) : '',
-    mentioned_user_ids: Array.isArray(mentionedUserIds) ? mentionedUserIds.map(toDeterministicUuid).filter(Boolean) : [],
+    mentioned_user_ids: Array.isArray(mentionedUserIds) ? mentionedUserIds.map(toForeignKeyUuid).filter(Boolean) : [],
     created_at: new Date().toISOString(),
   };
 
@@ -515,6 +803,35 @@ export async function createSupabaseComment(
   if (error) {
     console.error('Failed to create comment in Supabase:', error);
     throw error;
+  }
+
+  const mentionedIds = Array.isArray(mentionedUserIds)
+    ? mentionedUserIds.map(toForeignKeyUuid).filter((id): id is string => Boolean(id) && id !== toForeignKeyUuid(authorId))
+    : [];
+  let notificationSummary: CommentItem['notification'] | undefined;
+  if (mentionedIds.length > 0) {
+    const notificationRows = mentionedIds.map((userId) => ({
+      user_id: userId,
+      comment_id: data.id,
+      task_id: data.task_id,
+      actor_id: toForeignKeyUuid(authorId),
+      actor_name: authorName || 'Team Member',
+      type: 'mention' as const,
+      title: `${authorName || 'Team Member'} mentioned you`,
+      body: text.trim().slice(0, 240),
+      read: false,
+      created_at: new Date().toISOString(),
+    }));
+    const { error: notificationError } = await supabase.from('notifications').insert(notificationRows);
+    notificationSummary = {
+      requested: mentionedIds.length,
+      sent: notificationError ? 0 : mentionedIds.length,
+      failed: notificationError ? mentionedIds.length : 0,
+      errors: notificationError ? [notificationError.message] : undefined,
+    };
+    if (notificationError && notificationError.code !== '42P01') {
+      console.warn('Comment saved, but notification creation failed:', notificationError.message);
+    }
   }
 
   return {
@@ -525,7 +842,27 @@ export async function createSupabaseComment(
     createdAt: new Date(data.created_at).toISOString(),
     attachmentUrl: data.attachment_url ? normalizeUrl(data.attachment_url) : undefined,
     mentionedUserIds: Array.isArray(data.mentioned_user_ids) ? data.mentioned_user_ids.map(String) : [],
+    notification: notificationSummary,
   };
+}
+
+export async function markSupabaseNotificationRead(id: string, userId?: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(id);
+  if (!uuid) return;
+  let query = supabase.from('notifications').update({ read: true }).eq('id', uuid);
+  const userUuid = toDeterministicUuid(userId);
+  if (userUuid) query = query.eq('user_id', userUuid);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+export async function markAllSupabaseNotificationsRead(userId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase client is not initialized.');
+  const uuid = toDeterministicUuid(userId);
+  if (!uuid) return;
+  const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', uuid).eq('read', false);
+  if (error) throw error;
 }
 
 // ----------------------------------------------------------------------
@@ -536,6 +873,7 @@ export function subscribeToSupabaseRealtime(
   onTaskChange: (payload: any) => void,
   onCommentChange: (payload: any) => void,
   onResourceChange?: (payload: any) => void,
+  onNotificationChange?: (payload: any) => void,
 ) {
   if (!supabase) return () => {};
 
@@ -549,6 +887,9 @@ export function subscribeToSupabaseRealtime(
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'task_resources' }, (payload) => {
       onResourceChange?.(payload);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
+      onNotificationChange?.(payload);
     })
     .subscribe();
 

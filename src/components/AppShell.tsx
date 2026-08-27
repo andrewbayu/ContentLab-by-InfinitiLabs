@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ClientBrand, TeamMember } from '../services/sheets';
+import type { ClientBrand, TeamMember, NotificationItem } from '../services/sheets';
 import { ScopeDropdown } from './ScopeDropdown';
 import { 
   LayoutDashboard, 
@@ -17,7 +17,8 @@ import {
   RefreshCw,
   FileText,
   Files,
-  ClipboardCheck
+  ClipboardCheck,
+  Bell,
 } from 'lucide-react';
 import { getGeneratedAvatar } from '../utils/avatar';
 
@@ -37,6 +38,9 @@ interface AppShellProps {
   syncStatus: SyncStatus;
   lastSyncedAt: string | null;
   onRefresh: () => void;
+  notifications?: NotificationItem[];
+  onMarkNotificationRead?: (id: string) => Promise<void>;
+  onMarkAllNotificationsRead?: () => Promise<void>;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -53,11 +57,15 @@ export const AppShell: React.FC<AppShellProps> = ({
   syncStatus,
   lastSyncedAt,
   onRefresh,
+  notifications = [],
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
 }) => {
   // Desktop state: visible by default (isSidebarCollapsed = false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Mobile state: hidden by default (isMobileOpen = false)
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const handleNavClick = (tab: string) => {
     setActiveTab(tab);
@@ -77,6 +85,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   const syncTitle = lastSyncedAt
     ? `Last updated ${new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(new Date(lastSyncedAt))}`
     : 'Workspace is ready';
+  const unreadNotifications = notifications.filter((notification) => !notification.read);
 
   return (
     <div className="app-layout">
@@ -165,7 +174,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               textAlign: 'center',
               fontWeight: 600
             }}>
-              Sheets Not Connected
+              Supabase Not Connected
             </div>
           </div>
         )}
@@ -214,6 +223,48 @@ export const AppShell: React.FC<AppShellProps> = ({
                 : <RefreshCw className="sync-spin" size={14} />}
               <span>{syncLabel}</span>
             </button>
+
+            <div className="notification-center">
+              <button
+                type="button"
+                className={`notification-trigger ${isNotificationsOpen ? 'active' : ''}`}
+                onClick={() => setIsNotificationsOpen((open) => !open)}
+                aria-label={`Notifications${unreadNotifications.length ? `, ${unreadNotifications.length} unread` : ''}`}
+                aria-expanded={isNotificationsOpen}
+              >
+                <Bell size={17} />
+                {unreadNotifications.length > 0 && <span className="notification-count">{unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}</span>}
+              </button>
+              {isNotificationsOpen && (
+                <div className="notification-popover" role="dialog" aria-label="Notifications">
+                  <div className="notification-popover-header">
+                    <strong>Notifications</strong>
+                    {unreadNotifications.length > 0 && onMarkAllNotificationsRead && (
+                      <button type="button" onClick={() => void onMarkAllNotificationsRead()} className="notification-mark-all">Mark all read</button>
+                    )}
+                  </div>
+                  <div className="notification-list">
+                    {notifications.length === 0 ? (
+                      <div className="notification-empty">No notifications yet.</div>
+                    ) : notifications.slice(0, 20).map((notification) => (
+                      <button
+                        type="button"
+                        key={notification.id}
+                        className={`notification-item ${notification.read ? '' : 'unread'}`}
+                        onClick={() => onMarkNotificationRead && void onMarkNotificationRead(notification.id)}
+                      >
+                        <span className="notification-dot" aria-hidden="true" />
+                        <span className="notification-item-copy">
+                          <strong>{notification.title || 'New notification'}</strong>
+                          <span>{notification.body || 'Open ContentLab to review this update.'}</span>
+                          <small>{new Date(notification.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Authenticated User Profile Avatar Info */}
             {currentUser && (
