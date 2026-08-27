@@ -53,6 +53,7 @@ import {
   isSupabaseDbConfigured,
 } from './services/supabaseDb';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, NotificationItem, UserRole } from './services/sheets';
+import { resolveMentionedUserIds } from './utils/mentions';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 interface Toast {
@@ -576,10 +577,7 @@ function App() {
     if (!currentUser) return;
     beginWrite();
     try {
-      const normalizedText = text.toLocaleLowerCase();
-      const explicitNames = new Set(team.filter((member) => mentionedUserIds.includes(member.id)).map((member) => member.name.toLocaleLowerCase()));
-      const detectedIds = team.filter((member) => !explicitNames.has(member.name.toLocaleLowerCase()) && normalizedText.includes(`@${member.name.toLocaleLowerCase()}`)).map((member) => member.id);
-      const mentionIds = [...new Set([...mentionedUserIds, ...detectedIds])];
+      const mentionIds = resolveMentionedUserIds(text, team, mentionedUserIds);
       const created = await createSupabaseComment(contentId, currentUser.name, text, attachmentUrl, mentionIds, currentUser.id);
       setComments((prev) => [...prev, created]);
       if (mentionIds.length && (created as any).notification?.failed) addToast(`Comment saved, but ${(created as any).notification.failed} mention notification${(created as any).notification.failed === 1 ? '' : 's'} failed.`, 'error');
@@ -889,6 +887,12 @@ function App() {
     setIsModalOpen(true);
   };
 
+  const handleOpenNotification = async (notification: NotificationItem) => {
+    await handleMarkNotificationRead(notification.id);
+    const targetItem = notification.taskId ? items.find((item) => item.id === notification.taskId) : undefined;
+    if (targetItem) handleOpenEditModal(targetItem);
+  };
+
   const selectedBrand = useMemo(
     () => scopeKey.startsWith('brand:') ? clients.find((entry) => `brand:${entry.id}` === scopeKey) : undefined,
     [clients, scopeKey]
@@ -1001,6 +1005,7 @@ function App() {
       notifications={notifications}
       onMarkNotificationRead={handleMarkNotificationRead}
       onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+      onOpenNotification={handleOpenNotification}
     >
       {/* Pages Container */}
       <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -1049,8 +1054,18 @@ function App() {
                 onNavigateToReview={() => setActiveTab('review')}
                 onUpdateItem={handleClientUpdateItem}
                 onAddComment={handleAddComment}
+                notifications={notifications}
+                onOpenNotification={handleOpenNotification}
               />
-            : <DashboardView items={scopedItems} onEditItem={handleOpenEditModal} channels={channels} variablesConfig={variablesConfig} currentUser={currentUser} />
+            : <DashboardView
+                items={scopedItems}
+                onEditItem={handleOpenEditModal}
+                channels={channels}
+                variablesConfig={variablesConfig}
+                currentUser={currentUser}
+                notifications={notifications}
+                onOpenNotification={handleOpenNotification}
+              />
         )}
         
         {activeTab === 'review' && currentUser.role === 'client' && (
@@ -1065,6 +1080,8 @@ function App() {
             onNavigateToReview={() => setActiveTab('review')}
             onUpdateItem={handleClientUpdateItem}
             onAddComment={handleAddComment}
+            notifications={notifications}
+            onOpenNotification={handleOpenNotification}
           />
         )}
 
@@ -1097,6 +1114,8 @@ function App() {
                 onNavigateToReview={() => setActiveTab('review')}
                 onUpdateItem={handleClientUpdateItem}
                 onAddComment={handleAddComment}
+                notifications={notifications}
+                onOpenNotification={handleOpenNotification}
               />
             : <CalendarView
                 items={filteredItems}

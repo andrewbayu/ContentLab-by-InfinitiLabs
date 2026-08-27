@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ArrowRight,
+  Bell,
   Calendar,
   CheckCircle2,
   ChevronLeft,
@@ -22,7 +23,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { isCommentForTask, type CommentItem, type ContentItem, type TeamMember, type TaskResource } from '../services/sheets';
+import { isCommentForTask, type CommentItem, type ContentItem, type NotificationItem, type TeamMember, type TaskResource } from '../services/sheets';
 import { normalizeUrl } from '../utils/url';
 import { RichTextContent, RichTextPreview } from './RichText';
 
@@ -37,6 +38,8 @@ interface ClientPortalProps {
   onNavigateToReview: () => void;
   onUpdateItem: (item: ContentItem) => Promise<void>;
   onAddComment: (contentId: string, text: string, attachmentUrl?: string, mentionedUserIds?: string[]) => Promise<void>;
+  notifications?: NotificationItem[];
+  onOpenNotification?: (notification: NotificationItem) => Promise<void>;
 }
 
 const isReadyForReview = (item: ContentItem) => item.status === 'Review/Editing';
@@ -52,6 +55,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   onNavigateToReview,
   onUpdateItem,
   onAddComment,
+  notifications = [],
+  onOpenNotification,
 }) => {
   const contentItems = useMemo(() => items.filter((item) => item.taskType === 'Content'), [items]);
 
@@ -67,6 +72,10 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [saving, setSaving] = useState(false);
+  const latestNotifications = [...notifications]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 4);
+  const unreadNotifications = notifications.filter((notification) => !notification.read);
 
   // Calendar month state
   const [calendarDate, setCalendarDate] = useState(() => new Date());
@@ -460,6 +469,34 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           <button type="button" className="btn btn-primary client-main-action-btn" onClick={onNavigateToReview}>
             <ClipboardCheck size={16} /> Open Content Review
           </button>
+        </section>
+
+        <section className="client-latest-panel">
+          <div className="client-section-title">
+            <strong><Bell size={16} /> Latest Notifications</strong>
+            <span className="client-muted">{unreadNotifications.length} unread</span>
+          </div>
+          {latestNotifications.length ? (
+            <div className="client-latest-list">
+              {latestNotifications.map((notification) => (
+                <button
+                  type="button"
+                  key={notification.id}
+                  className="client-latest-item"
+                  onClick={() => onOpenNotification && void onOpenNotification(notification)}
+                  style={{ background: notification.read ? undefined : 'var(--primary-glow)' }}
+                >
+                  <Bell size={16} />
+                  <span>
+                    <strong>{notification.title || 'New notification'}</strong>
+                    <small>{notification.body || 'Open ContentLab to review this update.'}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="client-muted">No notifications yet.</p>
+          )}
         </section>
 
         <section className="client-latest-panel">

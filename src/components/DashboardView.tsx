@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { isUserInvolved } from '../services/sheets';
 import { getGeneratedAvatar } from '../utils/avatar';
-import type { ContentItem, Channel, VariablesConfig, TeamMember } from '../services/sheets';
+import type { ContentItem, Channel, VariablesConfig, TeamMember, NotificationItem } from '../services/sheets';
 import { 
   Layers, 
   CheckCircle, 
@@ -17,7 +17,9 @@ import {
   CheckSquare, 
   ArrowRight,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Bell,
+  AtSign,
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -26,6 +28,8 @@ interface DashboardViewProps {
   variablesConfig: VariablesConfig;
   onEditItem: (item: ContentItem) => void;
   currentUser: TeamMember;
+  notifications: NotificationItem[];
+  onOpenNotification: (notification: NotificationItem) => Promise<void>;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -34,6 +38,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   variablesConfig,
   onEditItem,
   currentUser,
+  notifications,
+  onOpenNotification,
 }) => {
   const [dashboardTab, setDashboardTab] = useState<'personal' | 'studio'>('personal');
 
@@ -208,6 +214,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     })
     .slice(0, 4);
 
+  const unreadNotifications = notifications.filter((notification) => !notification.read);
+  const latestNotifications = [...notifications]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 5);
+
 
   // Style helpers
   const getChannelStyle = (channelName: string) => {
@@ -305,7 +316,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Personal Metrics row */}
-          <div className="metrics-grid" style={{ marginBottom: '28px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="metrics-grid" style={{ marginBottom: '28px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div className="metric-card">
               <div className="metric-header">
               <span className="metric-title">Active tasks</span>
@@ -331,6 +342,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <span className="metric-value" style={{ color: '#10b981' }}>{formatNumber(myPublishedViews)}</span>
               <span className="metric-trend text-secondary">From published content</span>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-header">
+                <span className="metric-title">Notifications</span>
+                <Bell size={18} style={{ color: unreadNotifications.length ? '#f59e0b' : '#94a3b8' }} />
+              </div>
+              <span className="metric-value" style={unreadNotifications.length ? { color: '#d97706' } : {}}>{unreadNotifications.length}</span>
+              <span className="metric-trend text-secondary">Unread updates for you</span>
+            </div>
+          </div>
+
+          <div className="insight-panel" style={{ marginBottom: '24px' }}>
+            <div className="insight-header">
+              <h3 className="insight-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bell size={16} className="text-secondary" />
+                Latest notifications
+              </h3>
+              <span className="text-secondary" style={{ fontSize: '12px' }}>{unreadNotifications.length} unread</span>
+            </div>
+            <div className="recent-activity-list">
+              {latestNotifications.length > 0 ? latestNotifications.map((notification) => (
+                <button
+                  type="button"
+                  key={notification.id}
+                  className="activity-item clickable-row"
+                  onClick={() => void onOpenNotification(notification)}
+                  style={{
+                    width: '100%',
+                    border: 0,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    backgroundColor: notification.read ? 'transparent' : 'var(--primary-glow)',
+                  }}
+                >
+                  <div className="activity-icon-container" style={{ color: notification.type === 'mention' ? 'var(--primary)' : undefined }}>
+                    {notification.type === 'mention' ? <AtSign size={16} /> : <Bell size={16} />}
+                  </div>
+                  <div className="activity-details" style={{ flexGrow: 1 }}>
+                    <span className="activity-text" style={{ fontWeight: notification.read ? 600 : 700 }}>{notification.title || 'New notification'}</span>
+                    <span className="activity-time">{notification.body || 'Open ContentLab to review this update.'}</span>
+                  </div>
+                  <span className="activity-time" style={{ whiteSpace: 'nowrap' }}>
+                    {new Date(notification.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </button>
+              )) : (
+                <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  Belum ada notifikasi untuk Anda.
+                </div>
+              )}
             </div>
           </div>
 

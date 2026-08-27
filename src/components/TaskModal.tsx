@@ -131,6 +131,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [newBrandColor, setNewBrandColor] = useState('#2563eb');
   const [isAddingClient, setIsAddingClient] = useState(false);
 
+  const mentionQuery = (commentText.match(/(?:^|\s)@([^\s@]*)$/)?.[1] || '').toLocaleLowerCase();
+  const mentionCandidates = team.filter((member) => {
+    if (!mentionQuery) return true;
+    const emailHandle = member.email.split('@')[0] || '';
+    return [member.name, emailHandle].some((value) => value.toLocaleLowerCase().includes(mentionQuery));
+  });
+
   // Filter comments for this specific item
   const itemComments = comments.filter((c) => item && isCommentForTask(c, item));
 
@@ -1402,12 +1409,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   />
 
                   {/* Mention Suggestor Toolbar Panel */}
-                  {(showMentionSuggestions || commentText.includes('@')) && team.length > 0 && (
+                  {(showMentionSuggestions || commentText.includes('@')) && mentionCandidates.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border-subtle)' }}>
                       <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
                         <AtSign size={10} /> Mention:
                       </span>
-                      {team.map((member) => (
+                      {mentionCandidates.map((member) => (
                         <button
                           key={member.id}
                           type="button"

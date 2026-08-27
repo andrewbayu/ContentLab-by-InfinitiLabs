@@ -41,6 +41,7 @@ interface AppShellProps {
   notifications?: NotificationItem[];
   onMarkNotificationRead?: (id: string) => Promise<void>;
   onMarkAllNotificationsRead?: () => Promise<void>;
+  onOpenNotification?: (notification: NotificationItem) => Promise<void>;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -60,6 +61,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   notifications = [],
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  onOpenNotification,
 }) => {
   // Desktop state: visible by default (isSidebarCollapsed = false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -251,7 +253,11 @@ export const AppShell: React.FC<AppShellProps> = ({
                         type="button"
                         key={notification.id}
                         className={`notification-item ${notification.read ? '' : 'unread'}`}
-                        onClick={() => onMarkNotificationRead && void onMarkNotificationRead(notification.id)}
+                        onClick={() => {
+                          setIsNotificationsOpen(false);
+                          if (onOpenNotification) void onOpenNotification(notification);
+                          else if (onMarkNotificationRead) void onMarkNotificationRead(notification.id);
+                        }}
                       >
                         <span className="notification-dot" aria-hidden="true" />
                         <span className="notification-item-copy">
