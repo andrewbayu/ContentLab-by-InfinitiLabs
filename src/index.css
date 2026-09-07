@@ -647,7 +647,7 @@ h1, h2, h3, h4, h5, h6 {
   .client-drawer-footer { flex-direction: column; }
 }
 
-.dashboard-page { gap: 0; }
+.dashboard-page { display: block; min-height: 0; gap: 0; }
 
 /* Dashboard segmented tab control */
 .dashboard-tabs {
@@ -3593,4 +3593,20 @@ a.task-resource-title:hover { color: var(--primary); }
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 10px;
+}
+
+/* Keep essential header actions reachable on narrow screens. */
+@media (max-width: 640px) {
+  .app-header { gap: 8px; padding: 0 12px; }
+  .header-title-section { min-width: 0; gap: 4px; }
+  .header-title-section > button { margin-right: 0 !important; min-width: 44px; min-height: 44px; }
+  .header-title { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header-actions { flex-shrink: 0; gap: 4px; }
+  .header-user-chip { display: none !important; }
+  .header-create-task { width: 44px; min-height: 44px; padding: 10px; }
+  .header-create-task > span, .sync-indicator > span { display: none; }
+  .notification-trigger, .sync-indicator { min-width: 44px; min-height: 44px; justify-content: center; }
+  .dashboard-page .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
+  .dashboard-page .metric-card { padding: 16px; min-width: 0; }
+  .dashboard-page .dashboard-insights { grid-template-columns: minmax(0, 1fr) !important; }
 }

@@ -6,7 +6,6 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
 
 const DEFAULT_SCRIPT_URL =
   process.env.CONTENTLAB_API_URL ||

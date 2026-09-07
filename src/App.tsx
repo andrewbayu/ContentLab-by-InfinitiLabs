@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction, RefObject } from 'react';
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { AppShell } from './components/AppShell';
 import { LoginPage } from './components/LoginPage';
@@ -20,6 +21,7 @@ import {
   getCustomTags,
   saveCustomTags,
   getCachedWorkspaceData,
+  clearCachedWorkspaceData,
   saveCachedWorkspaceData,
   isUserInvolved,
   hasClientAccess,
@@ -53,6 +55,7 @@ import {
   isSupabaseDbConfigured,
 } from './services/supabaseDb';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, NotificationItem, UserRole } from './services/sheets';
+import { useToday } from './utils/useToday';
 import { resolveMentionedUserIds } from './utils/mentions';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
@@ -64,7 +67,15 @@ interface Toast {
 
 type TaskView = 'all' | 'content' | 'general' | 'mine' | 'overdue';
 
+function sessionSetter<T>(setter: Dispatch<SetStateAction<T>>, epoch: RefObject<number>, generation: number): Dispatch<SetStateAction<T>> {
+  return value => { if (epoch.current === generation) setter(value); };
+}
+
 function App() {
+  const today = useToday();
+  const sessionEpoch = useRef(0);
+  const loadSequence = useRef(0);
+  const authIdentity = useRef<string | null>(null);
   const authEnabled = isSupabaseAuthEnabled();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
     authEnabled ? false : localStorage.getItem('contentlab_is_authenticated') === 'true'
@@ -74,21 +85,21 @@ function App() {
   const [currentUser, setCurrentUser] = useState<TeamMember | null>(() => {
     if (authEnabled) return null;
     const saved = localStorage.getItem('contentlab_logged_user');
-    return saved ? JSON.parse(saved) : null;
+    try { return saved ? JSON.parse(saved) : null; } catch { return null; }
   });
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(authEnabled);
 
   const [initialCache] = useState(() => getCachedWorkspaceData());
-  const [items, setItems] = useState<ContentItem[]>(() => initialCache?.content || []);
-  const [team, setTeam] = useState<TeamMember[]>(() => initialCache?.team || []);
-  const [channels, setChannels] = useState<Channel[]>(() => initialCache?.channels || []);
-  const [comments, setComments] = useState<CommentItem[]>(() => initialCache?.comments || []);
-  const [clients, setClients] = useState<ClientBrand[]>(() => initialCache?.clients || []);
-  const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>(() => initialCache?.kpiDefinitions || []);
-  const [kpiUpdates, setKpiUpdates] = useState<KpiUpdate[]>(() => initialCache?.kpiUpdates || []);
-  const [documents, setDocuments] = useState<DocumentItem[]>(() => initialCache?.documents || []);
-  const [resources, setResources] = useState<TaskResource[]>(() => initialCache?.resources || []);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => initialCache?.notifications || []);
+  const [items, rawSetItems] = useState<ContentItem[]>(() => initialCache?.content || []);
+  const [team, rawSetTeam] = useState<TeamMember[]>(() => initialCache?.team || []);
+  const [channels, rawSetChannels] = useState<Channel[]>(() => initialCache?.channels || []);
+  const [comments, rawSetComments] = useState<CommentItem[]>(() => initialCache?.comments || []);
+  const [clients, rawSetClients] = useState<ClientBrand[]>(() => initialCache?.clients || []);
+  const [kpiDefinitions, rawSetKpiDefinitions] = useState<KpiDefinition[]>(() => initialCache?.kpiDefinitions || []);
+  const [kpiUpdates, rawSetKpiUpdates] = useState<KpiUpdate[]>(() => initialCache?.kpiUpdates || []);
+  const [documents, rawSetDocuments] = useState<DocumentItem[]>(() => initialCache?.documents || []);
+  const [resources, rawSetResources] = useState<TaskResource[]>(() => initialCache?.resources || []);
+  const [notifications, rawSetNotifications] = useState<NotificationItem[]>(() => initialCache?.notifications || []);
   const [scopeKey, setScopeKey] = useState(() => localStorage.getItem('contentlab_scope_key') || 'all');
   const [taskView, setTaskView] = useState<TaskView>(() => (localStorage.getItem('contentlab_task_view') as TaskView) || 'all');
   
@@ -99,22 +110,56 @@ function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(isAuthenticated && !initialCache);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [pendingWrites, setPendingWrites] = useState<number>(0);
+  const [pendingWrites, rawSetPendingWrites] = useState<number>(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(initialCache?.savedAt || null);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
+  const [isModalOpen, rawSetIsModalOpen] = useState<boolean>(false);
+  const [selectedItem, rawSetSelectedItem] = useState<ContentItem | null>(null);
   const [initialStatusForModal, setInitialStatusForModal] = useState<ContentItem['status'] | undefined>(undefined);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toasts, rawSetToasts] = useState<Toast[]>([]);
   const [isMock, setIsMock] = useState<boolean>(!isSupabaseDbConfigured());
   const hasWorkspaceData = useRef<boolean>(!!initialCache);
+
+  // Async writes from a signed-out session may finish later. Their captured
+  // setters must never repopulate the next user's workspace or rollback its data.
+  const renderEpoch = sessionEpoch.current;
+  const setItems = sessionSetter(rawSetItems, sessionEpoch, renderEpoch);
+  const setTeam = sessionSetter(rawSetTeam, sessionEpoch, renderEpoch);
+  const setChannels = sessionSetter(rawSetChannels, sessionEpoch, renderEpoch);
+  const setComments = sessionSetter(rawSetComments, sessionEpoch, renderEpoch);
+  const setClients = sessionSetter(rawSetClients, sessionEpoch, renderEpoch);
+  const setKpiDefinitions = sessionSetter(rawSetKpiDefinitions, sessionEpoch, renderEpoch);
+  const setKpiUpdates = sessionSetter(rawSetKpiUpdates, sessionEpoch, renderEpoch);
+  const setDocuments = sessionSetter(rawSetDocuments, sessionEpoch, renderEpoch);
+  const setResources = sessionSetter(rawSetResources, sessionEpoch, renderEpoch);
+  const setNotifications = sessionSetter(rawSetNotifications, sessionEpoch, renderEpoch);
+  const setSelectedItem = sessionSetter(rawSetSelectedItem, sessionEpoch, renderEpoch);
+  const setIsModalOpen = sessionSetter(rawSetIsModalOpen, sessionEpoch, renderEpoch);
+  const setToasts = sessionSetter(rawSetToasts, sessionEpoch, renderEpoch);
+  const setPendingWrites = sessionSetter(rawSetPendingWrites, sessionEpoch, renderEpoch);
+
+  const resetWorkspace = useCallback(() => {
+    sessionEpoch.current += 1;
+    clearCachedWorkspaceData();
+    rawSetToasts([]); rawSetPendingWrites(0);
+    rawSetItems([]); rawSetTeam([]); rawSetChannels([]); rawSetComments([]); rawSetClients([]);
+    rawSetKpiDefinitions([]); rawSetKpiUpdates([]); rawSetDocuments([]); rawSetResources([]); rawSetNotifications([]);
+    rawSetSelectedItem(null); rawSetIsModalOpen(false); setLastSyncedAt(null);
+    setActiveTab('dashboard'); setScopeKey('all'); setTaskView('all');
+    setIsSyncing(false); setIsInitialLoading(true);
+    hasWorkspaceData.current = false;
+  }, []);
 
   // Load the single operational database (Supabase)
   const loadData = async (showLoading = true) => {
     if (!isAuthenticated) return;
     if (showLoading && !hasWorkspaceData.current) setIsInitialLoading(true);
     setIsSyncing(true);
+    const epoch = sessionEpoch.current;
+    const sequence = ++loadSequence.current;
+    const isCurrent = () => epoch === sessionEpoch.current && sequence === loadSequence.current;
     try {
       const data = await fetchSupabaseInitialData(currentUser?.id);
+      if (!isCurrent()) return;
       setItems(data.content);
       setTeam(data.team);
       setChannels(data.channels);
@@ -139,18 +184,20 @@ function App() {
           const found = data.team.find((t) => t.id === currentUser.id || t.email === currentUser.email);
           if (found) {
             setCurrentUser(found);
-            localStorage.setItem('contentlab_logged_user', JSON.stringify(found));
           } else {
             handleLogout();
           }
         }
       }
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Failed to load data:', error);
       addToast('Error loading workspace from Supabase. Please refresh and try again.', 'error');
     } finally {
-      setIsInitialLoading(false);
-      setIsSyncing(false);
+      if (isCurrent()) {
+        setIsInitialLoading(false);
+        setIsSyncing(false);
+      }
     }
   };
 
@@ -169,8 +216,11 @@ function App() {
     }
 
     let active = true;
+    let receivedAuthEvent = false;
     const applyAuthUser = (user: TeamMember | null) => {
       if (!active) return;
+      if (authIdentity.current !== (user?.id ?? null)) resetWorkspace();
+      authIdentity.current = user?.id ?? null;
       setCurrentUser(user);
       setIsAuthenticated(Boolean(user));
       if (user) {
@@ -181,18 +231,18 @@ function App() {
     };
 
     void getSupabaseAuthUser()
-      .then(applyAuthUser)
+      .then(user => { if (!receivedAuthEvent) applyAuthUser(user); })
       .catch((error) => {
         console.error('Failed to restore Supabase Auth session:', error);
-        applyAuthUser(null);
+        if (!receivedAuthEvent) applyAuthUser(null);
       });
 
-    const unsubscribe = subscribeToSupabaseAuth(applyAuthUser);
+    const unsubscribe = subscribeToSupabaseAuth(user => { receivedAuthEvent = true; applyAuthUser(user); });
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [authEnabled]);
+  }, [authEnabled, resetWorkspace]);
 
   // Coalesce bursts of realtime events into a single refresh. Previously every
   // task/comment change triggered its own full-workspace refetch, so N concurrent
@@ -219,7 +269,7 @@ function App() {
     if (isAuthenticated) {
       loadDataRef.current();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser?.id]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -256,8 +306,8 @@ function App() {
     return () => window.clearTimeout(cacheTimer);
   }, [isAuthenticated, items, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents, resources, notifications]);
 
-  const beginWrite = useCallback(() => setPendingWrites((count) => count + 1), []);
-  const endWrite = useCallback(() => setPendingWrites((count) => Math.max(0, count - 1)), []);
+  const beginWrite = () => setPendingWrites((count) => count + 1);
+  const endWrite = () => setPendingWrites((count) => Math.max(0, count - 1));
 
 
   useEffect(() => {
@@ -295,7 +345,9 @@ function App() {
 
   // Logout Handler
   const handleLogout = () => {
-    if (authEnabled) void signOutSupabaseUser();
+    resetWorkspace();
+    authIdentity.current = null;
+    if (authEnabled) void signOutSupabaseUser().catch(() => addToast('Server sign-out failed. Please try signing out again after reconnecting.', 'error'));
     localStorage.removeItem('contentlab_is_authenticated');
     localStorage.removeItem('contentlab_logged_user');
     setCurrentUser(null);
@@ -644,7 +696,7 @@ function App() {
       await deleteSupabaseTeamMember(id);
       setTeam((prev) => prev.filter((t) => t.id !== id));
       addToast('Crew member removed from team registry.', 'success');
-    } catch (e) {
+    } catch {
       addToast('Failed to remove crew member.', 'error');
     } finally {
       endWrite();
@@ -676,7 +728,7 @@ function App() {
       await deleteSupabaseChannel(id);
       setChannels((prev) => prev.filter((c) => c.id !== id));
       addToast('Channel removed from registry.', 'success');
-    } catch (e) {
+    } catch {
       addToast('Failed to remove platform channel.', 'error');
     } finally {
       endWrite();
@@ -849,7 +901,7 @@ function App() {
 
   const allAvailableTags = useMemo(() => {
     return getCustomTags(items);
-  }, [items, customTags]);
+  }, [items]);
 
   // Custom tags
   const handleAddTag = (tag: string) => {
@@ -917,10 +969,10 @@ function App() {
     if (taskView === 'overdue') {
       const date = item.taskType === 'General' ? item.dueDate : item.publishDate;
       const done = item.status === 'Done' || item.status === 'Published';
-      return !!date && date < new Date().toISOString().slice(0, 10) && !done;
+      return !!date && date < today && !done;
     }
     return true;
-  }), [scopedItems, taskView, currentUser]);
+  }), [scopedItems, taskView, currentUser, today]);
 
   // Treat Documents & Notes linked to a task as card resources too, while
   // retaining the full document model for the editor and Reports page.
@@ -966,6 +1018,8 @@ function App() {
       <>
         <LoginPage 
           onLoginSuccess={(user) => {
+            if (authIdentity.current !== user.id) resetWorkspace();
+            authIdentity.current = user.id;
             setCurrentUser(user);
             setIsAuthenticated(true);
             addToast(`Selamat datang kembali, ${user.name}!`, 'success');

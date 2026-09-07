@@ -1,3 +1,4 @@
+import { authenticateSupabaseUser } from './supabaseDb';
 import { getGeneratedAvatar } from '../utils/avatar';
 import { normalizeUrl } from '../utils/url';
 
@@ -533,7 +534,7 @@ export function getCustomTags(items?: ContentItem[]): string[] {
   const result = Array.from(tagSet).sort();
   try {
     localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(result));
-  } catch (e) {}
+  } catch {}
   return result;
 }
 
@@ -541,36 +542,28 @@ export function saveCustomTags(tags: string[]): void {
   localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
 }
 
+// Workspace snapshots are session-only. Never restore another user's documents,
+// comments or notifications from a shared browser's persistent storage.
+let workspaceSnapshot: CachedWorkspaceData | null = null;
+
 export function getCachedWorkspaceData(): CachedWorkspaceData | null {
-  try {
-    const cached = JSON.parse(localStorage.getItem(WORKSPACE_CACHE_KEY) || 'null') as CachedWorkspaceData | null;
-    if (!cached || !Array.isArray(cached.content) || !Array.isArray(cached.team)) return null;
-    return {
-      ...cached,
-      documents: Array.isArray(cached.documents) ? cached.documents : [],
-      resources: Array.isArray(cached.resources) ? cached.resources : [],
-      notifications: Array.isArray(cached.notifications) ? cached.notifications : [],
-    };
-  } catch {
-    localStorage.removeItem(WORKSPACE_CACHE_KEY);
-    return null;
-  }
+  try { localStorage.removeItem(WORKSPACE_CACHE_KEY); } catch { /* Storage may be disabled. */ }
+  return workspaceSnapshot;
 }
 
 export function saveCachedWorkspaceData(data: WorkspaceData): string {
   const savedAt = new Date().toISOString();
-  const cache: CachedWorkspaceData = {
+  workspaceSnapshot = {
     ...data,
-    // Passwords are only needed by Apps Script during login and must not persist in the browser cache.
     team: data.team.map(({ password: _password, ...member }) => member),
     savedAt,
   };
-  localStorage.setItem(WORKSPACE_CACHE_KEY, JSON.stringify(cache));
   return savedAt;
 }
 
 export function clearCachedWorkspaceData(): void {
-  localStorage.removeItem(WORKSPACE_CACHE_KEY);
+  workspaceSnapshot = null;
+  try { localStorage.removeItem(WORKSPACE_CACHE_KEY); } catch { /* Storage may be disabled. */ }
 }
 
 function getLocalData(): WorkspaceData {
@@ -939,27 +932,8 @@ export async function loginUser(
   username: string, 
   password: string
 ): Promise<{ success: boolean; user?: TeamMember; error?: string }> {
-  const cleanUser = username.trim().toLowerCase();
-
-  // 0. Temporary emergency fallback for the pre-Auth migration only. It is
-  // deliberately disabled once Supabase Auth is enabled.
-  const { isSupabaseAuthEnabled } = await import('./supabaseDb');
-  if (!isSupabaseAuthEnabled() && (cleanUser === 'admin' || cleanUser === 'superadmin' || cleanUser === 'admin@contentlab.com')) {
-    const adminUser: TeamMember = {
-      id: 'super-admin-default',
-      name: 'Super Admin',
-      email: 'admin@contentlab.com',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      role: 'super',
-      client: 'All Clients',
-    };
-    return { success: true, user: adminUser };
-  }
-
-  // Supabase is the only operational identity source. Do not fall back to a
-  // browser cache or Google Sheets because that would create split sessions.
+  // Every login must be verified by Supabase Auth; migration bypasses are retired.
   try {
-    const { authenticateSupabaseUser } = await import('./supabaseDb');
     return await authenticateSupabaseUser(username, password);
   } catch (err) {
     console.error('Supabase authentication failed:', err);
@@ -1008,7 +982,7 @@ export async function createContent(
     let result: any = null;
     try {
       result = JSON.parse(text);
-    } catch (e) {
+    } catch {
       console.warn('Apps Script returned non-JSON response on createContent:', text.slice(0, 150));
     }
 
@@ -1067,7 +1041,7 @@ export async function updateContent(item: ContentItem): Promise<ContentItem> {
     let result: any = null;
     try {
       result = JSON.parse(text);
-    } catch (e) {
+    } catch {
       console.warn('Apps Script returned non-JSON response on updateContent:', text.slice(0, 150));
     }
 

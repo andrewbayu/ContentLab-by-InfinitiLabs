@@ -24,13 +24,9 @@ export function isSupabaseDbConfigured(): boolean {
   return !!supabase;
 }
 
-/**
- * Auth cutover switch. Keep this disabled until every active Team member has
- * an account in Supabase Auth and a matching team_members.auth_user_id.
- * Vercel can enable it with VITE_SUPABASE_AUTH_ENABLED=true for the cutover.
- */
+/** Auth + RLS cutover is complete. Never fall back to browser-trusted identity. */
 export function isSupabaseAuthEnabled(): boolean {
-  return String(import.meta.env.VITE_SUPABASE_AUTH_ENABLED || '').toLowerCase() === 'true';
+  return true;
 }
 
 const TEAM_MEMBER_COLUMNS = 'id,name,email,role,client_access,avatar_url,auth_user_id,created_at';
@@ -94,7 +90,7 @@ function tryParseJson(jsonString: string | null | undefined): any {
   if (!jsonString) return [];
   try {
     return JSON.parse(jsonString);
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -1146,24 +1142,24 @@ export async function getSupabaseAuthUser(): Promise<TeamMember | null> {
 export function subscribeToSupabaseAuth(onUserChange: (user: TeamMember | null) => void): () => void {
   if (!supabase) return () => undefined;
 
+  let generation = 0;
+  let active = true;
   const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    // Supabase advises keeping auth callbacks synchronous. Defer the profile
-    // lookup so it cannot deadlock another Supabase request.
+    const request = ++generation;
+    // Invalidate older profile lookups immediately, including queued callbacks.
     window.setTimeout(() => {
-      if (!session?.user) {
-        onUserChange(null);
-        return;
-      }
+      if (!active || request !== generation) return;
+      if (!session?.user) { onUserChange(null); return; }
       void resolveAuthMember(session.user.id)
-        .then(onUserChange)
+        .then(user => { if (active && request === generation) onUserChange(user); })
         .catch((error) => {
+          if (!active || request !== generation) return;
           console.error('Failed to resolve Supabase Auth profile:', error);
           onUserChange(null);
         });
     }, 0);
   });
-
-  return () => data.subscription.unsubscribe();
+  return () => { active = false; generation += 1; data.subscription.unsubscribe(); };
 }
 
 export async function signOutSupabaseUser(): Promise<void> {

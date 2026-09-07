@@ -9,6 +9,7 @@
 |---|---|---|
 | UI, halaman, layout | `src/App.tsx` | `src/components/` dan `src/App.css` |
 | Dokumen/content workflow | `src/components/DocumentsView.tsx` | `src/styles/documents.css` |
+| Focus Queue / deadlines | `src/components/FocusQueue.tsx` | `src/utils/focusQueue.ts`, `dates.ts`, `useToday.ts`, `tests/` |
 | Dashboard/analytics | `src/components/DashboardView.tsx` | `src/components/AnalyticsView.tsx` |
 | Task/kanban/list | `src/components/KanbanBoard.tsx` | `ListView.tsx`, `TaskModal.tsx` |
 | Kalender | `src/components/CalendarView.tsx` | `src/App.tsx` |
@@ -66,4 +67,6 @@ ContentLab-by-InfinitiLabs/
 ## Known validation notes
 
 - `npm.cmd run build` saat ini berhasil.
-- `npm.cmd run lint` berhasil tetapi memiliki warning existing di `src/App.tsx` dan `src/components/SettingsView.tsx`.
+- `npm run check` menjalankan lint, regression tests, dan build.
+- `npm run test:browser` memeriksa dashboard desktop/mobile dengan data sintetis.
+- Audit terbaru: `docs/AUDIT_2026-09-07.md`; historical memory files predate the mandatory Auth cutover.
