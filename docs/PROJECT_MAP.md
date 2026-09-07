@@ -9,6 +9,7 @@
 |---|---|---|
 | UI, halaman, layout | `src/App.tsx` | `src/components/` dan `src/App.css` |
 | Dokumen/content workflow | `src/components/DocumentsView.tsx` | `src/styles/documents.css` |
+| StrategistAI | `src/components/StrategistView.tsx` | `shared/strategist.ts`, `api/strategist.ts`, `docs/STRATEGIST_AI.md` |
 | Focus Queue / deadlines | `src/components/FocusQueue.tsx` | `src/utils/focusQueue.ts`, `dates.ts`, `useToday.ts`, `tests/` |
 | Dashboard/analytics | `src/components/DashboardView.tsx` | `src/components/AnalyticsView.tsx` |
 | Task/kanban/list | `src/components/KanbanBoard.tsx` | `ListView.tsx`, `TaskModal.tsx` |

@@ -14,6 +14,7 @@ interface TaskModalProps {
   onDelete?: (id: string) => void;
   item: ContentItem | null;
   initialStatus?: ContentItem['status'];
+  initialDraft?: Partial<ContentItem> | null;
   team: TeamMember[];
   channels: Channel[];
   clients: ClientBrand[];
@@ -49,6 +50,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   onDelete,
   item,
   initialStatus,
+  initialDraft,
   team,
   channels,
   clients,
@@ -183,11 +185,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setLikes(item.likes || '');
       setEngagement(item.engagement || '');
     } else {
-      setTitle('');
-      setBrief('');
+      setTitle(initialDraft?.title || '');
+      setBrief(initialDraft?.brief || '');
       setStatus(initialStatus || 'Idea');
-      setChannel(channels.length > 0 ? channels[0].name : '');
-      setFormat('Video');
+      setChannel(initialDraft?.channel || (channels.length > 0 ? channels[0].name : ''));
+      setFormat(initialDraft?.format || 'Video');
       setPriority('Medium');
       setOwnerId(activeUserId || '');
       setCollaboratorIds([]);
@@ -201,8 +203,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setStatus(initialStatus || (inferredType === 'General' ? 'To Do' : 'Idea'));
       setCategory('');
       setDueDate('');
-      setClient(defaultClientBrand?.client || '');
-      setBrand(defaultClientBrand?.brand || '');
+      setClient(initialDraft?.client || defaultClientBrand?.client || '');
+      setBrand(initialDraft?.brand || defaultClientBrand?.brand || '');
       
       // Reset optional fields
       setSelectedTags([]);
@@ -231,7 +233,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setResourceVisibility('internal');
     setResourceError('');
     setIsAddingResource(false);
-  }, [item, initialStatus, isOpen, team, channels, activeUser, activeUserId, defaultClientBrand]);
+  }, [item, initialStatus, initialDraft, isOpen, team, channels, activeUser, activeUserId, defaultClientBrand]);
 
   if (!isOpen) return null;
 

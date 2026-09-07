@@ -1,0 +1,15 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { StrategistView } from '../src/components/StrategistView';
+import { task, user } from './fixtures';
+import { generateStrategy } from '../src/services/strategist';
+vi.mock('../src/services/strategist',()=>({generateStrategy:vi.fn()}));
+afterEach(cleanup);
+const card=task({status:'Published',client:'Studio',views:'3.373',likes:'10'});
+const props={items:[card],currentUser:user,scopeLabel:'Studio',onEditItem:vi.fn(),onDraftIdea:vi.fn()};
+beforeEach(()=>{vi.clearAllMocks();vi.mocked(generateStrategy).mockResolvedValue({report:{summary:'Summary',insights:[],ideas:[],limitations:['Exploratory']},model:'test',generatedAt:new Date().toISOString(),analyzedIds:[card.id]});});
+it('does not render or generate for client users',()=>{render(<StrategistView {...props} currentUser={{...user,role:'client'}}/>);expect(screen.getByRole('alert').textContent).toContain('internal');expect(screen.queryByRole('button',{name:'Generate AI insights'})).toBeNull();});
+it('shows calculated indicators and lets users open evidence cards',async()=>{const u=userEvent.setup();render(<StrategistView {...props}/>);await u.click(screen.getByRole('button',{name:'Card indicators'}));expect(screen.getByText('3.373')).toBeTruthy();await u.click(screen.getByRole('button',{name:/Launch story/}));expect(props.onEditItem).toHaveBeenCalledWith(card);});
+it('generates cited ideas and opens a reviewable draft without saving',async()=>{const u=userEvent.setup();const idea={title:'New experiment',hook:'Hook',angle:'Angle',format:'Carousel',rationale:'Reason',metric:'Views',evidenceIds:[card.id]};vi.mocked(generateStrategy).mockResolvedValue({report:{summary:'Summary',insights:[{title:'Insight',explanation:'Evidence',evidenceIds:[card.id]}],ideas:[idea],limitations:['Exploratory']},model:'test',generatedAt:new Date().toISOString(),analyzedIds:[card.id]});render(<StrategistView {...props}/>);await u.click(screen.getByRole('button',{name:'Generate AI insights'}));await screen.findByText('Summary');await u.click(screen.getByRole('button',{name:/Idea lab/}));await u.click(screen.getByRole('button',{name:'Review sebagai draft task'}));expect(props.onDraftIdea).toHaveBeenCalledWith(idea,card);});
+it('clears a generated report on scope/data changes',async()=>{const u=userEvent.setup();const view=render(<StrategistView {...props}/>);await u.click(screen.getByRole('button',{name:'Generate AI insights'}));await screen.findByText('Summary');view.rerender(<StrategistView {...props} items={[]}/>);expect(screen.queryByText('Summary')).toBeNull();expect(screen.getByText('Belum ada konten di scope ini.')).toBeTruthy();});

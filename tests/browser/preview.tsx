@@ -1,6 +1,7 @@
 // Test fixture only. Not an application route and not included in the production build.
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { StrategistView } from '../../src/components/StrategistView';
 import { DashboardView } from '../../src/components/DashboardView';
 import { AppShell } from '../../src/components/AppShell';
 import { getVariablesConfig } from '../../src/services/sheets';
@@ -20,12 +21,16 @@ const items = [
 ];
 export function Preview() {
   const [selected, select] = useState('');
-  return <AppShell activeTab="dashboard" setActiveTab={() => {}} onOpenCreateModal={() => select('New task')}
-    isMock={false} currentUser={user} onLogout={() => {}} clients={[]} scopeKey="all" onScopeChange={() => {}}
+  const params = new URLSearchParams(window.location.search);
+  const [activeTab, setActiveTab] = useState(params.get('view') || 'dashboard');
+  const member = { ...user, role: params.get('role') === 'client' ? 'client' as const : 'team' as const };
+  const strategyItems = items.filter(item => item.taskType === 'Content').map((item, i) => ({ ...item, client: 'Preview Studio', brand: 'Preview Studio', status: 'Published' as const, publishDate: date(-i-1), views: String(3000 + i * 1500), likes: String(35+i*25) }));
+  return <AppShell activeTab={activeTab} setActiveTab={setActiveTab} onOpenCreateModal={() => select('New task')}
+    isMock={false} currentUser={member} onLogout={() => {}} clients={[]} scopeKey="all" onScopeChange={() => {}}
     syncStatus="saved" lastSyncedAt={null} onRefresh={() => {}}>
     {selected && <div role="status" style={{ padding: 16 }}>Opened: {selected}</div>}
-    <DashboardView items={items} currentUser={user} channels={[]} variablesConfig={getVariablesConfig()}
-      onEditItem={item => select(item.title)} notifications={[]} onOpenNotification={async () => {}} />
+    {activeTab === 'strategist' ? <StrategistView items={strategyItems} currentUser={member} scopeLabel="Preview Studio" onEditItem={item => select(item.title)} onDraftIdea={idea => select(idea.title)} /> : <DashboardView items={items} currentUser={user} channels={[]} variablesConfig={getVariablesConfig()}
+      onEditItem={item => select(item.title)} notifications={[]} onOpenNotification={async () => {}} />}
   </AppShell>;
 }
 createRoot(document.getElementById('root')!).render(<Preview />);
