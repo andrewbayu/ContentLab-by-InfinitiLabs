@@ -11,7 +11,7 @@ export default defineConfig({
       output: {
         manualChunks(id: string) {
           if (id.includes('node_modules')) {
-            if (id.includes('react')) return 'react-vendor';
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor';
             if (id.includes('@supabase')) return 'supabase-vendor';
           }
         },

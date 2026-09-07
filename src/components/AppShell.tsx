@@ -297,7 +297,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             )}
 
             {activeTab !== 'documents' && currentUser?.role !== 'client' && (
-              <button className="btn btn-primary" onClick={onOpenCreateModal}>
+              <button className="btn btn-primary header-create-task" aria-label="Create Task" onClick={onOpenCreateModal}>
                 <Plus size={16} />
                 <span>Create Task</span>
               </button>

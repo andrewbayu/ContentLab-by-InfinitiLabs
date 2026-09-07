@@ -174,7 +174,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         addToast('✅ Tidak ditemukan task ganda di database.', 'info');
       }
       onConnectionChange();
-    } catch (e) {
+    } catch {
       addToast('Gagal membersihkan task ganda.', 'error');
     } finally {
       setIsPurging(false);
@@ -311,7 +311,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setCreatorRole('team');
       setCreatorClient('');
       addToast(`Successfully added creator "${creatorName}"`, 'success');
-    } catch (e) {
+    } catch {
       addToast('Failed to add crew member.', 'error');
     } finally {
       setIsAddingCreator(false);
@@ -327,7 +327,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setChannelName('');
       setChannelColor('#2563eb');
       addToast(`Successfully added channel "${channelName}"`, 'success');
-    } catch (e) {
+    } catch {
       addToast('Failed to add platform channel.', 'error');
     } finally {
       setIsAddingChannel(false);
@@ -545,10 +545,10 @@ function doPost(e) {
             const member = teamData[i];
             if (text.includes("@" + member.name)) {
               if (member.email) {
-                const subject = "[ContentLab] Mentions from " + comment.author + " on \\\"" + contentTitle + "\\\"";
+                const subject = "[ContentLab] Mentions from " + comment.author + " on \\"" + contentTitle + "\\"";
                 const body = "Halo " + member.name + ",\\n\\n" +
-                             comment.author + " menyebut Anda dalam diskusi revisi untuk \\\"" + contentTitle + "\\\":\\n\\n" +
-                             "\\\"" + text + "\\\"\\n\\n" +
+                             comment.author + " menyebut Anda dalam diskusi revisi untuk \\"" + contentTitle + "\\":\\n\\n" +
+                             "\\"" + text + "\\"\\n\\n" +
                              "Silakan cek ContentLab Studio Planner Anda.";
                 MailApp.sendEmail(member.email, subject, body);
               }

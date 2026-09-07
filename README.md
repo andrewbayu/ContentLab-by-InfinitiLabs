@@ -1,57 +1,51 @@
 # ContentLab
 
-ContentLab is a React + TypeScript workspace for content operations, backed by Supabase Postgres. Google Sheets remains available only as a legacy/import integration during the Auth + RLS cutover.
+ContentLab is InfinitiLabs' content operations workspace: plan campaigns, manage production, review content, and track results across clients and brands. Built with React, TypeScript, Vite and Supabase Auth/Postgres.
 
-## Project structure
+## What's new
 
-- Start with [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) for fast repository navigation.
-- `src/` — application code, grouped by components, services, styles, and assets.
-- `integrations/` — external integrations and deployment-side scripts.
-- `docs/` — project notes and durable documentation.
-- `public/` — static files served as-is by Vite.
-- `docs/AUTH_RLS_CUTOVER.md` — step-by-step Supabase Auth and RLS cutover runbook.
+**Focus Queue** turns the overview into an actionable worklist: deadlines first, then reviews and urgent work. Search by task, brand or person, filter overdue/today/review/unplanned work, and open any task directly. The queue respects the existing personal/studio and client/brand scope.
+
+The September upgrade also retires the emergency login bypass, removes persistent workspace snapshots, protects account changes from late network responses, fixes local deadline calculations, and keeps rich-text editor code out of the initial React bundle. See [the audit](docs/AUDIT_2026-09-07.md) for evidence and remaining boundaries.
 
 ## Development
 
+Use Node.js 22.12+.
+
 ```bash
-npm install
+npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
-Before running locally, copy the required environment variables from `.env.example` into a local `.env.local` file.
+Configure the Supabase project and public anon key in `.env.local`. Supabase Auth is mandatory; users need an Auth account mapped to `team_members.auth_user_id`. See [the Auth/RLS runbook](docs/AUTH_RLS_CUTOVER.md). The former `VITE_SUPABASE_AUTH_ENABLED` flag no longer disables authentication.
+
+Workspace data stays in session memory and is fetched again after a page reload. It is cleared on account changes. Supabase manages its own authenticated session persistence. Google Sheets is a legacy/import integration only.
 
 ## Validation
 
 ```bash
-npm run lint
-npm run build
+npm run check                 # lint, regression tests, TypeScript and build
+npx playwright install chromium
+npm run test:browser          # desktop + mobile, synthetic data only
+npm audit
 ```
 
-Currently, two official plugins are available:
+For a deterministic Jakarta calendar check: `TZ=Asia/Jakarta npm test`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+During development, `/tests/browser/preview.html` previews the new dashboard with clearly synthetic fixtures. This is a test harness, not a production route; Vite's production build includes only the application entry.
 
-## React Compiler
+GitHub Actions runs lint, tests, build, browser checks, and the production dependency audit on pull requests.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Project structure
 
-## Expanding the Oxlint configuration
+Start with [PROJECT_MAP.md](docs/PROJECT_MAP.md).
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+- `src/components/` — application views and reusable UI.
+- `src/services/` — Supabase and legacy integration services.
+- `src/utils/` — date calculations and deterministic Focus Queue logic.
+- `tests/` — unit, session, interaction and browser regression coverage.
+- `supabase/` — schema and migration history.
+- `integrations/` — deployment-side integration scripts.
+- `mcp-server/` — ContentLab's Model Context Protocol server.
+- `docs/` — audit findings, operational runbooks and project notes.

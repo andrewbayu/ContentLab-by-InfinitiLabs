@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FocusQueue } from './FocusQueue';
+import { useToday } from '../utils/useToday';
 import { isUserInvolved } from '../services/sheets';
 import { getGeneratedAvatar } from '../utils/avatar';
 import type { ContentItem, Channel, VariablesConfig, TeamMember, NotificationItem } from '../services/sheets';
@@ -67,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const publishedItems = items.filter((item) => item.taskType === 'Content' && item.status === 'Published');
   const publishedCount = items.filter((item) => isComplete(item) || item.status === 'Scheduled').length;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = useToday();
   const overdueItems = items.filter(
     (item) =>
       !isComplete(item) &&
@@ -283,6 +285,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           Studio Overview
         </button>
       </div>
+
+      <FocusQueue key={dashboardTab} items={dashboardTab === 'personal' ? myItems : items} today={todayStr} onEditItem={onEditItem} personal={dashboardTab === 'personal'} />
 
       {/* =========================================
           TAB: WORKSPACE SAYA (PERSONAL VIEW)
