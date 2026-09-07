@@ -19,6 +19,7 @@ import {
   Files,
   ClipboardCheck,
   Bell,
+  BrainCircuit,
 } from 'lucide-react';
 import { getGeneratedAvatar } from '../utils/avatar';
 
@@ -152,6 +153,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               <button className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`} aria-current={activeTab === 'documents' ? 'page' : undefined} onClick={() => handleNavClick('documents')}><FileText className="nav-item-icon" />Documents &amp; Notes</button>
               <button className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} aria-current={activeTab === 'reports' ? 'page' : undefined} onClick={() => handleNavClick('reports')}><Files className="nav-item-icon" />Reports</button>
               <button className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`} aria-current={activeTab === 'analytics' ? 'page' : undefined} onClick={() => handleNavClick('analytics')}><BarChart3 className="nav-item-icon" />Analytics &amp; KPI</button>
+              {(currentUser?.role === 'super' || currentUser?.role === 'team') && <button className={`nav-item ${activeTab === 'strategist' ? 'active' : ''}`} aria-current={activeTab === 'strategist' ? 'page' : undefined} onClick={() => handleNavClick('strategist')}><BrainCircuit className="nav-item-icon" />StrategistAI</button>}
               {currentUser?.role === 'super' && (
                 <>
                   <span className="nav-section-label">Admin</span>
@@ -207,6 +209,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               {activeTab === 'documents' && 'Documents & Notes'}
               {activeTab === 'reports' && 'Reports'}
               {activeTab === 'analytics' && 'Analytics & KPI'}
+              {activeTab === 'strategist' && 'StrategistAI'}
               {activeTab === 'settings' && 'Settings Center'}
             </h2>
           </div>

@@ -1,8 +1,20 @@
 {
-  "rewrites": [
+  "functions": {
+    "api/strategist.ts": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/api/.*",
+      "status": 404
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }

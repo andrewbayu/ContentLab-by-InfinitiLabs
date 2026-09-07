@@ -8,6 +8,10 @@ ContentLab is InfinitiLabs' content operations workspace: plan campaigns, manage
 
 The September upgrade also retires the emergency login bypass, removes persistent workspace snapshots, protects account changes from late network responses, fixes local deadline calculations, and keeps rich-text editor code out of the initial React bundle. See [the audit](docs/AUDIT_2026-09-07.md) for evidence and remaining boundaries.
 
+## StrategistAI
+
+Internal teams have a separate StrategistAI menu with cohort benchmarks, brief readiness, and evidence-backed AI insights and experiment ideas. Generation runs through OpenRouter on a Vercel server function; configure `OPENROUTER_API_KEY` (server-only) and optionally `OPENROUTER_MODEL`, then redeploy. See [setup and methodology](docs/STRATEGIST_AI.md). Client users are denied in both the UI and API.
+
 ## Development
 
 Use Node.js 22.12+.

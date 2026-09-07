@@ -5,6 +5,7 @@ import { LoginPage } from './components/LoginPage';
 
 // Route-level code splitting: each view ships in its own async chunk and is only
 // downloaded when the user first navigates to it. Keeps the initial bundle lean.
+const StrategistView = lazy(() => import('./components/StrategistView').then(m => ({ default: m.StrategistView })));
 const DashboardView = lazy(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
 const ClientPortal = lazy(() => import('./components/ClientPortal').then((m) => ({ default: m.ClientPortal })));
 const KanbanBoard = lazy(() => import('./components/KanbanBoard').then((m) => ({ default: m.KanbanBoard })));
@@ -55,6 +56,8 @@ import {
   isSupabaseDbConfigured,
 } from './services/supabaseDb';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, KpiDefinition, KpiUpdate, DocumentItem, TaskResource, NotificationItem, UserRole } from './services/sheets';
+import type { StrategyIdea } from '../shared/strategist';
+import { internalRole } from '../shared/strategist';
 import { useToday } from './utils/useToday';
 import { resolveMentionedUserIds } from './utils/mentions';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
@@ -107,6 +110,7 @@ function App() {
   const [variablesConfig, setVariablesConfig] = useState<VariablesConfig>(getVariablesConfig());
   const [customTags, setCustomTags] = useState<string[]>(getCustomTags());
   
+  const [strategyDraft, setStrategyDraft] = useState<Partial<ContentItem> | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(isAuthenticated && !initialCache);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -140,6 +144,7 @@ function App() {
   const resetWorkspace = useCallback(() => {
     sessionEpoch.current += 1;
     clearCachedWorkspaceData();
+    setStrategyDraft(null);
     rawSetToasts([]); rawSetPendingWrites(0);
     rawSetItems([]); rawSetTeam([]); rawSetChannels([]); rawSetComments([]); rawSetClients([]);
     rawSetKpiDefinitions([]); rawSetKpiUpdates([]); rawSetDocuments([]); rawSetResources([]); rawSetNotifications([]);
@@ -311,6 +316,7 @@ function App() {
 
 
   useEffect(() => {
+    if (activeTab === 'strategist' && !internalRole(currentUser?.role)) setActiveTab('dashboard');
     if (activeTab === 'settings' && currentUser?.role !== 'super') {
       setActiveTab('dashboard');
     }
@@ -361,6 +367,7 @@ function App() {
   ) => {
     setIsModalOpen(false);
     setSelectedItem(null);
+    setStrategyDraft(null);
     beginWrite();
 
     const isEdit = !!itemPayload.id;
@@ -922,18 +929,21 @@ function App() {
   };
 
   const handleOpenCreateModal = () => {
+    setStrategyDraft(null);
     setSelectedItem(null);
     setInitialStatusForModal(undefined);
     setIsModalOpen(true);
   };
 
   const handleOpenCreateModalWithStatus = (status: ContentItem['status']) => {
+    setStrategyDraft(null);
     setSelectedItem(null);
     setInitialStatusForModal(status);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (item: ContentItem) => {
+    setStrategyDraft(null);
     setSelectedItem(item);
     setInitialStatusForModal(undefined);
     setIsModalOpen(true);
@@ -1006,6 +1016,13 @@ function App() {
   const handleTaskViewChange = (nextView: TaskView) => {
     setTaskView(nextView);
     localStorage.setItem('contentlab_task_view', nextView);
+  };
+
+  const handleStrategyDraft = (idea: StrategyIdea, source: ContentItem) => {
+    if (!internalRole(currentUser?.role)) return;
+    setStrategyDraft({ title: idea.title, format: idea.format as ContentItem['format'], client: source.client, brand: source.brand, channel: source.channel,
+      brief: `Hook: ${idea.hook}\n\nAngle: ${idea.angle}\n\nHipotesis: ${idea.rationale}\n\nMetrik eksperimen: ${idea.metric}\n\nSumber card: ${idea.evidenceIds.map(id => items.find(c => c.id === id)?.title || id).join('; ')}\n\nDraft StrategistAI — tinjau sebelum produksi.` });
+    setSelectedItem(null); setInitialStatusForModal('Idea'); setIsModalOpen(true);
   };
 
   if (isAuthChecking) {
@@ -1212,6 +1229,8 @@ function App() {
           <ReportsView documents={documents} currentUser={currentUser} />
         )}
 
+        {activeTab === 'strategist' && internalRole(currentUser.role) && <StrategistView key={`${currentUser.id}:${scopeKey}`} items={scopedItems} currentUser={currentUser} scopeLabel={scopeLabel} onEditItem={handleOpenEditModal} onDraftIdea={handleStrategyDraft} />}
+
         {activeTab === 'analytics' && (
           <AnalyticsView
             items={scopedItems}
@@ -1264,11 +1283,13 @@ function App() {
             onClose={() => {
               setIsModalOpen(false);
               setSelectedItem(null);
+              setStrategyDraft(null);
             }}
             onSave={handleSaveItem}
             onDelete={handleDeleteItem}
             item={selectedItem}
             initialStatus={initialStatusForModal}
+            initialDraft={strategyDraft}
             team={team}
             channels={channels}
             clients={clients}
