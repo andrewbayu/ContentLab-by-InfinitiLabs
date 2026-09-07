@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { analyzeCards, internalRole, plain, validateReport } from '../shared/strategist.ts';
-import type { StrategyCard } from '../shared/strategist.ts';
+import { analyzeCards, internalRole, plain, validateReport } from '../shared/strategist.js';
+import type { StrategyCard } from '../shared/strategist.js';
+
+// Vercel's standalone function compiler does not load the repository's Node
+// type declarations. Keep the runtime dependency explicit without exposing
+// any environment values to the client bundle.
+declare const process: { env: Record<string, string | undefined> };
 
 const string = { type: 'string' };
 const evidenceIds = { type: 'array', items: string };
