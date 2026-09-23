@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { uploadCoverImage, isCommentForTask } from '../services/sheets';
 import type { ContentItem, TeamMember, Channel, VariablesConfig, CommentItem, ClientBrand, TaskType, TaskResource, DocumentItem } from '../services/sheets';
 import { X, Trash2, Link, Check, RefreshCw, Send, MessageSquare, AtSign, Plus, Eye, ThumbsUp, BarChart2, ImagePlus, FileText, ExternalLink } from 'lucide-react';
@@ -116,6 +116,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [commentText, setCommentText] = useState('');
   const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const initializedFormSession = useRef<string | null>(null);
 
   // Inline creation states
   const [showAddCreatorForm, setShowAddCreatorForm] = useState(false);
@@ -145,6 +146,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   // Update form fields when modal opens or item changes
   useEffect(() => {
+    // Supporting data (team, channels, selected brand) can refresh while the
+    // editor is open. Reinitializing on those reference changes overwrites
+    // unsaved input, so initialize only once for this open/task session.
+    const formSession = `${isOpen ? 'open' : 'closed'}:${item?.id || 'new'}`;
+    if (initializedFormSession.current === formSession) return;
+    initializedFormSession.current = formSession;
+
     if (item) {
       const legacyOwnerMatches = team.filter((member) => member.name.trim().toLowerCase() === item.assignee.trim().toLowerCase());
       setTitle(item.title);
