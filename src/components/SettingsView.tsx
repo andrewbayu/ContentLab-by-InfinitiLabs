@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ClientAccessPicker } from './ClientAccessPicker';
 import { getGlobalScriptUrl, getScriptUrl, hasLocalScriptUrlOverride, saveScriptUrl, validateScriptUrl } from '../services/sheets';
 import { getGeneratedAvatar } from '../utils/avatar';
 import type { TeamMember, Channel, VariablesConfig, ClientBrand, UserRole } from '../services/sheets';
@@ -210,7 +211,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setEditName(member.name);
     setEditEmail(member.email);
     setEditRole(member.role);
-    setEditClient(member.client || '');
+    setEditClient(['all', 'all clients', '*'].includes((member.client || '').trim().toLowerCase()) ? '' : member.client || '');
   };
 
   const handleCancelEditMember = () => {
@@ -219,6 +220,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleSaveMemberEdit = async (member: TeamMember) => {
     if (!editName.trim() || !editEmail.trim()) return;
+    if (editRole === 'client' && (!editClient || editClient === '__none__' || editClient.includes(','))) {
+      addToast('Assign one client for a client account.', 'error');
+      return;
+    }
     setIsSavingMember(true);
     try {
       await onUpdateCreator({
@@ -304,7 +309,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!creatorName.trim() || !creatorEmail.trim() || !creatorPassword.trim() || (creatorRole === 'client' && !creatorClient)) return;
     setIsAddingCreator(true);
     try {
-      await onAddCreator(creatorName.trim(), creatorEmail.trim(), creatorPassword, creatorRole, creatorRole === 'client' ? creatorClient : '');
+      await onAddCreator(creatorName.trim(), creatorEmail.trim(), creatorPassword, creatorRole, creatorRole === 'super' ? '' : creatorClient);
       setCreatorName('');
       setCreatorEmail('');
       setCreatorPassword('');
@@ -949,7 +954,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                               <select
                                 className="form-select"
                                 value={editRole}
-                                onChange={(e) => setEditRole(e.target.value as UserRole)}
+                                onChange={(e) => { setEditRole(e.target.value as UserRole); setEditClient(''); }}
                                 style={{ width: '100%' }}
                               >
                                 <option value="team">Team Member</option>
@@ -960,18 +965,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                             {editRole !== 'super' && (
                               <div>
                                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>Client Access</label>
-                                <select
-                                  className="form-select"
-                                  value={editClient}
-                                  onChange={(e) => setEditClient(e.target.value)}
-                                  style={{ width: '100%' }}
-                                  required={editRole === 'client'}
-                                >
-                                  <option value="">{editRole === 'client' ? 'Assign Client *' : 'All Clients (Default)'}</option>
-                                  {[...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort().map((client) => (
-                                    <option key={client} value={client}>{client}</option>
-                                  ))}
-                                </select>
+                                <ClientAccessPicker value={editClient} onChange={setEditClient} role={editRole} clients={clients} />
                               </div>
                             )}
                           </div>
@@ -1006,7 +1000,7 @@ function deleteTaskMembers(spreadsheet, taskId) {
                                 <span className={`team-role-badge role-${member.role}`}>{member.role === 'super' ? 'Super Admin' : member.role === 'client' ? 'Client' : 'Team Member'}</span>
                               </div>
                               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                {member.email} · <strong style={{ color: '#2563eb' }}>{member.client ? `Access: ${member.client}` : 'Access: All Clients'}</strong>
+                                {member.email} · <strong style={{ color: '#2563eb' }}>{member.client === '__none__' ? 'Access: No clients' : member.client ? `Access: ${member.client}` : 'Access: All Clients'}</strong>
                               </div>
                             </div>
                           </div>
@@ -1053,18 +1047,13 @@ function deleteTaskMembers(spreadsheet, taskId) {
                   required
                 />
                 <input type="password" className="form-input" placeholder="Temporary Password *" value={creatorPassword} onChange={(e) => setCreatorPassword(e.target.value)} minLength={8} required />
-                <select className="form-select" value={creatorRole} onChange={(e) => { const role = e.target.value as UserRole; setCreatorRole(role); }} aria-label="User role">
+                <select className="form-select" value={creatorRole} onChange={(e) => { const role = e.target.value as UserRole; setCreatorRole(role); setCreatorClient(''); }} aria-label="User role">
                   <option value="team">Team Member</option>
                   <option value="client">Client</option>
                   <option value="super">Super Admin</option>
                 </select>
                 {creatorRole !== 'super' && (
-                  <select className="form-select" value={creatorClient} onChange={(e) => setCreatorClient(e.target.value)} aria-label="Assign client" required={creatorRole === 'client'}>
-                    <option value="">{creatorRole === 'client' ? 'Assign Client *' : 'Client Access: All Clients (Default)'}</option>
-                    {[...new Set(clients.filter((entry) => entry.active).map((entry) => entry.client))].sort().map((client) => (
-                      <option key={client} value={client}>{client}</option>
-                    ))}
-                  </select>
+                  <ClientAccessPicker value={creatorClient} onChange={setCreatorClient} role={creatorRole} clients={clients} />
                 )}
                 <button type="submit" className="btn btn-primary" disabled={isAddingCreator}>
                   {isAddingCreator ? 'Saving...' : 'Add User'}

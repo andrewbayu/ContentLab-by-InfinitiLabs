@@ -142,24 +142,23 @@ export function isUserInvolved(item: ContentItem, user: Pick<TeamMember, 'id' | 
 }
 
 export function getAssignedClients(user?: TeamMember): string[] {
-  if (!user || !user.client || user.client.trim() === '' || user.client === 'All' || user.client === '*') {
+  if (!user || !user.client || ['', 'all', 'all clients', '*'].includes(user.client.trim().toLowerCase())) {
     return [];
   }
   return user.client.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-export function hasClientAccess(user: TeamMember, itemClient?: string, itemBrand?: string): boolean {
+export function hasClientAccess(user: TeamMember, itemClient?: string, _itemBrand?: string): boolean {
   if (!user) return false;
   if (user.role === 'super') return true;
   const assigned = getAssignedClients(user);
-  if (assigned.length === 0) return true; // No restriction specified (has access to all)
+  if (assigned.length === 0) return user.role !== 'client';
 
   const targetClient = (itemClient || '').trim().toLowerCase();
-  const targetBrand = (itemBrand || '').trim().toLowerCase();
 
   return assigned.some((clientName) => {
     const norm = clientName.toLowerCase();
-    return (targetClient && targetClient.includes(norm)) || (targetBrand && targetBrand.includes(norm));
+    return norm !== '__none__' && !!targetClient && targetClient === norm;
   });
 }
 
@@ -1145,6 +1144,10 @@ export async function createComment(
 export async function createTeamMember(
   member: Omit<TeamMember, 'id' | 'avatar' | 'role'> & { role?: UserRole }
 ): Promise<TeamMember> {
+  const { isSupabaseDbConfigured, createSupabaseTeamMember } = await import('./supabaseDb');
+  if (isSupabaseDbConfigured() && localStorage.getItem('contentlab_db_provider') === 'supabase') {
+    return createSupabaseTeamMember(member);
+  }
   const url = getScriptUrl();
   const newMember: TeamMember = {
     ...member,
@@ -1180,6 +1183,10 @@ export async function createTeamMember(
 }
 
 export async function updateTeamMember(member: TeamMember): Promise<TeamMember> {
+  const { isSupabaseDbConfigured, updateSupabaseTeamMember } = await import('./supabaseDb');
+  if (isSupabaseDbConfigured() && localStorage.getItem('contentlab_db_provider') === 'supabase') {
+    return updateSupabaseTeamMember(member);
+  }
   const url = getScriptUrl();
   const { content, team, channels, comments, clients, kpiDefinitions, kpiUpdates, documents } = getLocalData();
   const updatedTeam = team.map((t) => (t.id === member.id ? member : t));

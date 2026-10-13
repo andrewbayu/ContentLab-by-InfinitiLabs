@@ -964,7 +964,7 @@ function App() {
 
   const scopedItems = useMemo(() => items.filter((item) => {
     if (currentUser?.role === 'client') return item.client === currentUser.client;
-    if (currentUser && currentUser.role === 'team' && !hasClientAccess(currentUser, item.client, item.brand) && !isUserInvolved(item, currentUser)) {
+    if (currentUser && currentUser.role === 'team' && !hasClientAccess(currentUser, item.client, item.brand)) {
       return false;
     }
     if (selectedBrand) return item.client === selectedBrand.client && item.brand === selectedBrand.brand;
@@ -1067,7 +1067,7 @@ function App() {
       isMock={isMock}
       currentUser={currentUser}
       onLogout={handleLogout}
-      clients={clients}
+      clients={clients.filter((entry) => hasClientAccess(currentUser, entry.client, entry.brand))}
       scopeKey={scopeKey}
       onScopeChange={handleScopeChange}
       syncStatus={pendingWrites > 0 ? 'saving' : isSyncing ? 'syncing' : 'saved'}
@@ -1215,10 +1215,10 @@ function App() {
 
         {activeTab === 'documents' && (
           <DocumentsView
-            documents={documents}
+            documents={documents.filter((entry) => (entry.visibility === 'personal' && entry.ownerId === currentUser.id) || hasClientAccess(currentUser, entry.client, entry.brand))}
             currentUser={currentUser}
-            clients={clients}
-            tasks={items}
+            clients={clients.filter((entry) => hasClientAccess(currentUser, entry.client, entry.brand))}
+            tasks={scopedItems}
             onCreateDocument={handleCreateDocument}
             onUpdateDocument={handleUpdateDocument}
             onDeleteDocument={handleDeleteDocument}
@@ -1226,7 +1226,7 @@ function App() {
         )}
 
         {activeTab === 'reports' && (
-          <ReportsView documents={documents} currentUser={currentUser} />
+          <ReportsView documents={documents.filter((entry) => hasClientAccess(currentUser, entry.client, entry.brand))} currentUser={currentUser} />
         )}
 
         {activeTab === 'strategist' && internalRole(currentUser.role) && <StrategistView key={`${currentUser.id}:${scopeKey}`} items={scopedItems} currentUser={currentUser} scopeLabel={scopeLabel} onEditItem={handleOpenEditModal} onDraftIdea={handleStrategyDraft} />}
@@ -1234,8 +1234,8 @@ function App() {
         {activeTab === 'analytics' && (
           <AnalyticsView
             items={scopedItems}
-            clients={clients}
-            definitions={kpiDefinitions}
+            clients={clients.filter((entry) => hasClientAccess(currentUser, entry.client, entry.brand))}
+            definitions={kpiDefinitions.filter((entry) => hasClientAccess(currentUser, entry.client, entry.brand))}
             updates={kpiUpdates}
             scopeKey={scopeKey}
             scopeLabel={scopeLabel}
@@ -1292,7 +1292,7 @@ function App() {
             initialDraft={strategyDraft}
             team={team}
             channels={channels}
-            clients={clients}
+            clients={clients.filter((entry) => hasClientAccess(currentUser, entry.client, entry.brand))}
             defaultClientBrand={selectedBrand}
             variablesConfig={variablesConfig}
             customTags={allAvailableTags}

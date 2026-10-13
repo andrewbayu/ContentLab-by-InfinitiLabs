@@ -109,10 +109,24 @@ function doPost(e) {
     else if (action === "createTeamMember") {
       const teamSheet = sheet.getSheetByName("Team");
       const member = postData.member;
+      teamSheet.getRange(1, 7).setValue("client");
       teamSheet.appendRow([
         member.id, member.name, member.email, member.avatar,
-        member.password || "", member.role || "team"
+        member.password || "", member.role || "team", member.client || ""
       ]);
+      result = { success: true, member: member };
+    }
+    else if (action === "updateTeamMember") {
+      const teamSheet = sheet.getSheetByName("Team");
+      const member = postData.member;
+      const rows = teamSheet.getDataRange().getValues();
+      const index = rows.findIndex(function(row, i) { return i > 0 && String(row[0]) === String(member.id); });
+      if (index < 0) throw new Error("Team member not found");
+      teamSheet.getRange(1, 7).setValue("client");
+      teamSheet.getRange(index + 1, 1, 1, 7).setValues([[
+        member.id, member.name, member.email, member.avatar || rows[index][3],
+        member.password || rows[index][4], member.role || "team", member.role === "super" ? "" : member.client || ""
+      ]]);
       result = { success: true, member: member };
     }
     else if (action === "createChannel") {
